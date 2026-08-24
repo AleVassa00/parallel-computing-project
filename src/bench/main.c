@@ -2,9 +2,9 @@
  *
  *   mpirun -np P ./bin/matmul_mpi -M .. -N .. -k .. --pr .. --pc ..
  *
- * Ogni processo esegue lo stesso codice e genera da se' il proprio blocco di
- * A: non esiste una fase di distribuzione della matrice, ed e' coerente con
- * la consegna, che esclude il preprocessamento dei dati dalla misura. */
+ * La modalita' predefinita genera A localmente su ciascun processo; la
+ * modalita' alternativa genera A globale sul grid rank 0 e la distribuisce.
+ * Entrambi i percorsi sono preprocessing, escluso dalla misura del kernel. */
 
 #include <mpi.h>
 
@@ -22,6 +22,11 @@
 #include "mpi/grid.h"
 #include "mpi/matmul_mpi.h"
 
+typedef enum {
+    A_MODE_LOCAL,
+    A_MODE_GLOBAL
+} a_mode_t;
+
 typedef struct {
     int M, N, k;
     int pr, pc;       /* 0 = forma della griglia scelta automaticamente */
@@ -29,11 +34,19 @@ typedef struct {
     uint64_t seed;
     int check;
     int csv;
+    a_mode_t a_mode;
 } opts_t;
 
 static const char *CSV_HEADER =
-    "kernel,scalar,M,N,k,P,pr,pc,reps,t_mean_s,t_median_s,t_min_s,gflops,"
-    "t_bcast_s,t_local_s,t_reduce_s,rel_err";
+    "kernel,scalar,a_mode,M,N,k,P,pr,pc,reps,"
+    "t_local_mean_s,t_local_median_s,t_local_min_s,"
+    "t_reduce_mean_s,t_total_mean_s,t_bcast_setup_s,"
+    "gflops,gflops_total,rel_err";
+
+static const char *a_mode_name(a_mode_t mode)
+{
+    return mode == A_MODE_GLOBAL ? "global" : "local";
+}
 
 static void usage(const char *prog)
 {
@@ -47,6 +60,8 @@ static void usage(const char *prog)
     printf("  --warmup <int>  untimed warm-up repetitions      (default 2)\n");
     printf("  --seed <u64>    generator seed                   (default %llu)\n",
            (unsigned long long)GEN_DEFAULT_SEED);
+    printf("  --a-mode <mode> generate A locally or distribute global A\n");
+    printf("                    local (default), global\n");
     printf("  --check         validate against the serial reference\n");
     printf("  --csv           print one CSV row instead of the report\n");
     printf("  --csv-header    print the CSV header and exit\n");
@@ -76,6 +91,7 @@ static void parse_args(int argc, char **argv, opts_t *o, int rank)
     o->seed = GEN_DEFAULT_SEED;
     o->check = 0;
     o->csv = 0;
+    o->a_mode = A_MODE_LOCAL;
 
     for (i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-M"))
@@ -96,6 +112,17 @@ static void parse_args(int argc, char **argv, opts_t *o, int rank)
             if (i + 1 >= argc)
                 die("option --seed requires a value");
             o->seed = strtoull(argv[++i], NULL, 10);
+        } else if (!strcmp(argv[i], "--a-mode")) {
+            const char *mode;
+            if (i + 1 >= argc)
+                die("option --a-mode requires a value");
+            mode = argv[++i];
+            if (!strcmp(mode, "local"))
+                o->a_mode = A_MODE_LOCAL;
+            else if (!strcmp(mode, "global"))
+                o->a_mode = A_MODE_GLOBAL;
+            else
+                die("invalid --a-mode '%s' (expected local or global)", mode);
         } else if (!strcmp(argv[i], "--check"))
             o->check = 1;
         else if (!strcmp(argv[i], "--csv"))
@@ -142,9 +169,11 @@ int main(int argc, char **argv)
     opts_t o;
     grid_t g;
     layout_t lay;
-    scalar_t *A_loc, *X_loc, *Ypart, *Y_loc = NULL;
-    double *t_tot, *t_bc, *t_lo, *t_re, *sorted;
-    double mean, median, tmin, gflops, rel_err = -1.0;
+    scalar_t *A_loc, *A_global = NULL, *X_loc, *Ypart, *Y_loc = NULL;
+    double *t_tot, *t_lo, *t_re, *sorted;
+    double mean_local, median_local, min_local;
+    double mean_reduce, mean_total, gflops, gflops_total, rel_err = -1.0;
+    double t_bcast_setup_local, t_bcast_setup = 0.0;
     int world_rank, world_size, r;
 
     MPI_Init(&argc, &argv);
@@ -156,7 +185,7 @@ int main(int argc, char **argv)
     /* 
      * Se l'utente non ha specificato la forma della griglia, la calcolo in modo
      * da renderla il più quadrata possibile. Se invece ha specificato solo una
-     * dimensione, calcolo l'altra in modo da usare tutti i processi. */
+     * dimensione, calcolo l'altra in modo da usare tutti i processi.
     */
     if (o.pr == 0 && o.pc == 0)
         grid_default_shape(world_size, &o.pr, &o.pc);
@@ -172,6 +201,8 @@ int main(int argc, char **argv)
     * globali e dalla forma della griglia.
     */
     grid_create(MPI_COMM_WORLD, o.pr, o.pc, &g);
+
+    /* Stabiliamo le porzioni di ogni matrice per il processo corrente.*/
     layout_init(&lay, &g, o.M, o.N, o.k);
 
     /* Avviso se la griglia e' piu' grande della matrice: alcuni processi non
@@ -189,19 +220,34 @@ int main(int argc, char **argv)
     if (g.my_col == 0)
         Y_loc = xmalloc((size_t)lay.m_loc * lay.ldy * sizeof *Y_loc);
 
-    /* Generazione locale: ogni processo scrive il proprio blocco e con esso
-     * fa il first touch delle proprie pagine, che finiscono cosi' sul nodo
-     * NUMA del core su cui gira. */
-    gen_block_A(A_loc, lay.lda, lay.m_loc, lay.n_loc,
-                lay.row0, lay.col0, lay.N, o.seed);
+    if (o.a_mode == A_MODE_LOCAL) {
+        /* Modalita' predefinita: ogni processo genera direttamente il proprio
+         * blocco e fa anche il first touch delle proprie pagine. */
+        gen_block_A(A_loc, lay.lda, lay.m_loc, lay.n_loc,
+                    lay.row0, lay.col0, lay.N, o.seed);
+    } else {
+        /* Modalita' alternativa: soltanto il grid rank 0 materializza la
+         * matrice globale. Lo stesso generatore e gli stessi indici globali
+         * garantiscono valori identici alla generazione locale. */
+        if (g.rank == 0) {
+            A_global = xmalloc((size_t)lay.M * (size_t)lay.N * sizeof *A_global);
+            gen_block_A(A_global, lay.N, lay.M, lay.N, 0, 0, lay.N, o.seed);
+        }
+        distribute_global_A(&g, &lay, A_global, A_loc);
+        xfree(A_global);
+        A_global = NULL;
+    }
 
     /* X e' collocata sulla riga 0 della griglia: solo quei processi la
-     * generano, gli altri la ricevono dal broadcast dentro mpi_matmul. */
+     * generano; il singolo broadcast di setup la replica lungo le colonne. */
     if (g.my_row == 0)
         gen_block_X(X_loc, lay.ldx, lay.n_loc, lay.k, lay.col0, o.seed);
 
+    t_bcast_setup_local = mpi_distribute_X(&g, &lay, X_loc);
+    MPI_Reduce(&t_bcast_setup_local, &t_bcast_setup, 1, MPI_DOUBLE,
+               MPI_MAX, 0, g.grid);
+
     t_tot = xmalloc((size_t)o.reps * sizeof *t_tot);
-    t_bc = xmalloc((size_t)o.reps * sizeof *t_bc);
     t_lo = xmalloc((size_t)o.reps * sizeof *t_lo);
     t_re = xmalloc((size_t)o.reps * sizeof *t_re);
     sorted = xmalloc((size_t)o.reps * sizeof *sorted);
@@ -216,7 +262,6 @@ int main(int argc, char **argv)
         MPI_Barrier(g.grid);
         mpi_matmul(&g, &lay, A_loc, X_loc, Ypart, Y_loc, &tt);
         t_tot[r] = tt.t_total;
-        t_bc[r] = tt.t_bcast;
         t_lo[r] = tt.t_local;
         t_re[r] = tt.t_reduce;
     }
@@ -225,7 +270,6 @@ int main(int argc, char **argv)
      * rank 0: l'operazione e' finita quando ha finito l'ultimo. Le riduzioni
      * si fanno alla fine, su tutto il vettore, per non disturbare le misure. */
     MPI_Reduce(g.rank == 0 ? MPI_IN_PLACE : t_tot, t_tot, o.reps, MPI_DOUBLE, MPI_MAX, 0, g.grid);
-    MPI_Reduce(g.rank == 0 ? MPI_IN_PLACE : t_bc, t_bc, o.reps, MPI_DOUBLE, MPI_MAX, 0, g.grid);
     MPI_Reduce(g.rank == 0 ? MPI_IN_PLACE : t_lo, t_lo, o.reps, MPI_DOUBLE, MPI_MAX, 0, g.grid);
     MPI_Reduce(g.rank == 0 ? MPI_IN_PLACE : t_re, t_re, o.reps, MPI_DOUBLE, MPI_MAX, 0, g.grid);
 
@@ -233,39 +277,50 @@ int main(int argc, char **argv)
         rel_err = check_against_serial(&g, &lay, Y_loc, o.seed);
 
     if (g.rank == 0) {
-        memcpy(sorted, t_tot, (size_t)o.reps * sizeof *sorted);
+        memcpy(sorted, t_lo, (size_t)o.reps * sizeof *sorted);
         qsort(sorted, (size_t)o.reps, sizeof *sorted, cmp_double);
-        mean = vec_mean(t_tot, o.reps);
-        median = (o.reps % 2) ? sorted[o.reps / 2]
-                              : 0.5 * (sorted[o.reps / 2 - 1] + sorted[o.reps / 2]);
-        tmin = sorted[0];
+        mean_local = vec_mean(t_lo, o.reps);
+        median_local = (o.reps % 2) ? sorted[o.reps / 2]
+                                    : 0.5 * (sorted[o.reps / 2 - 1] + sorted[o.reps / 2]);
+        min_local = sorted[0];
+        mean_reduce = vec_mean(t_re, o.reps);
+        mean_total = vec_mean(t_tot, o.reps);
 
-        /* metrica imposta dalla consegna: FLOPS = 2*M*N*k / T,
-         * in doppia precisione per non troncare a M = N = 40000 */
-        gflops = 2.0 * (double)o.M * (double)o.N * (double)o.k / median / 1.0e9;
+        /* Metrica ufficiale: T e' la MEDIA, sulle repetition, del massimo
+         * tempo di SOLO local_gemm fra tutti i processi. */
+        gflops = 2.0 * (double)o.M * (double)o.N * (double)o.k
+                  / mean_local / 1.0e9;
+        gflops_total = 2.0 * (double)o.M * (double)o.N * (double)o.k
+                        / mean_total / 1.0e9;
 
         if (o.csv) {
-            printf("%s,%s,%d,%d,%d,%d,%d,%d,%d,%.9e,%.9e,%.9e,%.6f,%.9e,%.9e,%.9e,%.3e\n",
-                   kernel_name(), SCALAR_NAME, o.M, o.N, o.k, g.nprocs, g.pr, g.pc,
-                   o.reps, mean, median, tmin, gflops,
-                   vec_mean(t_bc, o.reps), vec_mean(t_lo, o.reps), vec_mean(t_re, o.reps),
-                   rel_err);
+            printf("%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,"
+                   "%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.6f,%.6f,%.3e\n",
+                   kernel_name(), SCALAR_NAME, a_mode_name(o.a_mode),
+                   o.M, o.N, o.k, g.nprocs, g.pr, g.pc, o.reps,
+                   mean_local, median_local, min_local,
+                   mean_reduce, mean_total, t_bcast_setup,
+                   gflops, gflops_total, rel_err);
         } else {
             double bytes_A = (double)o.M * o.N * sizeof(scalar_t);
-            printf("matmul_mpi  M=%d N=%d k=%d  grid=%dx%d (P=%d)  %s  kernel=%s\n",
-                   o.M, o.N, o.k, g.pr, g.pc, g.nprocs, SCALAR_NAME, kernel_name());
+            printf("matmul_mpi  M=%d N=%d k=%d  grid=%dx%d (P=%d)  %s  kernel=%s  A=%s\n",
+                   o.M, o.N, o.k, g.pr, g.pc, g.nprocs, SCALAR_NAME,
+                   kernel_name(), a_mode_name(o.a_mode));
             printf("  local block  A %dx%d   X %dx%d   Y %dx%d      A total %.1f MiB\n",
                    lay.m_loc, lay.n_loc, lay.n_loc, lay.k, lay.m_loc, lay.k,
                    bytes_A / 1048576.0);
             printf("  reps=%d warmup=%d seed=%llu\n",
                    o.reps, o.warmup, (unsigned long long)o.seed);
-            printf("  time (max over ranks)   mean %.3f ms   median %.3f ms   min %.3f ms\n",
-                   mean * 1e3, median * 1e3, tmin * 1e3);
-            printf("  phases (mean of max)    bcast %.3f ms   local %.3f ms   reduce %.3f ms\n",
-                   vec_mean(t_bc, o.reps) * 1e3, vec_mean(t_lo, o.reps) * 1e3,
-                   vec_mean(t_re, o.reps) * 1e3);
-            printf("  performance             %.3f GFLOPS  (2*M*N*k = %.3f GFLOP)\n",
-                   gflops, 2.0 * o.M * o.N * o.k / 1e9);
+            printf("  local_gemm (max ranks)  mean %.3f ms   median %.3f ms   min %.3f ms\n",
+                   mean_local * 1e3, median_local * 1e3, min_local * 1e3);
+            printf("  phases (mean of max)    local %.3f ms   reduce %.3f ms   total %.3f ms\n",
+                   mean_local * 1e3, mean_reduce * 1e3, mean_total * 1e3);
+            printf("  setup                    X bcast %.3f ms (excluded from benchmark)\n",
+                   t_bcast_setup * 1e3);
+            printf("  performance             compute-only %.3f GFLOPS   total %.3f GFLOPS\n",
+                   gflops, gflops_total);
+            printf("                          (2*M*N*k = %.3f GFLOP; official T = local mean)\n",
+                   2.0 * (double)o.M * (double)o.N * (double)o.k / 1e9);
             if (o.check)
                 printf("  validation              relative L2 error %.3e   [%s]\n",
                        rel_err, (rel_err <= SCALAR_CHECK_TOL) ? "PASS" : "FAIL");
@@ -274,11 +329,11 @@ int main(int argc, char **argv)
     }
 
     xfree(A_loc);
+    xfree(A_global);
     xfree(X_loc);
     xfree(Ypart);
     xfree(Y_loc);
     xfree(t_tot);
-    xfree(t_bc);
     xfree(t_lo);
     xfree(t_re);
     xfree(sorted);

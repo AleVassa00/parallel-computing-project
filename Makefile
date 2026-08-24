@@ -72,17 +72,21 @@ $(TESTBIN): test/test_index.c src/index/index.c
 test: $(TESTBIN)
 	./$(TESTBIN)
 
-# Validazione: taglie volutamente NON divisibili per il numero di processi,
-# cosi' i blocchi risultano disuguali ed eventuali off-by-one emergono.
-# La stessa Y deve uscire da tutte le forme di griglia.
+# Validazione delle due modalita' di A sulle forme di griglia e sui k richiesti.
+# Le taglie 301x173 sono volutamente non divisibili per 2 e 4, cosi' i blocchi
+# risultano disuguali ed eventuali off-by-one emergono.
 check: all
 	./$(TESTBIN)
-	mpirun -np 1 $(MPIFLAGS) ./$(BIN) -M 301 -N 173 -k 3  --pr 1 --pc 1 --check --reps 2
-	mpirun -np 4 $(MPIFLAGS) ./$(BIN) -M 301 -N 173 -k 6  --pr 1 --pc 4 --check --reps 2
-	mpirun -np 4 $(MPIFLAGS) ./$(BIN) -M 301 -N 173 -k 6  --pr 4 --pc 1 --check --reps 2
-	mpirun -np 4 $(MPIFLAGS) ./$(BIN) -M 301 -N 173 -k 8  --pr 2 --pc 2 --check --reps 2
-	mpirun -np 3 $(MPIFLAGS) ./$(BIN) -M 301 -N 173 -k 32 --pr 3 --pc 1 --check --reps 2
-	mpirun -np 4 $(MPIFLAGS) ./$(BIN) -M 64  -N 512 -k 20 --pr 2 --pc 2 --check --reps 2
+	mpirun -np 1 $(MPIFLAGS) ./$(BIN) -M 257 -N 257 -k 3  --pr 1 --pc 1 --a-mode local  --check --reps 2
+	mpirun -np 1 $(MPIFLAGS) ./$(BIN) -M 257 -N 257 -k 3  --pr 1 --pc 1 --a-mode global --check --reps 2
+	mpirun -np 4 $(MPIFLAGS) ./$(BIN) -M 301 -N 173 -k 6  --pr 1 --pc 4 --a-mode local  --check --reps 2
+	mpirun -np 4 $(MPIFLAGS) ./$(BIN) -M 301 -N 173 -k 6  --pr 1 --pc 4 --a-mode global --check --reps 2
+	mpirun -np 4 $(MPIFLAGS) ./$(BIN) -M 301 -N 173 -k 8  --pr 4 --pc 1 --a-mode local  --check --reps 2
+	mpirun -np 4 $(MPIFLAGS) ./$(BIN) -M 301 -N 173 -k 8  --pr 4 --pc 1 --a-mode global --check --reps 2
+	mpirun -np 4 $(MPIFLAGS) ./$(BIN) -M 301 -N 173 -k 20 --pr 2 --pc 2 --a-mode local  --check --reps 2
+	mpirun -np 4 $(MPIFLAGS) ./$(BIN) -M 301 -N 173 -k 20 --pr 2 --pc 2 --a-mode global --check --reps 2
+	mpirun -np 4 $(MPIFLAGS) ./$(BIN) -M 64  -N 512 -k 32 --pr 2 --pc 2 --a-mode local  --check --reps 2
+	mpirun -np 4 $(MPIFLAGS) ./$(BIN) -M 64  -N 512 -k 32 --pr 2 --pc 2 --a-mode global --check --reps 2
 
 clean:
 	rm -rf $(OBJDIR) bin

@@ -19,8 +19,7 @@ void *xmalloc(size_t bytes)
      * processi che indici globali). Si alloca comunque il minimo: il puntatore
      * resta valido, e nessun percorso deve preoccuparsi di aritmetica su NULL
      * o di buffer nulli passati alle collettive con count == 0. */
-    if (bytes == 0)
-        bytes = 1;
+    if (bytes == 0) bytes = 1;
 
     /* aligned_alloc esige una dimensione multipla dell'allineamento */
     bytes = (bytes + SCPA_ALIGN - 1) / SCPA_ALIGN * SCPA_ALIGN;
