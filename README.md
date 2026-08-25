@@ -17,11 +17,28 @@ Università degli Studi di Roma Tor Vergata
 ```bash
 make                # bin/matmul_mpi e bin/test_index
 make test           # test delle funzioni indice (non richiede MPI)
-make check          # validazione MPI contro il seriale su piu' forme di griglia
+make check          # check-cxx + validazione MPI contro il seriale
+make check-cxx      # kernel.h e util.h restano utilizzabili da nvcc
 make PREC=float check # stessa matrice di validazione in singola precisione
 make check-padding  # --a-mode global con lda = n_loc + 8
 make KERNEL=<nome>  # seleziona src/kernel/<nome>.c come local_gemm
 ```
+
+Ogni configurazione ha un binario con nome proprio, cosi' una build non puo'
+sovrascriverne un'altra e far misurare in float una campagna che si credeva in
+double. Il default (double, `scheme_a`) resta `bin/matmul_mpi`; ogni scostamento
+aggiunge un suffisso:
+
+| comando | binario |
+|---|---|
+| `make` | `bin/matmul_mpi` |
+| `make PREC=float` | `bin/matmul_mpi-float` |
+| `make FORCE_GENERIC_K=1` | `bin/matmul_mpi-generic` |
+| `make TEST_A_PADDING=8` | `bin/matmul_mpi-pad8` |
+| `make KERNEL=cuda` | `bin/matmul_mpi-cuda` |
+
+La riga finale di `make` ricorda sempre quale binario e' stato prodotto e con
+quali variabili.
 
 Esecuzione:
 
@@ -52,6 +69,21 @@ Una invocazione del prodotto MPI esegue, nell'ordine, `MPI_Bcast` della fetta
 di X lungo il column communicator, `local_gemm`, e `MPI_Reduce(MPI_SUM)` lungo
 il row communicator. Generazione/distribuzione di A resta preprocessing.
 
+Il kernel locale ha un ciclo di vita in tre fasi, perche' A non cambia mai fra
+un'invocazione e l'altra mentre X e Y cambiano sempre:
+
+```c
+kern = local_gemm_create(m_loc, n_loc, k, A_loc, lda);  /* preprocessing, non cronometrato */
+local_gemm(kern, X_loc, ldx, Ypart, ldy);               /* regione cronometrata */
+local_gemm_destroy(kern);
+```
+
+Per `scheme_a` create/destroy si limitano a registrare forma e puntatore. Per
+il backend CUDA `create` sara' la `cudaMemcpy` H2D di A in VRAM, che deve
+avvenire una volta sola: la consegna esclude dalla misura il tempo di
+trasferimento da e verso la scheda, e con A dell'ordine dei GB una copia per
+invocazione misurerebbe il PCIe, non la GPU.
+
 Per ogni repetition si prende separatamente il massimo fra i rank dei tempi di
 broadcast, calcolo locale, reduce e totale. Il totale e' misurato direttamente
 dall'inizio del broadcast alla fine della reduce. Le metriche sono:
@@ -65,11 +97,9 @@ gflops_compute = 2*M*N*k / mean(max_rank(t_local)) / 1e9
 per ogni altro valore. Per un microbenchmark sullo stesso problema:
 
 ```bash
-make FORCE_GENERIC_K=0
-mpirun -np 4 ./bin/matmul_mpi -M 8000 -N 8000 -k 8 --pr 2 --pc 2 --csv
-
-make FORCE_GENERIC_K=1
-mpirun -np 4 ./bin/matmul_mpi -M 8000 -N 8000 -k 8 --pr 2 --pc 2 --csv
+make FORCE_GENERIC_K=1        # i due binari coesistono, non serve ricompilare
+mpirun -np 4 ./bin/matmul_mpi         -M 8000 -N 8000 -k 8 --pr 2 --pc 2 --csv
+mpirun -np 4 ./bin/matmul_mpi-generic -M 8000 -N 8000 -k 8 --pr 2 --pc 2 --csv
 ```
 
 ## Struttura
@@ -83,4 +113,4 @@ mpirun -np 4 ./bin/matmul_mpi -M 8000 -N 8000 -k 8 --pr 2 --pc 2 --csv
 | `src/kernel` | `local_gemm`, un file per implementazione |
 | `src/mpi` | griglia cartesiana, distribuzione, algoritmo `Y = AX` |
 | `src/bench` | driver di misura e validazione |
-| `test` | test isolato delle funzioni indice |
+| `test` | test isolato delle funzioni indice, probe C++ dell'interfaccia |

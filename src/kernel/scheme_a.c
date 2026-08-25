@@ -31,6 +31,8 @@
 
 #include <stddef.h>
 
+#include "common/util.h"
+
 /* Ampiezza del blocco di colonne tenuto negli accumulatori.
  * 32 copre tutti i k del collaudo (3, 6, 8, 20, 32): in quei casi il ciclo
  * su c0 e' degenere e A viene letta una volta sola. */
@@ -127,11 +129,51 @@ DEFINE_FIXED_KERNEL(32, COLS_32)
 
 #endif /* FORCE_GENERIC_K */
 
-void local_gemm(int m, int n, int k,
-                const scalar_t *restrict A, int lda,
-                const scalar_t *restrict X, int ldx,
-                scalar_t *restrict Y, int ldy)
+/* Stato del backend.
+ *
+ * Per lo schema A scalare non c'e' nulla da preparare: A e' gia' nella memoria
+ * del processo e il kernel la legge direttamente, quindi il contesto si limita
+ * a registrare forma e puntatore. Esiste comunque, e con la stessa interfaccia
+ * degli altri backend, perche' e' qui che il backend CUDA terra' il puntatore
+ * alla copia di A in VRAM: da quel lato create() e' una cudaMemcpy H2D che
+ * deve avvenire UNA volta sola, fuori dalla regione cronometrata. */
+struct local_gemm_ctx {
+    int m, n, k;
+    int lda;
+    const scalar_t *A;
+};
+
+local_gemm_t *local_gemm_create(int m, int n, int k,
+                                const scalar_t *A, int lda)
 {
+    local_gemm_t *ctx;
+
+    if (m < 0 || n < 0 || k < 0)
+        die("local_gemm_create: invalid local block %dx%d with k=%d", m, n, k);
+    if (lda < n)
+        die("local_gemm_create: lda %d is smaller than n %d", lda, n);
+    if (n > 0 && m > 0 && A == NULL)
+        die("local_gemm_create: A is NULL for a non-empty %dx%d block", m, n);
+
+    ctx = xmalloc(sizeof *ctx);
+    ctx->m = m;
+    ctx->n = n;
+    ctx->k = k;
+    ctx->lda = lda;
+    ctx->A = A;
+    return ctx;
+}
+
+void local_gemm(local_gemm_t *ctx,
+                const scalar_t *SCPA_RESTRICT X, int ldx,
+                scalar_t *SCPA_RESTRICT Y, int ldy)
+{
+    /* Copie locali: il puntatore ad A torna a essere restrict all'interno di
+     * questa funzione, cosi' i kernel specializzati ricevono la stessa
+     * garanzia di non aliasing che avevano quando A era un parametro. */
+    const scalar_t *SCPA_RESTRICT A = ctx->A;
+    const int m = ctx->m, n = ctx->n, k = ctx->k, lda = ctx->lda;
+
 #ifdef FORCE_GENERIC_K
     kernel_generic(m, n, k, A, lda, X, ldx, Y, ldy);
 #else
@@ -156,6 +198,13 @@ void local_gemm(int m, int n, int k,
         break;
     }
 #endif
+}
+
+void local_gemm_destroy(local_gemm_t *ctx)
+{
+    /* Nessuna risorsa esterna da rilasciare: A appartiene al chiamante.
+     * Il backend CUDA fara' qui la cudaFree della copia in VRAM. */
+    xfree(ctx);
 }
 
 const char *kernel_name(void)

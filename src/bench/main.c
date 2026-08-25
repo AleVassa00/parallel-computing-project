@@ -207,6 +207,7 @@ int main(int argc, char **argv)
     grid_t g;
     layout_t lay;
     scalar_t *A_loc, *A_global = NULL, *X_loc, *Ypart, *Y_loc = NULL;
+    local_gemm_t *kern;
     double *t_bc, *t_lo, *t_re, *t_tot, *sorted;
     double mean_bcast, mean_local, mean_reduce, mean_total;
     double median_total, min_total, gflops, gflops_compute, rel_err = -1.0;
@@ -284,6 +285,15 @@ int main(int argc, char **argv)
         A_global = NULL;
     }
 
+    /* Preparazione del backend: e' PREPROCESSING, quindi sta fuori dalla
+     * regione cronometrata. Va dopo che A_loc e' stata popolata, perche' e'
+     * qui che un backend CUDA copierebbe A in VRAM una volta sola (la
+     * consegna esclude dalla misura i trasferimenti da e verso la scheda).
+     * Forma e leading dimension vengono dal layout una volta sola: il kernel
+     * non puo' piu' essere invocato con dimensioni diverse da quelle con cui
+     * A e' stata preparata. */
+    kern = local_gemm_create(lay.m_loc, lay.n_loc, lay.k, A_loc, lay.lda);
+
     /* X e' collocata sulla riga 0 della griglia: solo quei processi la
      * generano. Ogni mpi_matmul la replica lungo le colonne come prima fase
      * del prodotto distribuito. */
@@ -297,14 +307,14 @@ int main(int argc, char **argv)
     sorted = xmalloc((size_t)o.reps * sizeof *sorted);
 
     for (r = 0; r < o.warmup; r++)
-        mpi_matmul(&g, &lay, A_loc, X_loc, Ypart, Y_loc, NULL);
+        mpi_matmul(&g, &lay, kern, X_loc, Ypart, Y_loc, NULL);
 
     for (r = 0; r < o.reps; r++) {
         matmul_time_t tt;
         /* barriera prima di ogni ripetizione: senza, un processo in anticipo
          * comincerebbe a cronometrare mentre gli altri sono ancora indietro */
         MPI_Barrier(g.grid);
-        mpi_matmul(&g, &lay, A_loc, X_loc, Ypart, Y_loc, &tt);
+        mpi_matmul(&g, &lay, kern, X_loc, Ypart, Y_loc, &tt);
         t_bc[r] = tt.t_bcast;
         t_tot[r] = tt.t_total;
         t_lo[r] = tt.t_local;
@@ -377,6 +387,8 @@ int main(int argc, char **argv)
         fflush(stdout);
     }
 
+    /* prima il backend, poi la memoria di A: il contesto la referenzia */
+    local_gemm_destroy(kern);
     xfree(A_loc);
     xfree(A_global);
     xfree(X_loc);

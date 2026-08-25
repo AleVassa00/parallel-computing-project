@@ -2,10 +2,8 @@
 
 #include <stddef.h>
 
-#include "kernel/kernel.h"
-
 void mpi_matmul(const grid_t *g, const layout_t *l,
-                const scalar_t *A_loc,
+                local_gemm_t *kern,
                 scalar_t *X_loc,
                 scalar_t *Ypart,
                 scalar_t *Y_loc,
@@ -24,10 +22,7 @@ void mpi_matmul(const grid_t *g, const layout_t *l,
 
     /* 2. Contributo locale: righe [row0, row0+m_loc) di Y, limitatamente alle
      *    colonne [col0, col0+n_loc) di A. E' un risultato PARZIALE. */
-    local_gemm(l->m_loc, l->n_loc, l->k,
-               A_loc, l->lda,
-               X_loc, l->ldx,
-               Ypart, l->ldy);
+    local_gemm(kern, X_loc, l->ldx, Ypart, l->ldy);
 
     t2 = MPI_Wtime();
 
