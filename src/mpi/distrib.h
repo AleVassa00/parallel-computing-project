@@ -34,10 +34,10 @@ typedef struct {
 
 void layout_init(layout_t *l, const grid_t *g, int M, int N, int k);
 
-/* Distribuisce A_global, presente soltanto sul grid rank 0, nei blocchi
- * contigui A_loc descritti dal layout 2D. Sul root ogni blocco remoto e'
- * descritto direttamente dentro la matrice row-major con MPI_Type_vector;
- * il destinatario riceve invece m_loc*n_loc scalar_t contigui.
+/* Distribuisce A_global, presente soltanto sul grid rank 0, nei blocchi A_loc
+ * descritti dal layout 2D. A_loc e' row-major con leading dimension lda e non
+ * e' necessariamente contigua fra righe. Il root descrive il blocco globale
+ * con stride N; il destinatario descrive il layout locale con stride lda.
  *
  * A_global puo' essere NULL sui processi diversi dal grid rank 0. Gli errori
  * MPI sono riportati e causano MPI_Abort sul communicator cartesiano. */

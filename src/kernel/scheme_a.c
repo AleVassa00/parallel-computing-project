@@ -22,11 +22,10 @@
  * con l'unrolling su c, che pero' satura a min(k, ampiezza del gruppo). Qui
  * il riuso e' k per costruzione.
  *
- * Vincolo: servono k accumulatori vivi contemporaneamente. Per k <= KB il
- * ciclo esterno su c0 gira una volta sola e A viene letta esattamente una
- * volta; per k > KB (fuori dal collaudo richiesto, ma il codice deve
- * funzionare per k generico) A viene riletta ceil(k/KB) volte, che resta il
- * comportamento migliore possibile a parita' di registri disponibili. */
+ * I k obbligatori hanno funzioni con aggiornamenti espliciti, cosi' il
+ * compilatore vede a compile-time il numero di accumulatori. Gli altri k
+ * usano il fallback bloccato generico; per k > KB A viene riletta
+ * ceil(k/KB) volte. */
 
 #include "kernel/kernel.h"
 
@@ -37,10 +36,10 @@
  * su c0 e' degenere e A viene letta una volta sola. */
 #define KB 32
 
-void local_gemm(int m, int n, int k,
-                const scalar_t *restrict A, int lda,
-                const scalar_t *restrict X, int ldx,
-                scalar_t *restrict Y, int ldy)
+static void kernel_generic(int m, int n, int k,
+                           const scalar_t *restrict A, int lda,
+                           const scalar_t *restrict X, int ldx,
+                           scalar_t *restrict Y, int ldy)
 {
     int c0;
 
@@ -60,12 +59,6 @@ void local_gemm(int m, int n, int k,
             for (j = 0; j < n; j++) {
                 const scalar_t a = arow[j];
                 const scalar_t *restrict xrow = X + (size_t)j * (size_t)ldx + c0;
-                /* Ciclo interno corto: con cw noto solo a runtime il
-                 * compilatore genera versione vettoriale + coda scalare e
-                 * tiene acc[] in stack (comunque residente in L1).
-                 * La specializzazione sui k del collaudo, che permette di
-                 * inchiodare acc[] nei registri vettoriali, e' il passo
-                 * successivo sul kernel e non cambia questa interfaccia. */
                 for (c = 0; c < cw; c++)
                     acc[c] += a * xrow[c];
             }
@@ -76,7 +69,100 @@ void local_gemm(int m, int n, int k,
     }
 }
 
+#ifndef FORCE_GENERIC_K
+
+/* Una sola lista per ogni ampiezza genera dichiarazione, aggiornamento e
+ * store. Il percorso caldo risultante contiene istruzioni C esplicite per
+ * ogni colonna, senza un limite runtime sul ciclo c. */
+#define COLS_3(M)  M(0) M(1) M(2)
+#define COLS_6(M)  COLS_3(M) M(3) M(4) M(5)
+#define COLS_8(M)  COLS_6(M) M(6) M(7)
+#define COLS_20(M) COLS_8(M) M(8) M(9) M(10) M(11) M(12) M(13) \
+                   M(14) M(15) M(16) M(17) M(18) M(19)
+#define COLS_32(M) COLS_20(M) M(20) M(21) M(22) M(23) M(24) M(25) \
+                   M(26) M(27) M(28) M(29) M(30) M(31)
+
+#define DECLARE_ACC(c) scalar_t acc##c = (scalar_t)0;
+#define UPDATE_ACC(c)  acc##c += a * xrow[c];
+#define STORE_ACC(c)   yrow[c] = acc##c;
+
+#define DEFINE_FIXED_KERNEL(K, COLS)                                         \
+    static void kernel_k##K(int m, int n,                                    \
+                            const scalar_t *restrict A, int lda,              \
+                            const scalar_t *restrict X, int ldx,              \
+                            scalar_t *restrict Y, int ldy)                    \
+    {                                                                         \
+        int i;                                                                \
+        for (i = 0; i < m; i++) {                                             \
+            const scalar_t *restrict arow =                                   \
+                A + (size_t)i * (size_t)lda;                                  \
+            scalar_t *restrict yrow = Y + (size_t)i * (size_t)ldy;            \
+            int j;                                                            \
+            COLS(DECLARE_ACC)                                                 \
+            for (j = 0; j < n; j++) {                                         \
+                const scalar_t a = arow[j];                                   \
+                const scalar_t *restrict xrow =                               \
+                    X + (size_t)j * (size_t)ldx;                              \
+                COLS(UPDATE_ACC)                                              \
+            }                                                                 \
+            COLS(STORE_ACC)                                                   \
+        }                                                                     \
+    }
+
+DEFINE_FIXED_KERNEL(3, COLS_3)
+DEFINE_FIXED_KERNEL(6, COLS_6)
+DEFINE_FIXED_KERNEL(8, COLS_8)
+DEFINE_FIXED_KERNEL(20, COLS_20)
+DEFINE_FIXED_KERNEL(32, COLS_32)
+
+#undef DEFINE_FIXED_KERNEL
+#undef STORE_ACC
+#undef UPDATE_ACC
+#undef DECLARE_ACC
+#undef COLS_32
+#undef COLS_20
+#undef COLS_8
+#undef COLS_6
+#undef COLS_3
+
+#endif /* FORCE_GENERIC_K */
+
+void local_gemm(int m, int n, int k,
+                const scalar_t *restrict A, int lda,
+                const scalar_t *restrict X, int ldx,
+                scalar_t *restrict Y, int ldy)
+{
+#ifdef FORCE_GENERIC_K
+    kernel_generic(m, n, k, A, lda, X, ldx, Y, ldy);
+#else
+    switch (k) {
+    case 3:
+        kernel_k3(m, n, A, lda, X, ldx, Y, ldy);
+        break;
+    case 6:
+        kernel_k6(m, n, A, lda, X, ldx, Y, ldy);
+        break;
+    case 8:
+        kernel_k8(m, n, A, lda, X, ldx, Y, ldy);
+        break;
+    case 20:
+        kernel_k20(m, n, A, lda, X, ldx, Y, ldy);
+        break;
+    case 32:
+        kernel_k32(m, n, A, lda, X, ldx, Y, ldy);
+        break;
+    default:
+        kernel_generic(m, n, k, A, lda, X, ldx, Y, ldy);
+        break;
+    }
+#endif
+}
+
 const char *kernel_name(void)
 {
+#ifdef FORCE_GENERIC_K
+    return "scheme_a_generic";
+#else
     return "scheme_a";
+#endif
 }

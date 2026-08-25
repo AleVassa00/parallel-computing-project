@@ -18,7 +18,8 @@ Università degli Studi di Roma Tor Vergata
 make                # bin/matmul_mpi e bin/test_index
 make test           # test delle funzioni indice (non richiede MPI)
 make check          # validazione MPI contro il seriale su piu' forme di griglia
-make PREC=float     # ricompila in singola precisione
+make PREC=float check # stessa matrice di validazione in singola precisione
+make check-padding  # --a-mode global con lda = n_loc + 8
 make KERNEL=<nome>  # seleziona src/kernel/<nome>.c come local_gemm
 ```
 
@@ -47,10 +48,29 @@ fattorizzazione piu' quadrata di P), `--reps --warmup`, `--seed`,
 `--a-mode local|global`, `--check` (validazione contro il seriale), `--csv` /
 `--csv-header` per la campagna di misura. `--help` per l'elenco completo.
 
-Il broadcast di X viene eseguito una sola volta nel setup. Il valore `gflops`
-usa esclusivamente la media dei tempi massimi fra rank di `local_gemm`:
-`2*M*N*k / t_local_mean / 1e9`. `gflops_total` include invece anche la reduce
-di Y ed e' riportato soltanto come metrica aggiuntiva.
+Una invocazione del prodotto MPI esegue, nell'ordine, `MPI_Bcast` della fetta
+di X lungo il column communicator, `local_gemm`, e `MPI_Reduce(MPI_SUM)` lungo
+il row communicator. Generazione/distribuzione di A resta preprocessing.
+
+Per ogni repetition si prende separatamente il massimo fra i rank dei tempi di
+broadcast, calcolo locale, reduce e totale. Il totale e' misurato direttamente
+dall'inizio del broadcast alla fine della reduce. Le metriche sono:
+
+```text
+gflops         = 2*M*N*k / mean(max_rank(t_total)) / 1e9
+gflops_compute = 2*M*N*k / mean(max_rank(t_local)) / 1e9
+```
+
+`scheme_a` specializza in C portabile `k=3,6,8,20,32` e usa il kernel generico
+per ogni altro valore. Per un microbenchmark sullo stesso problema:
+
+```bash
+make FORCE_GENERIC_K=0
+mpirun -np 4 ./bin/matmul_mpi -M 8000 -N 8000 -k 8 --pr 2 --pc 2 --csv
+
+make FORCE_GENERIC_K=1
+mpirun -np 4 ./bin/matmul_mpi -M 8000 -N 8000 -k 8 --pr 2 --pc 2 --csv
+```
 
 ## Struttura
 

@@ -13,7 +13,8 @@ void  xfree(void *p);
  * dentro l'algoritmo parallelo si usa MPI_Wtime. */
 double now_seconds(void);
 
-/* Errore fatale: stampa su stderr ed esce. */
+/* Errore fatale: usa exit prima di MPI_Init/dopo MPI_Finalize e MPI_Abort
+ * durante un job MPI, evitando di lasciare rank bloccati nelle collettive. */
 void die(const char *fmt, ...);
 
 #endif /* SCPA_UTIL_H */

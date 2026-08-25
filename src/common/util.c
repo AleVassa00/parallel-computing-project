@@ -4,6 +4,8 @@
 
 #include "common/util.h"
 
+#include <mpi.h>
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,12 +45,24 @@ double now_seconds(void)
 
 void die(const char *fmt, ...)
 {
+    int initialized = 0, finalized = 0;
     va_list ap;
+
     va_start(ap, fmt);
     fputs("fatal: ", stderr);
     vfprintf(stderr, fmt, ap);
     fputc('\n', stderr);
     va_end(ap);
     fflush(stderr);
+
+    /* Prima di MPI_Init (e dopo MPI_Finalize) exit e' l'unica terminazione
+     * lecita. Durante un job MPI, invece, la morte di un solo rank potrebbe
+     * lasciare gli altri bloccati in una collettiva: termina l'intero job. */
+    MPI_Initialized(&initialized);
+    if (initialized)
+        MPI_Finalized(&finalized);
+    if (initialized && !finalized)
+        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+
     exit(EXIT_FAILURE);
 }

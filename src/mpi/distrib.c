@@ -10,6 +10,10 @@
 
 #define TAG_DISTRIBUTE_A 1701
 
+#ifndef TEST_A_PADDING
+#define TEST_A_PADDING 0
+#endif
+
 static void mpi_abort_error(MPI_Comm comm, int error_code, const char *operation)
 {
     char message[MPI_MAX_ERROR_STRING];
@@ -50,7 +54,10 @@ void layout_init(layout_t *l, const grid_t *g, int M, int N, int k)
      * tutti quelli di una stessa colonna su n_loc (count del broadcast).
      * E' la condizione di consistenza delle due collettive. */
 
-    l->lda = l->n_loc; /* nessun padding per ora: il gancio e' qui */
+    /* La build normale usa lda == n_loc. Il target check-padding definisce
+     * TEST_A_PADDING=8 per collaudare il datatype ricevente con stride locale
+     * senza esporre il padding come opzione pubblica. */
+    l->lda = l->n_loc + TEST_A_PADDING;
     l->ldx = k;
     l->ldy = k;
 }
@@ -132,11 +139,33 @@ void distribute_global_A(const grid_t *g, const layout_t *l,
         const int count = block_element_count(g->grid, l->m_loc, l->n_loc);
 
         if (count > 0) {
+            MPI_Datatype recv_type = MPI_DATATYPE_NULL;
             MPI_Status status;
-            error_code = MPI_Recv(A_loc, count, SCALAR_MPI_TYPE, root,
-                                  TAG_DISTRIBUTE_A, g->grid, &status);
+
+            /* Il sender cammina nel globale con stride N; il receiver scrive
+             * direttamente nel layout locale, che puo' avere lda > n_loc. */
+            error_code = MPI_Type_vector(l->m_loc, l->n_loc, l->lda,
+                                         SCALAR_MPI_TYPE, &recv_type);
             if (error_code != MPI_SUCCESS)
+                mpi_abort_error(g->grid, error_code,
+                                "MPI_Type_vector(local A block)");
+            error_code = MPI_Type_commit(&recv_type);
+            if (error_code != MPI_SUCCESS) {
+                MPI_Type_free(&recv_type);
+                mpi_abort_error(g->grid, error_code,
+                                "MPI_Type_commit(local A block)");
+            }
+
+            error_code = MPI_Recv(A_loc, 1, recv_type, root,
+                                  TAG_DISTRIBUTE_A, g->grid, &status);
+            if (error_code != MPI_SUCCESS) {
+                MPI_Type_free(&recv_type);
                 mpi_abort_error(g->grid, error_code, "MPI_Recv(A block)");
+            }
+            error_code = MPI_Type_free(&recv_type);
+            if (error_code != MPI_SUCCESS)
+                mpi_abort_error(g->grid, error_code,
+                                "MPI_Type_free(local A block)");
         }
     }
 }
