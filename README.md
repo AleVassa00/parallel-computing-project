@@ -23,6 +23,7 @@ make PREC=float check # stessa matrice di validazione in singola precisione
 make check-padding  # --a-mode global con lda = n_loc + 8
 make KERNEL=<nome>  # seleziona src/kernel/<nome>.c oppure .cu come local_gemm
 make KERNEL=cuda_naive check   # backend CUDA (richiede nvcc: solo sul server)
+make KERNEL=cuda_warp check    # warp-per-row, template sui cinque k richiesti
 ```
 
 Ogni configurazione ha un binario con nome proprio, cosi' una build non puo'
@@ -37,6 +38,7 @@ aggiunge un suffisso:
 | `make FORCE_GENERIC_K=1` | `bin/matmul_mpi-generic` |
 | `make TEST_A_PADDING=8` | `bin/matmul_mpi-pad8` |
 | `make KERNEL=cuda_naive` | `bin/matmul_mpi-cuda_naive` |
+| `make KERNEL=cuda_warp` | `bin/matmul_mpi-cuda_warp` |
 
 La riga finale di `make` ricorda sempre quale binario e' stato prodotto e con
 quali variabili.
@@ -104,6 +106,31 @@ backend CUDA si compila sul server (`module load cuda`, oppure
 `cuda_naive` e' la **baseline**, non il kernel finale: un thread per elemento di
 Y, che quindi perde il riuso di A in registro dello schema A. Serve a validare
 la pipeline e a dare il numero contro cui misurare le versioni successive.
+
+`cuda_warp` assegna invece un warp a ogni riga di Y. La lane `l` visita gli
+indici `j=l,l+32,...`, percio' le lane leggono consecutivamente A, e riusa ogni
+valore caricato nei K accumulatori della lane. I risultati parziali vengono
+ridotti nel warp con `__shfl_down_sync`; la lane 0 scrive la riga di Y. I casi
+`k=3,6,8,20,32` sono istanze template distinte, mentre ogni altro k attraversa
+un fallback runtime a tile di quattro colonne, senza un limite massimo su k.
+
+Validazione completa e controllo dei registri sul server:
+
+```bash
+make KERNEL=cuda_warp check
+make KERNEL=cuda_warp PREC=float check
+make -B KERNEL=cuda_warp EXTRA_NVCCFLAGS='-Xptxas -v'
+```
+
+Il benchmark di uscita va eseguito in double, su un solo rank/GPU, e confrontato
+con `cuda_naive` sulla stessa configurazione. La metrica del backend e'
+`GFLOPS kernel-only`:
+
+```bash
+mpirun -np 1 --bind-to core --map-by core ./bin/matmul_mpi-cuda_warp \
+  -M 20000 -N 20000 -k 8 --pr 1 --pc 1 --a-mode local \
+  --warmup 2 --reps 10
+```
 
 Le fasi cadono cosi':
 

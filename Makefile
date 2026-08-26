@@ -7,6 +7,7 @@
 #   make PREC=float ricompila in singola precisione
 #   make KERNEL=..  seleziona l'implementazione di local_gemm (.c oppure .cu)
 #   make FORCE_GENERIC_K=1  forza il fallback generico di scheme_a
+#   make KERNEL=cuda_warp  backend CUDA warp-per-row con dispatch su k
 #
 # Il backend si sceglie con KERNEL e il Makefile capisce da solo se e' un file C
 # o un file CUDA:  src/kernel/$$(KERNEL).cu ha la precedenza su .c, viene
@@ -38,6 +39,7 @@ PREC   ?= double
 FORCE_GENERIC_K ?= 0
 TEST_A_PADDING  ?= 0
 EXTRA_CFLAGS    ?=
+EXTRA_NVCCFLAGS ?=
 
 # -march=native su x86, -mcpu=native su aarch64: si prova cosa accetta il
 # compilatore, cosi' lo stesso Makefile vale su VM di sviluppo e su server.
@@ -119,7 +121,7 @@ ifeq ($(KERNEL_IS_CUDA),1)
 # dato a nvcc direttamente, che non lo conosce: passa al compilatore host con
 # -Xcompiler. -lineinfo serve dopo, per correlare i profili di ncu al sorgente.
 NVCCFLAGS := -O3 -std=c++14 -arch=$(NVCC_ARCH) -Isrc $(PRECDEF) -lineinfo \
-	-Xcompiler -Wall -Xcompiler -Wextra
+	-Xcompiler -Wall -Xcompiler -Wextra $(EXTRA_NVCCFLAGS)
 ifneq ($(ARCHFLAGS),)
 NVCCFLAGS += -Xcompiler $(ARCHFLAGS)
 endif

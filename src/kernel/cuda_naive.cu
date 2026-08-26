@@ -28,7 +28,7 @@
  *    k = 32 sono 256 byte, cioe' da meno di una transazione a due transazioni
  *    piene. Ogni gruppo di k thread legge poi lo STESSO A[i][j].
  *
- * La versione warp-shuffle di M4.3 rovescia entrambe le cose: distribuisce il
+ * La versione warp-shuffle di M4.2 rovescia entrambe le cose: distribuisce il
  * ciclo su j fra le 32 corsie di un warp (lane l prende j = l, l+32, ...), cosi'
  * corsie consecutive leggono elementi consecutivi di A - coalescenza piena - e
  * ogni corsia tiene tutti e k gli accumulatori in registro, riducendoli alla
@@ -69,7 +69,7 @@
 
 /* 256 thread per blocco: 8 warp, divisore di 1024, valore neutro che non
  * pregiudica l'occupancy su Turing. Non e' un parametro da ottimizzare qui:
- * lo diventa nel kernel di M4.3. */
+ * lo diventa nel kernel di M4.2. */
 #define BLOCK_THREADS 256
 
 #define BYTES_PER_GIB 1073741824.0
