@@ -22,7 +22,7 @@ extern "C" const char *scpa_cxx_iface_probe(void)
     /* Un backend CUDA scriverebbe esattamente questa sequenza: create in
      * preprocessing (H2D di A), local_gemm nella regione cronometrata,
      * destroy alla fine (cudaFree). */
-    local_gemm_t *ctx = local_gemm_create(0, 0, 0, 0, 0);
+    local_gemm_t *ctx = local_gemm_create(0, 0, 0, 0, 0, 0, 0);
     if (ctx == 0)
         die("local_gemm_create must never return NULL");   /* mai vero: e' il contratto */
     local_gemm(ctx, 0, 0, 0, 0);

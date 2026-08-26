@@ -140,6 +140,7 @@ DEFINE_FIXED_KERNEL(32, COLS_32)
 struct local_gemm_ctx {
     int m, n, k;
     int lda;
+    int ldx, ldy;
     const scalar_t *A;
     double t_setup;   /* misurato davvero, anche se qui e' ~1 us: il confronto
                        * con il backend CUDA ha senso solo se lo stesso numero
@@ -147,7 +148,8 @@ struct local_gemm_ctx {
 };
 
 local_gemm_t *local_gemm_create(int m, int n, int k,
-                                const scalar_t *A, int lda)
+                                const scalar_t *A, int lda,
+                                int ldx, int ldy)
 {
     local_gemm_t *ctx;
     const double t0 = now_seconds();
@@ -156,6 +158,9 @@ local_gemm_t *local_gemm_create(int m, int n, int k,
         die("local_gemm_create: invalid local block %dx%d with k=%d", m, n, k);
     if (lda < n)
         die("local_gemm_create: lda %d is smaller than n %d", lda, n);
+    if (ldx < k || ldy < k)
+        die("local_gemm_create: ldx %d and ldy %d must both be at least k=%d",
+            ldx, ldy, k);
     if (n > 0 && m > 0 && A == NULL)
         die("local_gemm_create: A is NULL for a non-empty %dx%d block", m, n);
 
@@ -164,6 +169,8 @@ local_gemm_t *local_gemm_create(int m, int n, int k,
     ctx->n = n;
     ctx->k = k;
     ctx->lda = lda;
+    ctx->ldx = ldx;
+    ctx->ldy = ldy;
     ctx->A = A;
     ctx->t_setup = now_seconds() - t0;
     return ctx;
@@ -178,6 +185,11 @@ void local_gemm(local_gemm_t *ctx,
      * garanzia di non aliasing che avevano quando A era un parametro. */
     const scalar_t *SCPA_RESTRICT A = ctx->A;
     const int m = ctx->m, n = ctx->n, k = ctx->k, lda = ctx->lda;
+
+    if (ldx != ctx->ldx || ldy != ctx->ldy)
+        die("local_gemm: leading dimensions changed between calls "
+            "(ldx %d -> %d, ldy %d -> %d)",
+            ctx->ldx, ldx, ctx->ldy, ldy);
 
 #ifdef FORCE_GENERIC_K
     kernel_generic(m, n, k, A, lda, X, ldx, Y, ldy);

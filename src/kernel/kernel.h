@@ -52,11 +52,14 @@ extern "C" {
  * inizializzazione globale nascosta, e il backend resta riutilizzabile. */
 typedef struct local_gemm_ctx local_gemm_t;
 
-/* Prepara il backend per una A fissa, m x n con leading dimension lda.
- * A deve essere gia' popolata e deve restare valida fino a local_gemm_destroy.
- * Non ritorna mai NULL: in caso di errore termina il job. */
+/* Prepara il backend per una A fissa, m x n con leading dimension lda, e per
+ * buffer X/Y con leading dimension ldx/ldy. A deve essere gia' popolata e deve
+ * restare valida fino a local_gemm_destroy. Per CUDA tutte le allocazioni e la
+ * copia H2D di A terminano qui, fuori dalle repetition. Non ritorna mai NULL:
+ * in caso di errore termina il job. */
 local_gemm_t *local_gemm_create(int m, int n, int k,
-                                const scalar_t *A, int lda);
+                                const scalar_t *A, int lda,
+                                int ldx, int ldy);
 
 /* Y = A * X       (assegnazione, NON accumulo)
  *
@@ -64,8 +67,9 @@ local_gemm_t *local_gemm_create(int m, int n, int k,
  *   X: n x k, riga j a partire da X + j*ldx        row-major, k contiguo
  *   Y: m x k, riga i a partire da Y + i*ldy        row-major, k contiguo
  *
- * m, n, k e lda sono quelli passati a local_gemm_create: non si ripetono qui,
- * cosi' non possono divergere fra preparazione e invocazione.
+ * m, n, k, lda, ldx e ldy sono fissati da local_gemm_create. ldx e ldy
+ * restano nella firma dell'invocazione per rendere esplicito il layout dei
+ * buffer, ma il backend verifica che non siano cambiati.
  * X e Y non devono sovrapporsi fra loro ne' con A (sono dichiarati restrict).
  * Le leading dimension di X e Y restano parametri e non coincidono
  * necessariamente con k: e' il gancio per il padding anti-conflict-miss
@@ -94,11 +98,12 @@ void local_gemm_destroy(local_gemm_t *ctx);
  *   t_local   (misurato dal chiamante)  = H2D + kernel + D2H
  *   t_kernel  (misurato dal backend)    = solo kernel
  *
- * e la loro differenza e' esattamente il costo del PCIe, che e' il numero da
- * commentare nella relazione. Il backend e' l'unico che puo' misurare
- * t_kernel, perche' su CUDA va fatto con i cudaEvent sullo stream, non con
- * l'orologio dell'host: un lancio e' asincrono e l'orologio dell'host
- * misurerebbe il tempo di accodamento, non quello di esecuzione. */
+ * La differenza t_local-t_kernel misura congiuntamente trasferimenti e overhead
+ * del runtime host (lancio, record/sync e controlli), non il solo PCIe. Il
+ * backend e' l'unico che puo' misurare t_kernel, perche' su CUDA va fatto con i
+ * cudaEvent sullo stream, non con l'orologio dell'host: un lancio e' asincrono
+ * e l'orologio dell'host misurerebbe il tempo di accodamento, non quello di
+ * esecuzione. */
 
 /* Tempo di calcolo della SOLA ultima invocazione di local_gemm, in secondi.
  * Restituisce un valore NEGATIVO se il backend non distingue il kernel dal
@@ -108,9 +113,10 @@ double local_gemm_last_compute_seconds(const local_gemm_t *ctx);
 
 /* Tempo speso in preparazione, in secondi: tutto cio' che e' avvenuto una
  * volta sola fuori dalla regione cronometrata. Per un backend di CPU e' circa
- * zero; per CUDA e' creazione del contesto + cudaMalloc + H2D di A, cioe'
- * proprio il costo che la scelta di separare create da local_gemm ha tolto dal
- * cammino misurato. Va riportato, non nascosto. */
+ * zero; per CUDA e' creazione del contesto + tutti i cudaMalloc + H2D di A e
+ * sincronizzazione finale, cioe' proprio il costo che la scelta di separare
+ * create da local_gemm ha tolto dal cammino misurato. Va riportato, non
+ * nascosto. */
 double local_gemm_setup_seconds(const local_gemm_t *ctx);
 
 /* Nome del backend attivo, per l'intestazione delle misure. */

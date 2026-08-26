@@ -48,6 +48,7 @@
 
 #include <cuda_runtime.h>
 
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "kernel/kernel.h"
@@ -106,7 +107,7 @@ static __global__ void naive_kernel(int m, int n, int k,
 struct local_gemm_ctx {
     int m, n, k;
     int lda;
-    int ldx, ldy;        /* fissate alla prima invocazione (-1 = non ancora) */
+    int ldx, ldy;
     scalar_t *dA;
     scalar_t *dX;
     scalar_t *dY;
@@ -122,20 +123,40 @@ struct local_gemm_ctx {
  * variabile d'ambiente, cosi' questo file non deve dipendere da MPI. */
 static int pick_device(void)
 {
-    const char *env;
+    const char *env, *local_rank_env, *local_size_env;
     int ndev = 0;
-    long id;
+    long id, local_rank, local_size;
 
     CUDA_CHECK(cudaGetDeviceCount(&ndev));
     if (ndev < 1)
         die("cuda_naive: no CUDA device available");
 
-    env = getenv("SCPA_CUDA_DEVICE");            /* override esplicito */
-    if (env == NULL) env = getenv("OMPI_COMM_WORLD_LOCAL_RANK");   /* OpenMPI */
-    if (env == NULL) env = getenv("MV2_COMM_WORLD_LOCAL_RANK");    /* MVAPICH */
-    if (env == NULL) env = getenv("SLURM_LOCALID");                /* Slurm   */
+    local_rank_env = getenv("OMPI_COMM_WORLD_LOCAL_RANK");       /* OpenMPI */
+    if (local_rank_env == NULL)
+        local_rank_env = getenv("MV2_COMM_WORLD_LOCAL_RANK");    /* MVAPICH */
+    if (local_rank_env == NULL)
+        local_rank_env = getenv("SLURM_LOCALID");                /* Slurm   */
+    local_rank = (local_rank_env != NULL) ? strtol(local_rank_env, NULL, 10) : 0;
+    if (local_rank < 0)
+        local_rank = 0;
 
-    id = (env != NULL) ? strtol(env, NULL, 10) : 0;
+    local_size_env = getenv("OMPI_COMM_WORLD_LOCAL_SIZE");
+    if (local_size_env == NULL)
+        local_size_env = getenv("MV2_COMM_WORLD_LOCAL_SIZE");
+    if (local_size_env == NULL)
+        local_size_env = getenv("SLURM_NTASKS_PER_NODE");
+    local_size = (local_size_env != NULL) ? strtol(local_size_env, NULL, 10) : 1;
+
+    if (local_rank == 0 && local_size > ndev)
+        fprintf(stderr,
+                "warning: %ld local MPI ranks share %d CUDA device(s); "
+                "correctness is preserved, but official/kernel GPU timing "
+                "does not represent one-rank-per-GPU throughput\n",
+                local_size, ndev);
+
+    env = getenv("SCPA_CUDA_DEVICE");            /* override esplicito */
+    id = (env != NULL) ? strtol(env, NULL, 10) : local_rank;
+
     if (id < 0)
         id = 0;
     return (int)(id % ndev);
@@ -150,10 +171,11 @@ static size_t nonzero(size_t bytes)
 }
 
 local_gemm_t *local_gemm_create(int m, int n, int k,
-                                const scalar_t *A, int lda)
+                                const scalar_t *A, int lda,
+                                int ldx, int ldy)
 {
     local_gemm_t *ctx;
-    size_t bytes_A, need, free_b = 0, total_b = 0;
+    size_t bytes_A, bytes_X, bytes_Y, need, free_b = 0, total_b = 0;
     const double t0 = now_seconds();
 
     /* Stessi controlli del backend scalare: l'interfaccia e' una sola, e i suoi
@@ -162,6 +184,9 @@ local_gemm_t *local_gemm_create(int m, int n, int k,
         die("local_gemm_create: invalid local block %dx%d with k=%d", m, n, k);
     if (lda < n)
         die("local_gemm_create: lda %d is smaller than n %d", lda, n);
+    if (ldx < k || ldy < k)
+        die("local_gemm_create: ldx %d and ldy %d must both be at least k=%d",
+            ldx, ldy, k);
     if (n > 0 && m > 0 && A == NULL)
         die("local_gemm_create: A is NULL for a non-empty %dx%d block", m, n);
 
@@ -170,8 +195,8 @@ local_gemm_t *local_gemm_create(int m, int n, int k,
     ctx->n = n;
     ctx->k = k;
     ctx->lda = lda;
-    ctx->ldx = -1;
-    ctx->ldy = -1;
+    ctx->ldx = ldx;
+    ctx->ldy = ldy;
     ctx->dA = NULL;
     ctx->dX = NULL;
     ctx->dY = NULL;
@@ -180,22 +205,21 @@ local_gemm_t *local_gemm_create(int m, int n, int k,
     ctx->device = pick_device();
     CUDA_CHECK(cudaSetDevice(ctx->device));
 
-    /* La creazione del contesto CUDA e' pigra e costa da un decimo di secondo a
-     * qualche secondo. cudaFree(0) la forza QUI, dove siamo in preprocessing;
-     * senza, il conto verrebbe presentato alla prima local_gemm, cioe' dentro la
-     * regione cronometrata (e con --warmup 0 dentro la prima repetition). */
+    /* I runtime recenti inizializzano il contesto gia' in cudaSetDevice;
+     * cudaFree(0) forza l'inizializzazione nei runtime precedenti ed e' un
+     * no-op sicuro negli altri. In entrambi i casi il costo resta QUI, nel
+     * preprocessing, e non nella prima local_gemm con --warmup 0. */
     CUDA_CHECK(cudaFree(0));
 
     bytes_A = (size_t)m * (size_t)lda * sizeof(scalar_t);
+    bytes_X = (size_t)n * (size_t)ldx * sizeof(scalar_t);
+    bytes_Y = (size_t)m * (size_t)ldy * sizeof(scalar_t);
 
     /* A e' l'oggetto grande: 40000x40000 in double sono 12.8 GiB contro i 15.5
      * GiB della Quadro RTX 5000. Meglio un messaggio che dice quanto manca che
-     * un "out of memory" generico a meta' campagna. Nella stima si contano
-     * anche X e Y, che qui non sono ancora dimensionati: ldx e ldy arrivano
-     * dalla prima invocazione e valgono almeno k. */
-    need = bytes_A
-         + (size_t)n * (size_t)k * sizeof(scalar_t)
-         + (size_t)m * (size_t)k * sizeof(scalar_t);
+     * un "out of memory" generico a meta' campagna. La stima usa i layout
+     * effettivi di A, X e Y ricevuti dal driver. */
+    need = bytes_A + bytes_X + bytes_Y;
     CUDA_CHECK(cudaMemGetInfo(&free_b, &total_b));
     if (need + (64u << 20) > free_b)
         die("cuda_naive: device %d has %.2f GiB free out of %.2f GiB, "
@@ -210,51 +234,24 @@ local_gemm_t *local_gemm_create(int m, int n, int k,
     if (bytes_A > 0)
         CUDA_CHECK(cudaMemcpy(ctx->dA, A, bytes_A, cudaMemcpyHostToDevice));
 
+    /* Anche X e Y vengono dimensionate qui: nessuna cudaMalloc puo' quindi
+     * cadere nella prima repetition, neppure con --warmup 0. */
+    CUDA_CHECK(cudaMalloc((void **)&ctx->dX, nonzero(bytes_X)));
+    CUDA_CHECK(cudaMalloc((void **)&ctx->dY, nonzero(bytes_Y)));
+    CUDA_CHECK(cudaMemset(ctx->dY, 0, nonzero(bytes_Y)));
+
     /* Gli event vanno creati una volta sola: crearli e distruggerli a ogni
      * invocazione sarebbe una chiamata al driver dentro la misura. */
     CUDA_CHECK(cudaEventCreate(&ctx->ev_start));
     CUDA_CHECK(cudaEventCreate(&ctx->ev_stop));
 
+    /* Le copie H2D da memoria paginabile possono ritornare prima che il DMA
+     * sia terminato. Questa sincronizzazione garantisce che tutto il setup sia
+     * davvero concluso prima di uscire dalla regione di preprocessing. */
+    CUDA_CHECK(cudaDeviceSynchronize());
+
     ctx->t_setup = now_seconds() - t0;
     return ctx;
-}
-
-/* ldx e ldy non sono parametri di local_gemm_create - li porta l'invocazione -
- * quindi i buffer di X e Y si allocano alla prima chiamata e non piu'. Nel
- * driver quella chiamata e' un warm-up (--warmup vale 2 per default), percio' la
- * allocazione resta fuori dalle repetition cronometrate; il suo costo viene
- * comunque sommato a t_setup, cosi' non sparisce dai dati. */
-static void ensure_xy(local_gemm_t *ctx, int ldx, int ldy)
-{
-    double t0;
-
-    if (ctx->dX != NULL) {
-        /* Il layout e' calcolato una volta sola in layout_init: se cambiasse
-         * qui, i buffer di device avrebbero la dimensione sbagliata. Meglio
-         * fermarsi che leggere fuori. */
-        if (ldx != ctx->ldx || ldy != ctx->ldy)
-            die("cuda_naive: leading dimensions changed between calls "
-                "(ldx %d -> %d, ldy %d -> %d)", ctx->ldx, ldx, ctx->ldy, ldy);
-        return;
-    }
-
-    if (ldx < ctx->k || ldy < ctx->k)
-        die("cuda_naive: ldx %d and ldy %d must both be at least k=%d",
-            ldx, ldy, ctx->k);
-
-    t0 = now_seconds();
-    ctx->ldx = ldx;
-    ctx->ldy = ldy;
-    CUDA_CHECK(cudaMalloc((void **)&ctx->dX,
-                          nonzero((size_t)ctx->n * (size_t)ldx * sizeof(scalar_t))));
-    CUDA_CHECK(cudaMalloc((void **)&ctx->dY,
-                          nonzero((size_t)ctx->m * (size_t)ldy * sizeof(scalar_t))));
-    /* Il kernel scrive solo le colonne [0, k): se ldy > k il resto del buffer
-     * verrebbe ricopiato sull'host cosi' com'e'. Azzerarlo una volta evita di
-     * riportare indietro memoria non inizializzata. */
-    CUDA_CHECK(cudaMemset(ctx->dY, 0,
-                          nonzero((size_t)ctx->m * (size_t)ldy * sizeof(scalar_t))));
-    ctx->t_setup += now_seconds() - t0;
 }
 
 void local_gemm(local_gemm_t *ctx,
@@ -265,7 +262,10 @@ void local_gemm(local_gemm_t *ctx,
     const long long threads = (long long)m * (long long)k;
     float ms = 0.0f;
 
-    ensure_xy(ctx, ldx, ldy);
+    if (ldx != ctx->ldx || ldy != ctx->ldy)
+        die("cuda_naive: leading dimensions changed between calls "
+            "(ldx %d -> %d, ldy %d -> %d)",
+            ctx->ldx, ldx, ctx->ldy, ldy);
 
     /* H2D di X: una fetta n x k, cioe' pochi MiB. E' dentro l'invocazione
      * perche' X e' il risultato del MPI_Bcast appena concluso. */

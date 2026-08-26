@@ -14,9 +14,13 @@ typedef struct {
     double t_local;
     double t_reduce;
     double t_total;
+    /* Tempo usato per la metrica ufficiale. Coincide con t_total sui backend
+     * CPU; su CUDA sostituisce la fase locale con il solo t_kernel, escludendo
+     * H2D/D2H ma conservando le due comunicazioni MPI. */
+    double t_official;
     /* Tempo del solo kernel, chiesto al backend. Su CPU e' negativo
      * ("non applicabile": la risposta e' gia' t_local); su CUDA e' il tempo
-     * misurato dai cudaEvent, cioe' t_local meno H2D di X e D2H di Y. */
+     * misurato dai cudaEvent. */
     double t_kernel;
 } matmul_time_t;
 

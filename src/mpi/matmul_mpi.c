@@ -37,6 +37,8 @@ void mpi_matmul(const grid_t *g, const layout_t *l,
     t3 = MPI_Wtime();
 
     if (t != NULL) {
+        const double kernel_time = local_gemm_last_compute_seconds(kern);
+
         t->t_bcast = t1 - t0;
         t->t_local = t2 - t1;
         t->t_reduce = t3 - t2;
@@ -44,6 +46,9 @@ void mpi_matmul(const grid_t *g, const layout_t *l,
         /* Interrogato DOPO t3, non fra t2 e la reduce: e' una lettura di uno
          * stato che il backend ha gia' congelato alla fine di local_gemm, e
          * metterla dentro una finestra cronometrata ne falserebbe il valore. */
-        t->t_kernel = local_gemm_last_compute_seconds(kern);
+        t->t_kernel = kernel_time;
+        t->t_official = (kernel_time >= 0.0)
+                      ? t->t_bcast + kernel_time + t->t_reduce
+                      : t->t_total;
     }
 }

@@ -74,8 +74,8 @@ Il kernel locale ha un ciclo di vita in tre fasi, perche' A non cambia mai fra
 un'invocazione e l'altra mentre X e Y cambiano sempre:
 
 ```c
-kern = local_gemm_create(m_loc, n_loc, k, A_loc, lda);  /* preprocessing, non cronometrato */
-local_gemm(kern, X_loc, ldx, Ypart, ldy);               /* regione cronometrata */
+kern = local_gemm_create(m_loc, n_loc, k, A_loc, lda, ldx, ldy); /* preprocessing */
+local_gemm(kern, X_loc, ldx, Ypart, ldy);                        /* cronometrato */
 local_gemm_destroy(kern);
 ```
 
@@ -109,32 +109,52 @@ Le fasi cadono cosi':
 
 | fase | dove | cronometrata? |
 |---|---|---|
-| creazione contesto CUDA, `cudaMalloc`, H2D di **A** | `local_gemm_create` | no, e' preprocessing (`t_setup_s`) |
+| creazione contesto CUDA, tutti i `cudaMalloc`, H2D di **A** | `local_gemm_create` | no, e' preprocessing (`t_setup_s`) |
 | H2D di **X**, kernel, D2H di **Y** | `local_gemm` | si', e' `t_local` |
 | solo il kernel, misurato con i `cudaEvent` | dentro `local_gemm` | si', ed e' `t_kernel` |
 
-`t_local - t_kernel` e' esattamente il costo del PCIe per invocazione, che la
-consegna consente di riportare a parte anziche' dentro T.
+`t_local - t_kernel` viene riportato come `transfer/runtime overhead`: contiene
+H2D e D2H, ma anche lancio, record/sync degli event, controlli CUDA e altro
+overhead host. Non viene presentato impropriamente come misura del solo PCIe.
 
-I buffer di X e Y si allocano alla prima invocazione, perche' `ldx` e `ldy`
-arrivano da li' e non da `local_gemm_create`. Con il default `--warmup 2` quella
-prima invocazione e' un warm-up e l'allocazione resta fuori dalle repetition
-cronometrate; il suo costo viene comunque sommato a `t_setup_s`, quindi non
-sparisce dai dati. Con `--warmup 0` finirebbe nella prima repetition.
+I buffer di X e Y vengono allocati in `local_gemm_create`, che riceve anche
+`ldx` e `ldy`; una `cudaDeviceSynchronize` conclude realmente il preprocessing
+prima di restituire. Di conseguenza nessuna allocazione o coda residua della
+copia di A entra nella prima repetition, neppure con `--warmup 0`.
+
+Ogni rank sceglie la GPU usando il local rank esportato da OpenMPI, MVAPICH o
+Slurm; `SCPA_CUDA_DEVICE` resta disponibile come override esplicito. Se sul
+nodo ci sono piu' rank locali che GPU, il programma avverte che le GPU vengono
+condivise: il risultato resta corretto, ma i tempi `t_kernel` e ufficiali non
+rappresentano il caso one-rank-per-GPU. Per misure confrontabili va quindi
+usato al massimo un rank per GPU, salvo documentare esplicitamente la
+condivisione (per esempio tramite MPS).
 
 Se il blocco locale non entra in VRAM (40000x40000 in double sono 12.8 GiB
 contro i 15.5 GiB della Quadro RTX 5000) il programma si ferma prima di
 allocare, dicendo quanta memoria serve e quanta ce n'e'.
 
 Per ogni repetition si prende separatamente il massimo fra i rank dei tempi di
-broadcast, calcolo locale, reduce e totale. Il totale e' misurato direttamente
-dall'inizio del broadcast alla fine della reduce. Le metriche sono:
+broadcast, calcolo locale, reduce, totale end-to-end e tempo ufficiale. Il
+totale end-to-end e' sempre misurato direttamente dall'inizio del broadcast
+alla fine della reduce. Il tempo ufficiale locale vale:
 
 ```text
-gflops         = 2*M*N*k / mean(max_rank(t_total))  / 1e9   metrica ufficiale
-gflops_compute = 2*M*N*k / mean(max_rank(t_local))  / 1e9   senza le collettive
-gflops_kernel  = 2*M*N*k / mean(max_rank(t_kernel)) / 1e9   senza H2D/D2H
+t_official = t_total                         backend CPU
+t_official = t_bcast + t_kernel + t_reduce backend CUDA
 ```
+
+La `MPI_Reduce(MPI_MAX)` viene applicata a `t_official` repetition per
+repetition prima di calcolarne la media. Le metriche sono:
+
+```text
+gflops         = 2*M*N*k / mean(max_rank(t_official)) / 1e9 metrica ufficiale
+gflops_compute = 2*M*N*k / mean(max_rank(t_compute))  / 1e9 solo calcolo
+gflops_kernel  = 2*M*N*k / mean(max_rank(t_kernel))   / 1e9 alias CUDA
+```
+
+`t_compute` coincide con `t_local` su CPU e con `t_kernel` su CUDA. `t_total`
+resta disponibile come misura end-to-end reale, comprensiva dei trasferimenti.
 
 `t_kernel` e `gflops_kernel` valgono `-1` per i backend di CPU, dove il kernel
 coincide con `t_local` e non c'e' niente da separare. `t_setup_s` riporta il

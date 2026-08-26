@@ -43,7 +43,8 @@ typedef struct {
 static const char *CSV_HEADER =
     "kernel,scalar,a_mode,M,N,k,P,pr,pc,reps,"
     "t_bcast_mean_s,t_local_mean_s,t_reduce_mean_s,t_total_mean_s,"
-    "t_total_median_s,t_total_min_s,t_kernel_mean_s,t_setup_s,"
+    "t_official_mean_s,t_total_median_s,t_total_min_s,t_kernel_mean_s,"
+    "t_transfer_runtime_overhead_mean_s,t_setup_s,"
     "gflops,gflops_compute,gflops_kernel,rel_err";
 
 static const char *a_mode_name(a_mode_t mode)
@@ -209,8 +210,9 @@ int main(int argc, char **argv)
     layout_t lay;
     scalar_t *A_loc, *A_global = NULL, *X_loc, *Ypart, *Y_loc = NULL;
     local_gemm_t *kern;
-    double *t_bc, *t_lo, *t_re, *t_tot, *t_ke, *sorted;
-    double mean_bcast, mean_local, mean_reduce, mean_total, mean_kernel;
+    double *t_bc, *t_lo, *t_re, *t_tot, *t_of, *t_ke, *t_tr, *sorted;
+    double mean_bcast, mean_local, mean_reduce, mean_total, mean_official;
+    double mean_kernel, mean_compute, mean_transfer_runtime = -1.0;
     double median_total, min_total, gflops, gflops_compute, rel_err = -1.0;
     double gflops_kernel = -1.0, t_setup;
     int world_rank, world_size, r;
@@ -294,7 +296,8 @@ int main(int argc, char **argv)
      * Forma e leading dimension vengono dal layout una volta sola: il kernel
      * non puo' piu' essere invocato con dimensioni diverse da quelle con cui
      * A e' stata preparata. */
-    kern = local_gemm_create(lay.m_loc, lay.n_loc, lay.k, A_loc, lay.lda);
+    kern = local_gemm_create(lay.m_loc, lay.n_loc, lay.k,
+                             A_loc, lay.lda, lay.ldx, lay.ldy);
 
     /* X e' collocata sulla riga 0 della griglia: solo quei processi la
      * generano. Ogni mpi_matmul la replica lungo le colonne come prima fase
@@ -306,7 +309,9 @@ int main(int argc, char **argv)
     t_tot = xmalloc((size_t)o.reps * sizeof *t_tot);
     t_lo = xmalloc((size_t)o.reps * sizeof *t_lo);
     t_re = xmalloc((size_t)o.reps * sizeof *t_re);
+    t_of = xmalloc((size_t)o.reps * sizeof *t_of);
     t_ke = xmalloc((size_t)o.reps * sizeof *t_ke);
+    t_tr = xmalloc((size_t)o.reps * sizeof *t_tr);
     sorted = xmalloc((size_t)o.reps * sizeof *sorted);
 
     for (r = 0; r < o.warmup; r++)
@@ -322,7 +327,9 @@ int main(int argc, char **argv)
         t_tot[r] = tt.t_total;
         t_lo[r] = tt.t_local;
         t_re[r] = tt.t_reduce;
+        t_of[r] = tt.t_official;
         t_ke[r] = tt.t_kernel;
+        t_tr[r] = (tt.t_kernel >= 0.0) ? tt.t_local - tt.t_kernel : -1.0;
     }
 
     /* Il tempo di una invocazione e' il MASSIMO fra i processi, non quello del
@@ -336,10 +343,17 @@ int main(int argc, char **argv)
                MPI_DOUBLE, MPI_MAX, 0, g.grid);
     MPI_Reduce(g.rank == 0 ? MPI_IN_PLACE : t_tot, t_tot, o.reps,
                MPI_DOUBLE, MPI_MAX, 0, g.grid);
+    /* t_official e' costruito LOCALMENTE per ogni repetition e solo dopo si
+     * prende il massimo: sommare medie/massimi delle singole fasi non darebbe
+     * il cammino critico di una vera invocazione. */
+    MPI_Reduce(g.rank == 0 ? MPI_IN_PLACE : t_of, t_of, o.reps,
+               MPI_DOUBLE, MPI_MAX, 0, g.grid);
     /* Stesso criterio per il tempo di kernel e per il preprocessing: conta il
      * processo piu' lento, non il rank 0. Il sentinella negativo dei backend di
      * CPU sopravvive al massimo, perche' li' e' negativo su tutti i rank. */
     MPI_Reduce(g.rank == 0 ? MPI_IN_PLACE : t_ke, t_ke, o.reps,
+               MPI_DOUBLE, MPI_MAX, 0, g.grid);
+    MPI_Reduce(g.rank == 0 ? MPI_IN_PLACE : t_tr, t_tr, o.reps,
                MPI_DOUBLE, MPI_MAX, 0, g.grid);
     t_setup = local_gemm_setup_seconds(kern);
     MPI_Reduce(g.rank == 0 ? MPI_IN_PLACE : &t_setup, &t_setup, 1,
@@ -355,32 +369,39 @@ int main(int argc, char **argv)
         mean_local = vec_mean(t_lo, o.reps);
         mean_reduce = vec_mean(t_re, o.reps);
         mean_total = vec_mean(t_tot, o.reps);
+        mean_official = vec_mean(t_of, o.reps);
         mean_kernel = vec_mean(t_ke, o.reps);
+        mean_transfer_runtime = vec_mean(t_tr, o.reps);
+        mean_compute = (mean_kernel >= 0.0) ? mean_kernel : mean_local;
         median_total = (o.reps % 2) ? sorted[o.reps / 2]
                                     : 0.5 * (sorted[o.reps / 2 - 1] + sorted[o.reps / 2]);
         min_total = sorted[0];
 
-        /* Metrica ufficiale: media, sulle repetition, del massimo fra rank
-         * del tempo misurato direttamente sull'intero prodotto MPI. */
+        /* Metrica ufficiale: prodotto MPI completo, ma senza i trasferimenti
+         * CUDA come richiesto dalla traccia. Su CPU mean_official coincide con
+         * il totale end-to-end misurato direttamente. */
         gflops = 2.0 * (double)o.M * (double)o.N * (double)o.k
-                  / mean_total / 1.0e9;
+                  / mean_official / 1.0e9;
         gflops_compute = 2.0 * (double)o.M * (double)o.N * (double)o.k
-                          / mean_local / 1.0e9;
+                          / mean_compute / 1.0e9;
         /* Solo se il backend sa distinguere il kernel dai trasferimenti.
          * Questa e' la colonna che, sul backend CUDA, esclude H2D e D2H come
          * la consegna consente esplicitamente di fare. */
-        if (mean_kernel > 0.0)
-            gflops_kernel = 2.0 * (double)o.M * (double)o.N * (double)o.k
-                             / mean_kernel / 1.0e9;
+        if (mean_kernel > 0.0) {
+            /* Alias CUDA esplicito, mantenuto nel CSV per distinguere a colpo
+             * d'occhio le righe GPU. Il valore coincide con gflops_compute. */
+            gflops_kernel = gflops_compute;
+        }
 
         if (o.csv) {
             printf("%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,"
-                   "%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,"
+                   "%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,"
                    "%.6f,%.6f,%.6f,%.3e\n",
                    kernel_name(), SCALAR_NAME, a_mode_name(o.a_mode),
                    o.M, o.N, o.k, g.nprocs, g.pr, g.pc, o.reps,
                    mean_bcast, mean_local, mean_reduce, mean_total,
-                   median_total, min_total, mean_kernel, t_setup,
+                   mean_official, median_total, min_total, mean_kernel,
+                   mean_transfer_runtime, t_setup,
                    gflops, gflops_compute, gflops_kernel, rel_err);
         } else {
             double bytes_A = (double)o.M * o.N * sizeof(scalar_t);
@@ -395,14 +416,17 @@ int main(int argc, char **argv)
             printf("  Bcast mean              %.3f ms\n", mean_bcast * 1e3);
             printf("  Local mean              %.3f ms\n", mean_local * 1e3);
             printf("  Reduce mean             %.3f ms\n", mean_reduce * 1e3);
-            printf("  Total mean              %.3f ms   median %.3f ms   min %.3f ms\n",
+            printf("  Total mean (end-to-end) %.3f ms   median %.3f ms   min %.3f ms\n",
                    mean_total * 1e3, median_total * 1e3, min_total * 1e3);
-            if (mean_kernel > 0.0) {
-                /* La differenza fra i due e' il costo del PCIe per
-                 * invocazione: H2D della fetta di X piu' D2H della fetta di Y.
-                 * E' il numero da riportare a parte nella relazione. */
-                printf("  Kernel mean             %.3f ms   (H2D+D2H %.3f ms)\n",
-                       mean_kernel * 1e3, (mean_local - mean_kernel) * 1e3);
+            if (mean_kernel >= 0.0) {
+                printf("  Official mean           %.3f ms   (GPU transfers excluded)\n",
+                       mean_official * 1e3);
+                printf("  Kernel mean             %.3f ms\n", mean_kernel * 1e3);
+                printf("  Transfer/runtime ovh.   %.3f ms\n",
+                       mean_transfer_runtime * 1e3);
+            } else {
+                printf("  Official mean           %.3f ms   (same as end-to-end)\n",
+                       mean_official * 1e3);
             }
             printf("  Backend setup           %.3f ms   (preprocessing, fuori dalla misura)\n",
                    t_setup * 1e3);
@@ -410,7 +434,7 @@ int main(int argc, char **argv)
             printf("  GFLOPS compute-only     %.3f\n", gflops_compute);
             if (gflops_kernel > 0.0)
                 printf("  GFLOPS kernel-only      %.3f\n", gflops_kernel);
-            printf("                          (2*M*N*k = %.3f GFLOP; official T = total mean)\n",
+            printf("                          (2*M*N*k = %.3f GFLOP; official T = official mean)\n",
                    2.0 * (double)o.M * (double)o.N * (double)o.k / 1e9);
             if (o.check)
                 printf("  validation              relative L2 error %.3e   [%s]\n",
@@ -430,7 +454,9 @@ int main(int argc, char **argv)
     xfree(t_tot);
     xfree(t_lo);
     xfree(t_re);
+    xfree(t_of);
     xfree(t_ke);
+    xfree(t_tr);
     xfree(sorted);
     grid_free(&g);
     MPI_Finalize();
