@@ -78,6 +78,41 @@ void local_gemm(local_gemm_t *ctx,
  * Tollera ctx == NULL. */
 void local_gemm_destroy(local_gemm_t *ctx);
 
+/* ---------------------------------------------------------------------------
+ * Canali di misura del backend
+ * ---------------------------------------------------------------------------
+ * Su CPU il tempo dell'invocazione misurato dal chiamante (t_local, orologio
+ * attorno a local_gemm) E' il tempo del kernel: non c'e' nient'altro in mezzo.
+ * Su GPU non e' cosi'. Una invocazione contiene tre cose diverse:
+ *
+ *     H2D di X   ->   lancio del kernel   ->   D2H di Y
+ *
+ * e la consegna dice esplicitamente che i trasferimenti da e verso la scheda
+ * NON vanno inclusi nel tempo T con cui si calcola 2*M*N*k/T, ma possono
+ * essere misurati e discussi a parte. Servono percio' due canali distinti:
+ *
+ *   t_local   (misurato dal chiamante)  = H2D + kernel + D2H
+ *   t_kernel  (misurato dal backend)    = solo kernel
+ *
+ * e la loro differenza e' esattamente il costo del PCIe, che e' il numero da
+ * commentare nella relazione. Il backend e' l'unico che puo' misurare
+ * t_kernel, perche' su CUDA va fatto con i cudaEvent sullo stream, non con
+ * l'orologio dell'host: un lancio e' asincrono e l'orologio dell'host
+ * misurerebbe il tempo di accodamento, non quello di esecuzione. */
+
+/* Tempo di calcolo della SOLA ultima invocazione di local_gemm, in secondi.
+ * Restituisce un valore NEGATIVO se il backend non distingue il kernel dal
+ * resto dell'invocazione (e' il caso dei backend di CPU: li' la risposta e'
+ * gia' t_local) oppure se local_gemm non e' ancora stata chiamata. */
+double local_gemm_last_compute_seconds(const local_gemm_t *ctx);
+
+/* Tempo speso in preparazione, in secondi: tutto cio' che e' avvenuto una
+ * volta sola fuori dalla regione cronometrata. Per un backend di CPU e' circa
+ * zero; per CUDA e' creazione del contesto + cudaMalloc + H2D di A, cioe'
+ * proprio il costo che la scelta di separare create da local_gemm ha tolto dal
+ * cammino misurato. Va riportato, non nascosto. */
+double local_gemm_setup_seconds(const local_gemm_t *ctx);
+
 /* Nome del backend attivo, per l'intestazione delle misure. */
 const char *kernel_name(void);
 

@@ -21,7 +21,8 @@ make check          # check-cxx + validazione MPI contro il seriale
 make check-cxx      # kernel.h e util.h restano utilizzabili da nvcc
 make PREC=float check # stessa matrice di validazione in singola precisione
 make check-padding  # --a-mode global con lda = n_loc + 8
-make KERNEL=<nome>  # seleziona src/kernel/<nome>.c come local_gemm
+make KERNEL=<nome>  # seleziona src/kernel/<nome>.c oppure .cu come local_gemm
+make KERNEL=cuda_naive check   # backend CUDA (richiede nvcc: solo sul server)
 ```
 
 Ogni configurazione ha un binario con nome proprio, cosi' una build non puo'
@@ -35,7 +36,7 @@ aggiunge un suffisso:
 | `make PREC=float` | `bin/matmul_mpi-float` |
 | `make FORCE_GENERIC_K=1` | `bin/matmul_mpi-generic` |
 | `make TEST_A_PADDING=8` | `bin/matmul_mpi-pad8` |
-| `make KERNEL=cuda` | `bin/matmul_mpi-cuda` |
+| `make KERNEL=cuda_naive` | `bin/matmul_mpi-cuda_naive` |
 
 La riga finale di `make` ricorda sempre quale binario e' stato prodotto e con
 quali variabili.
@@ -79,19 +80,65 @@ local_gemm_destroy(kern);
 ```
 
 Per `scheme_a` create/destroy si limitano a registrare forma e puntatore. Per
-il backend CUDA `create` sara' la `cudaMemcpy` H2D di A in VRAM, che deve
-avvenire una volta sola: la consegna esclude dalla misura il tempo di
-trasferimento da e verso la scheda, e con A dell'ordine dei GB una copia per
-invocazione misurerebbe il PCIe, non la GPU.
+il backend CUDA `create` e' la `cudaMemcpy` H2D di A in VRAM, che avviene una
+volta sola: la consegna esclude dalla misura il tempo di trasferimento da e
+verso la scheda, e con A dell'ordine dei GB una copia per invocazione
+misurerebbe il PCIe, non la GPU.
+
+## Backend CUDA
+
+Il Makefile riconosce da solo se il backend e' C o CUDA: se esiste
+`src/kernel/<nome>.cu` viene compilato con `nvcc -arch=sm_75` e il binario
+linkato con `-lcudart`. Non c'e' nessun flag da ricordarsi.
+
+```bash
+make KERNEL=cuda_naive check      # 24 validazioni contro il seriale, su GPU
+mpirun -np 1 ./bin/matmul_mpi-cuda_naive -M 10000 -N 10000 -k 32 --reps 10
+```
+
+Su una macchina senza `nvcc` la build si ferma con un messaggio esplicito: il
+backend CUDA si compila sul server (`module load cuda`, oppure
+`make NVCC=/usr/local/cuda/bin/nvcc ...`). Tutto il resto del progetto, incluso
+`make check-cxx`, continua a funzionare ovunque.
+
+`cuda_naive` e' la **baseline**, non il kernel finale: un thread per elemento di
+Y, che quindi perde il riuso di A in registro dello schema A. Serve a validare
+la pipeline e a dare il numero contro cui misurare le versioni successive.
+
+Le fasi cadono cosi':
+
+| fase | dove | cronometrata? |
+|---|---|---|
+| creazione contesto CUDA, `cudaMalloc`, H2D di **A** | `local_gemm_create` | no, e' preprocessing (`t_setup_s`) |
+| H2D di **X**, kernel, D2H di **Y** | `local_gemm` | si', e' `t_local` |
+| solo il kernel, misurato con i `cudaEvent` | dentro `local_gemm` | si', ed e' `t_kernel` |
+
+`t_local - t_kernel` e' esattamente il costo del PCIe per invocazione, che la
+consegna consente di riportare a parte anziche' dentro T.
+
+I buffer di X e Y si allocano alla prima invocazione, perche' `ldx` e `ldy`
+arrivano da li' e non da `local_gemm_create`. Con il default `--warmup 2` quella
+prima invocazione e' un warm-up e l'allocazione resta fuori dalle repetition
+cronometrate; il suo costo viene comunque sommato a `t_setup_s`, quindi non
+sparisce dai dati. Con `--warmup 0` finirebbe nella prima repetition.
+
+Se il blocco locale non entra in VRAM (40000x40000 in double sono 12.8 GiB
+contro i 15.5 GiB della Quadro RTX 5000) il programma si ferma prima di
+allocare, dicendo quanta memoria serve e quanta ce n'e'.
 
 Per ogni repetition si prende separatamente il massimo fra i rank dei tempi di
 broadcast, calcolo locale, reduce e totale. Il totale e' misurato direttamente
 dall'inizio del broadcast alla fine della reduce. Le metriche sono:
 
 ```text
-gflops         = 2*M*N*k / mean(max_rank(t_total)) / 1e9
-gflops_compute = 2*M*N*k / mean(max_rank(t_local)) / 1e9
+gflops         = 2*M*N*k / mean(max_rank(t_total))  / 1e9   metrica ufficiale
+gflops_compute = 2*M*N*k / mean(max_rank(t_local))  / 1e9   senza le collettive
+gflops_kernel  = 2*M*N*k / mean(max_rank(t_kernel)) / 1e9   senza H2D/D2H
 ```
+
+`t_kernel` e `gflops_kernel` valgono `-1` per i backend di CPU, dove il kernel
+coincide con `t_local` e non c'e' niente da separare. `t_setup_s` riporta il
+preprocessing del backend, che per costruzione sta fuori da tutte e tre.
 
 `scheme_a` specializza in C portabile `k=3,6,8,20,32` e usa il kernel generico
 per ogni altro valore. Per un microbenchmark sullo stesso problema:
@@ -110,7 +157,7 @@ mpirun -np 4 ./bin/matmul_mpi-generic -M 8000 -N 8000 -k 8 --pr 2 --pc 2 --csv
 | `src/index` | partizionamento a blocchi degli indici globali |
 | `src/gen` | generatore riproducibile, funzione degli indici globali |
 | `src/serial` | implementazione seriale di riferimento (oracolo) |
-| `src/kernel` | `local_gemm`, un file per implementazione |
+| `src/kernel` | `local_gemm`, un file per implementazione (`.c` o `.cu`) |
 | `src/mpi` | griglia cartesiana, distribuzione, algoritmo `Y = AX` |
 | `src/bench` | driver di misura e validazione |
 | `test` | test isolato delle funzioni indice, probe C++ dell'interfaccia |

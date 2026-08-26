@@ -14,6 +14,10 @@ typedef struct {
     double t_local;
     double t_reduce;
     double t_total;
+    /* Tempo del solo kernel, chiesto al backend. Su CPU e' negativo
+     * ("non applicabile": la risposta e' gia' t_local); su CUDA e' il tempo
+     * misurato dai cudaEvent, cioe' t_local meno H2D di X e D2H di Y. */
+    double t_kernel;
 } matmul_time_t;
 
 /* Y = A*X distribuito. Tutti i processi eseguono lo stesso codice.

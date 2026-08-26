@@ -141,12 +141,16 @@ struct local_gemm_ctx {
     int m, n, k;
     int lda;
     const scalar_t *A;
+    double t_setup;   /* misurato davvero, anche se qui e' ~1 us: il confronto
+                       * con il backend CUDA ha senso solo se lo stesso numero
+                       * viene dallo stesso punto del codice in entrambi. */
 };
 
 local_gemm_t *local_gemm_create(int m, int n, int k,
                                 const scalar_t *A, int lda)
 {
     local_gemm_t *ctx;
+    const double t0 = now_seconds();
 
     if (m < 0 || n < 0 || k < 0)
         die("local_gemm_create: invalid local block %dx%d with k=%d", m, n, k);
@@ -161,6 +165,7 @@ local_gemm_t *local_gemm_create(int m, int n, int k,
     ctx->k = k;
     ctx->lda = lda;
     ctx->A = A;
+    ctx->t_setup = now_seconds() - t0;
     return ctx;
 }
 
@@ -205,6 +210,22 @@ void local_gemm_destroy(local_gemm_t *ctx)
     /* Nessuna risorsa esterna da rilasciare: A appartiene al chiamante.
      * Il backend CUDA fara' qui la cudaFree della copia in VRAM. */
     xfree(ctx);
+}
+
+/* Su CPU il kernel E' l'invocazione: non esiste un tempo di calcolo distinto
+ * da t_local, e restituire t_local qui vorrebbe dire duplicare in una colonna
+ * un numero che il chiamante ha gia'. Il valore negativo dice "non applicabile"
+ * e il driver lo riporta come tale, cosi' nel CSV si vede a colpo d'occhio
+ * quali righe vengono da un backend con trasferimenti e quali no. */
+double local_gemm_last_compute_seconds(const local_gemm_t *ctx)
+{
+    (void)ctx;
+    return -1.0;
+}
+
+double local_gemm_setup_seconds(const local_gemm_t *ctx)
+{
+    return (ctx != NULL) ? ctx->t_setup : 0.0;
 }
 
 const char *kernel_name(void)

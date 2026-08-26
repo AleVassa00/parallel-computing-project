@@ -41,5 +41,9 @@ void mpi_matmul(const grid_t *g, const layout_t *l,
         t->t_local = t2 - t1;
         t->t_reduce = t3 - t2;
         t->t_total = t3 - t0;
+        /* Interrogato DOPO t3, non fra t2 e la reduce: e' una lettura di uno
+         * stato che il backend ha gia' congelato alla fine di local_gemm, e
+         * metterla dentro una finestra cronometrata ne falserebbe il valore. */
+        t->t_kernel = local_gemm_last_compute_seconds(kern);
     }
 }

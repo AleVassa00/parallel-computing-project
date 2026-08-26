@@ -5,8 +5,15 @@
 #   make check      validazione MPI contro il seriale su piu' forme di griglia
 #   make check-cxx  verifica che kernel.h resti utilizzabile da nvcc
 #   make PREC=float ricompila in singola precisione
-#   make KERNEL=..  seleziona l'implementazione di local_gemm
+#   make KERNEL=..  seleziona l'implementazione di local_gemm (.c oppure .cu)
 #   make FORCE_GENERIC_K=1  forza il fallback generico di scheme_a
+#
+# Il backend si sceglie con KERNEL e il Makefile capisce da solo se e' un file C
+# o un file CUDA:  src/kernel/$$(KERNEL).cu ha la precedenza su .c, viene
+# compilato con nvcc e il binario viene linkato con -lcudart. Serve nvcc nel
+# PATH (sul server:  module load cuda, oppure NVCC=/usr/local/cuda/bin/nvcc).
+#
+#   make KERNEL=cuda_naive check   ->   bin/matmul_mpi-cuda_naive, validato
 #
 # Ogni configurazione produce un BINARIO CON NOME PROPRIO: la configurazione di
 # riferimento (double, scheme_a) e' bin/matmul_mpi, ogni variante aggiunge un
@@ -17,6 +24,12 @@
 CC     := gcc
 CXX    := g++
 MPICC  := mpicc
+NVCC   ?= nvcc
+
+# Turing (Quadro RTX 5000, sm_75) e' l'architettura del server. Compilare per
+# la sola architettura di destinazione, e non per un fat binary, e' quello che
+# serve: il codice non deve girare altrove.
+NVCC_ARCH ?= sm_75
 
 # Il kernel locale e' un file intercambiabile: il resto del codice vede solo
 # l'interfaccia local_gemm dichiarata in src/kernel/kernel.h.
@@ -74,24 +87,61 @@ ifneq ($(TEST_A_PADDING),0)
 CFLAGS += -DTEST_A_PADDING=$(TEST_A_PADDING)
 endif
 
-SRCS := \
+# Tutto il progetto tranne il kernel: questi file sono C e non cambiano mai.
+C_SRCS := \
 	src/common/util.c \
 	src/index/index.c \
 	src/gen/gen.c \
 	src/serial/serial.c \
-	src/kernel/$(KERNEL).c \
 	src/mpi/grid.c \
 	src/mpi/distrib.c \
 	src/mpi/matmul_mpi.c \
 	src/bench/check.c \
 	src/bench/main.c
 
+# Il kernel invece puo' essere C o CUDA, e la differenza la decide l'estensione
+# del file che esiste: .cu ha la precedenza. E' questo che rende il backend
+# davvero intercambiabile - non c'e' un flag CUDA=1 da ricordarsi di passare.
+KERNEL_SRC := $(firstword $(wildcard src/kernel/$(KERNEL).cu src/kernel/$(KERNEL).c))
+ifeq ($(KERNEL_SRC),)
+$(error KERNEL='$(KERNEL)': non esiste ne' src/kernel/$(KERNEL).cu ne' src/kernel/$(KERNEL).c)
+endif
+
+ifeq ($(suffix $(KERNEL_SRC)),.cu)
+KERNEL_IS_CUDA := 1
+else
+KERNEL_IS_CUDA := 0
+endif
+
+ifeq ($(KERNEL_IS_CUDA),1)
+# nvcc compila i .cu come C++: -std=c++14 riguarda il codice host del .cu, non
+# il resto del progetto, che resta C11 compilato da mpicc. -march=native NON va
+# dato a nvcc direttamente, che non lo conosce: passa al compilatore host con
+# -Xcompiler. -lineinfo serve dopo, per correlare i profili di ncu al sorgente.
+NVCCFLAGS := -O3 -std=c++14 -arch=$(NVCC_ARCH) -Isrc $(PRECDEF) -lineinfo \
+	-Xcompiler -Wall -Xcompiler -Wextra
+ifneq ($(ARCHFLAGS),)
+NVCCFLAGS += -Xcompiler $(ARCHFLAGS)
+endif
+
+# Il link lo fa mpicc (servono le librerie MPI), quindi il runtime CUDA va
+# aggiunto a mano; -lstdc++ perche' un oggetto prodotto da nvcc e' C++.
+ifeq ($(origin CUDA_HOME), undefined)
+CUDA_HOME := $(patsubst %/bin/,%,$(dir $(shell command -v $(NVCC) 2>/dev/null)))
+endif
+ifneq ($(CUDA_HOME),)
+LDFLAGS += -L$(CUDA_HOME)/lib64
+endif
+LDLIBS += -lcudart -lstdc++
+endif
+
 # Configurazioni diverse non condividono ne' oggetti ne' binario: cambiare
 # precisione, padding o dispatch non puo' quindi riutilizzare accidentalmente
 # una vecchia build ne' sovrascrivere quella di riferimento.
 OBJDIR ?= obj/matmul_mpi$(CONFIG)
-OBJS   := $(patsubst src/%.c,$(OBJDIR)/%.o,$(SRCS))
-DEPS   := $(OBJS:.o=.d)
+KERNEL_OBJ := $(OBJDIR)/kernel/$(KERNEL).o
+OBJS   := $(patsubst src/%.c,$(OBJDIR)/%.o,$(C_SRCS)) $(KERNEL_OBJ)
+DEPS   := $(patsubst src/%.c,$(OBJDIR)/%.d,$(C_SRCS))
 
 BIN ?= bin/matmul_mpi$(CONFIG)
 TESTBIN := bin/test_index
@@ -99,22 +149,40 @@ TESTBIN := bin/test_index
 .PHONY: all test check check-mpi check-cxx check-padding padding-run clean
 
 all: $(BIN) $(TESTBIN)
-	@echo "built $(BIN)  [PREC=$(PREC) KERNEL=$(KERNEL) FORCE_GENERIC_K=$(FORCE_GENERIC_K) TEST_A_PADDING=$(TEST_A_PADDING)]"
+	@echo "built $(BIN)  [PREC=$(PREC) KERNEL=$(KERNEL) ($(KERNEL_SRC)) FORCE_GENERIC_K=$(FORCE_GENERIC_K) TEST_A_PADDING=$(TEST_A_PADDING)]"
 
 $(OBJDIR)/%.o: src/%.c
 	@mkdir -p $(dir $@)
 	$(MPICC) $(CFLAGS) -c $< -o $@
 
+# Un kernel .cu lo compila nvcc. Nessuna generazione automatica delle
+# dipendenze qui (l'opzione cambia fra le versioni di nvcc): gli header del
+# kernel sono tre e si elencano sotto, esplicitamente.
+$(OBJDIR)/kernel/%.o: src/kernel/%.cu
+	@mkdir -p $(dir $@)
+	@command -v $(NVCC) >/dev/null 2>&1 || { \
+		echo "errore: '$(NVCC)' non trovato nel PATH."; \
+		echo "        Il backend '$*' e' CUDA: va compilato sul server."; \
+		echo "        Prova 'module load cuda' oppure NVCC=/usr/local/cuda/bin/nvcc."; \
+		exit 1; }
+	$(NVCC) $(NVCCFLAGS) -c $< -o $@
+
+ifeq ($(KERNEL_IS_CUDA),1)
+$(KERNEL_OBJ): src/kernel/kernel.h src/common/scalar.h src/common/util.h
+endif
+
 # Niente target FORCE: ora che il nome del binario dipende dalla
 # configurazione, la normale logica di dipendenza di make e' corretta.
 $(BIN): $(OBJS)
 	@mkdir -p bin
-	$(MPICC) $(CFLAGS) $^ -o $@ $(LDLIBS)
+	$(MPICC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
-# I test degli indici non usano MPI: compilatore normale, binario autonomo.
+# I test degli indici non usano ne' MPI ne' CUDA: compilatore normale, binario
+# autonomo, e -lm scritto qui invece di $(LDLIBS), che con un backend .cu
+# conterrebbe anche -lcudart.
 $(TESTBIN): test/test_index.c src/index/index.c
 	@mkdir -p bin
-	$(CC) $(CFLAGS) $^ -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) $^ -o $@ -lm
 
 test: $(TESTBIN)
 	./$(TESTBIN)
@@ -162,6 +230,7 @@ check-cxx:
 		-c test/cxx_iface.cpp -o $(OBJDIR)/cxx_iface.o
 	@if command -v nm >/dev/null 2>&1; then \
 		for sym in local_gemm_create local_gemm local_gemm_destroy \
+		           local_gemm_last_compute_seconds local_gemm_setup_seconds \
 		           kernel_name xmalloc die; do \
 			nm -u $(OBJDIR)/cxx_iface.o | grep -qw $$sym || { \
 				echo "check-cxx: FAIL: '$$sym' e' decorato (manca extern \"C\" in un header)"; \
