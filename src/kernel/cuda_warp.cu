@@ -65,7 +65,14 @@ static __global__ void warp_kernel_fixed(int m, int n,
             acc[c] += a * xrow[c];
     }
 
-    mask = __activemask();
+    /* Maschera piena, non __activemask(). Da Volta in poi le lane di un warp
+     * possono divergere e riconvergere in modo indipendente, e la guida CUDA
+     * dice esplicitamente che il valore di __activemask() non implica
+     * convergenza: usarlo come maschera di una __shfl_*_sync e' un
+     * comportamento non definito se due lane ne ottengono una diversa. Qui il
+     * return sopra e' UNIFORME sul warp (warp_id non dipende da lane), quindi
+     * le 32 lane sono tutte vive e la maschera corretta e' nota a priori. */
+    mask = 0xffffffffu;
 #pragma unroll
     for (offset = WARP_SIZE / 2; offset > 0; offset >>= 1) {
 #pragma unroll
@@ -105,7 +112,7 @@ static __global__ void warp_kernel_runtime(int m, int n, int k,
         return;
 
     arow = A + (size_t)warp_id * (size_t)lda;
-    mask = __activemask();
+    mask = 0xffffffffu;   /* stesso motivo del kernel template qui sopra */
 
     for (c0 = 0; c0 < k; c0 += RUNTIME_TILE) {
 #pragma unroll

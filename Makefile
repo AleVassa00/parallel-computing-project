@@ -8,6 +8,9 @@
 #   make KERNEL=..  seleziona l'implementazione di local_gemm (.c oppure .cu)
 #   make FORCE_GENERIC_K=1  forza il fallback generico di scheme_a
 #   make KERNEL=cuda_warp  backend CUDA warp-per-row con dispatch su k
+#   make KERNEL=cuda_warp_smem  come sopra, ma con il tile di X in shared
+#   make KERNEL=cuda_warp_smem SMEM_PAD=0  la stessa cosa senza il padding k+1
+#   make KERNEL=cublas     riferimento esterno (aggiunge -lcublas da solo)
 #
 # Il backend si sceglie con KERNEL e il Makefile capisce da solo se e' un file C
 # o un file CUDA:  src/kernel/$$(KERNEL).cu ha la precedenza su .c, viene
@@ -38,6 +41,13 @@ KERNEL ?= scheme_a
 PREC   ?= double
 FORCE_GENERIC_K ?= 0
 TEST_A_PADDING  ?= 0
+
+# Scalari di padding aggiunti a ogni riga del tile di X in shared memory dal
+# backend cuda_warp_smem. 1 rompe il conflitto a 32 vie sui banchi che si
+# presenta a k=32 in double; SMEM_PAD=0 e' il termine di paragone da misurare.
+# Riguarda solo i backend CUDA che lo leggono, ma entra nel nome della
+# configurazione: le due build coesistono come binari distinti.
+SMEM_PAD        ?= 1
 EXTRA_CFLAGS    ?=
 EXTRA_NVCCFLAGS ?=
 
@@ -65,6 +75,9 @@ CONFIG := $(CONFIG)-generic
 endif
 ifneq ($(TEST_A_PADDING),0)
 CONFIG := $(CONFIG)-pad$(TEST_A_PADDING)
+endif
+ifneq ($(SMEM_PAD),1)
+CONFIG := $(CONFIG)-smempad$(SMEM_PAD)
 endif
 LDLIBS := -lm
 
@@ -121,6 +134,7 @@ ifeq ($(KERNEL_IS_CUDA),1)
 # dato a nvcc direttamente, che non lo conosce: passa al compilatore host con
 # -Xcompiler. -lineinfo serve dopo, per correlare i profili di ncu al sorgente.
 NVCCFLAGS := -O3 -std=c++14 -arch=$(NVCC_ARCH) -Isrc $(PRECDEF) -lineinfo \
+	-DSCPA_SMEM_PAD=$(SMEM_PAD) \
 	-Xcompiler -Wall -Xcompiler -Wextra $(EXTRA_NVCCFLAGS)
 ifneq ($(ARCHFLAGS),)
 NVCCFLAGS += -Xcompiler $(ARCHFLAGS)
@@ -135,6 +149,13 @@ ifneq ($(CUDA_HOME),)
 LDFLAGS += -L$(CUDA_HOME)/lib64
 endif
 LDLIBS += -lcudart -lstdc++
+
+# Stessa idea del riconoscimento .cu/.c: un backend che include cublas_v2.h ha
+# bisogno anche di -lcublas al link, e il Makefile lo deduce dal sorgente
+# invece di chiedere un flag CUBLAS=1 da ricordarsi.
+ifneq ($(shell grep -l cublas_v2.h $(KERNEL_SRC) 2>/dev/null),)
+LDLIBS += -lcublas
+endif
 endif
 
 # Configurazioni diverse non condividono ne' oggetti ne' binario: cambiare
@@ -151,7 +172,7 @@ TESTBIN := bin/test_index
 .PHONY: all test check check-mpi check-cxx check-padding padding-run clean
 
 all: $(BIN) $(TESTBIN)
-	@echo "built $(BIN)  [PREC=$(PREC) KERNEL=$(KERNEL) ($(KERNEL_SRC)) FORCE_GENERIC_K=$(FORCE_GENERIC_K) TEST_A_PADDING=$(TEST_A_PADDING)]"
+	@echo "built $(BIN)  [PREC=$(PREC) KERNEL=$(KERNEL) ($(KERNEL_SRC)) FORCE_GENERIC_K=$(FORCE_GENERIC_K) TEST_A_PADDING=$(TEST_A_PADDING) SMEM_PAD=$(SMEM_PAD)]"
 
 $(OBJDIR)/%.o: src/%.c
 	@mkdir -p $(dir $@)

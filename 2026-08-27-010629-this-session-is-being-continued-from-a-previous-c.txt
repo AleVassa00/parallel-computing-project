@@ -1,0 +1,514 @@
+ ▐▛███▛█   Claude Code v2.1.246
+▝▜██████▀  Opus 5 · Claude Pro
+  ▝▝ ▝▝    ~/Scrivania/scpa/parallel-computing-project
+
+
+※ recap: Obiettivo: completare il progetto Y=AX aggiungendo il backend CUDA. La parte MPI è verificata e i difetti 2, 3 e 4 sono sistemati; ho consegnato il piano CUDA in cinque fasi. Prossima azione: implementare M4.1, cioè regola nvcc, cuda_naive.cu e i due accessori di timing. (disable recaps in /config)
+
+❯ /compact                                                                      
+  ⎿  Compacted (ctrl+o to see full summary)
+     PreCompact ["/home/andrea/.local/share/GitKrakenCLI/gk" ai hook run --host 
+     claude-code] completed successfully
+     PostCompact ["/home/andrea/.local/share/GitKrakenCLI/gk" ai hook run --host
+     claude-code] completed successfully
+
+❯ /export                                                                       
+  ⎿  Conversation exported to:
+     /home/andrea/Scrivania/scpa/scelte-implementative.txt
+
+❯ /memory 
+  ⎿  Opened ./CLAUDE.md
+
+     ▎ To use a different editor, set the $EDITOR or $VISUAL environment variable.
+
+❯ /memory 
+  ⎿  Opened ~/.claude/CLAUDE.md
+
+     ▎ To use a different editor, set the $EDITOR or $VISUAL environment variable.
+
+❯ genera il prossimo step M4.1                                                  
+
+  Read 1 file, listed 1 directory, ran 5 shell commands (ctrl+o to expand)
+
+● Ho tutto il contesto. Procedo con M4.1.
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+● Ora il driver di misura (main.c): due nuove colonne CSV e le righe di report.
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Ora il backend CUDA vero e proprio.
+
+  Read 1 file (ctrl+o to expand)
+
+● Ora il Makefile: rilevamento .cu, regola nvcc, link con -lcudart.
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Ora verifico che tutto compili e passi la validazione (backend scalare,
+  l'unico costruibile su questa VM).
+
+  Ran 4 shell commands (ctrl+o to expand)
+● Ora un controllo che posso davvero fare senza GPU: verificare a compilazione
+  il codice host del .cu. Prima rendo controllabili dal compilatore i formati di
+  die().
+
+  Ran 8 shell commands (ctrl+o to expand)
+
+● M4.1 fatto. Ecco cosa c'è adesso e come l'ho verificato.
+
+  Cosa ho aggiunto
+
+  1. Il Makefile capisce da solo se il backend è C o CUDA
+
+  KERNEL_SRC := $(firstword $(wildcard src/kernel/$(KERNEL).cu
+  src/kernel/$(KERNEL).c))
+
+  .cu ha la precedenza. Non c'è nessun CUDA=1 da ricordarsi: make 
+  KERNEL=cuda_naive produce da solo bin/matmul_mpi-cuda_naive, compilando il
+  kernel con nvcc -arch=sm_75 e linkando con mpicc ... -lcudart -lstdc++.
+  -march=native passa a nvcc come -Xcompiler -march=native, perché nvcc quel
+  flag non lo conosce.
+
+  2. src/kernel/cuda_naive.cu — la baseline (335 righe)
+
+  Un thread per elemento di Y: i = t/k, c = t%k, ciclo su j. È deliberatamente
+  il kernel che perde il riuso di A in registro: ogni thread tiene un solo
+  accumulatore, quindi la riga di A viene richiesta k volte invece di una. È
+  esattamente il punto contro cui misurerai il warp-shuffle di M4.3.
+
+  Il ciclo di vita cade dove serve:
+
+  ┌─────────────────────────────────────┬───────────────────┬───────────────┐
+  │                fase                 │       dove        │     in T?     │
+  ├─────────────────────────────────────┼───────────────────┼───────────────┤
+  │ contesto CUDA + cudaMalloc + H2D di │ local_gemm_create │ no →          │
+  │  A                                  │                   │ t_setup_s     │
+  ├─────────────────────────────────────┼───────────────────┼───────────────┤
+  │ H2D di X, kernel, D2H di Y          │ local_gemm        │ sì → t_local  │
+  ├─────────────────────────────────────┼───────────────────┼───────────────┤
+  │ solo il kernel, via cudaEvent       │ dentro local_gemm │ sì → t_kernel │
+  └─────────────────────────────────────┴───────────────────┴───────────────┘
+
+  t_local - t_kernel è il costo del PCIe per invocazione — il numero che la
+  consegna ti permette di riportare a parte invece che dentro T.
+
+  3. I due canali di misura in kernel.h
+
+  local_gemm_last_compute_seconds() e local_gemm_setup_seconds(). Il primo
+  restituisce −1 su CPU: lì il kernel è t_local, e duplicare quel numero in una
+  colonna nasconderebbe la differenza fra le righe del CSV che vengono da un
+  backend con trasferimenti e quelle che no. Nuove colonne: t_kernel_mean_s,
+  t_setup_s, gflops_kernel.
+
+  Verifiche
+
+  - make check → 24/24 PASS, con errori relativi identici cifra per cifra a
+    prima (0.000e+00, 1.779e-16, … 6.958e-16): la modifica è numericamente
+    inerte. Idem PREC=float (24/24), FORCE_GENERIC_K=1 (24/24), check-padding.
+  - check-cxx copre i simboli nuovi: ho fatto uscire di proposito
+    local_gemm_last_compute_seconds da extern "C" e il target ha fallito con il
+    messaggio giusto.
+  - ASan/UBSan: i 22 leak riportati bottomano tutti in MPI_Init (interni
+    OpenMPI), zero menzioni di xmalloc/local_gemm_create.
+  - Ho aggiunto __attribute__((format(printf))) a die() e ricompilato: i
+    messaggi CUDA mescolano %d, %zu, %.2f, e ora è il compilatore a
+    controllarli.
+
+  Il .cu non è compilabile qui (niente nvcc su questa macchina). Per non
+  consegnartelo alla cieca l'ho fatto type-checkare da g++ con uno shim
+  usa-e-getta di cuda_runtime.h, sostituendo la sola sintassi <<<>>>: corpo del
+  kernel incluso, zero warning (l'unico che compare è blocks inutilizzato,
+  artefatto della sostituzione). Restano non verificabili solo la sintassi di
+  lancio e il comportamento a runtime.
+
+  Due cose da sapere prima di girarlo sul server:
+
+  - I buffer di X e Y si allocano alla prima invocazione, perché ldx/ldy
+    arrivano da lì e non da create. Con --warmup 2 (il default) quella è un
+    warm-up, quindi resta fuori dalle repetition; il costo viene comunque
+    sommato a t_setup_s. Con --warmup 0 finirebbe nella prima repetition.
+  - C'è un guard su cudaMemGetInfo: se il blocco locale non entra in VRAM il
+    programma si ferma prima di allocare dicendo quanto serve e quanto c'è
+    (40000×40000 in double = 12.8 GiB contro 15.5 GiB della RTX 5000).
+
+  Criterio di uscita di M4.1, da eseguire sul server: make KERNEL=cuda_naive 
+  check deve dare 24/24 con gli stessi ~1e-16. Se passa, la pipeline è validata
+  end-to-end e M4.2/M4.3 aggiungono solo il kernel.
+
+  src/kernel/cuda_naive.cu è ancora untracked — va git add.
+
+✻ Churned for 11m 52s · done mercoledì 16:56
+
+※ recap: Goal: add a CUDA backend to the MPI matrix×multivector kernel. M4.1 is done: Makefile now builds .cu backends, cuda_naive.cu written, timing channels added, 24/24 checks pass locally. Next: run make KERNEL=cuda_naive check on the department server. (disable recaps in /config)
+
+❯ /compact                                                                      
+  ⎿  Compacted (ctrl+o to see full summary)
+     PreCompact ["/home/andrea/.local/share/GitKrakenCLI/gk" ai hook run --host 
+     claude-code] completed successfully
+     PostCompact ["/home/andrea/.local/share/GitKrakenCLI/gk" ai hook run --host
+     claude-code] completed successfully
+  ⎿  Read progetto-2025-2026.pdf (79KB)
+
+❯ Il codice è stato aggiornato e credo che dovremmo essere arrivati             
+  all'implementazione di M4.3. Controlla se l'implementazione di CUDA sia       
+  corretta. Dopodiché forniscimi nuovamente quali sono i passi del piano        
+  funzionale che abbiamo eseguito finora correttamente finora (a livello        
+  implementativo, ancora da provare sul server) e quelli che rimangono,         
+  ricordandomi anche quali sono i criteri di uscita di ciascun passo per        
+  poterli rieseguire.                                                           
+
+  Searched for 2 patterns, read 4 files, ran 19 shell commands (ctrl+o to expand)
+
+● Background command "Run CPU regression checks in background" completed (exit
+code 0)
+● Trovato un punto da correggere. Lo applico e poi ri-verifico.
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Ho verificato tutto quello che è verificabile senza GPU. Riassumo prima il
+  risultato, poi il piano.
+
+  ---
+
+  1. Dove siamo davvero
+
+  Una precisazione prima di tutto: quello che è implementato è M4.2, non M4.3.
+
+  Nel piano funzionale M4.3 è cuda_warp_smem (X messa in shared memory con il
+  padding k+1), e quel file non esiste: in src/kernel/ ci sono solo scheme_a.c,
+  cuda_naive.cu e cuda_warp.cu. Quindi M4.1 e M4.2 sono scritti, M4.3 è il 
+  prossimo.
+
+  ---
+
+  2. Come ho controllato il CUDA senza avere una GPU
+
+  Su questa macchina non c'è né nvcc né una scheda, quindi un make 
+  KERNEL=cuda_warp check è impossibile. Rileggere il codice però non basta: gli
+  errori tipici del warp shuffle (una lane che esce prima delle altre, una
+  riduzione che perde un pezzo, un bordo sbagliato quando n non è multiplo di
+  32) non si vedono leggendo.
+
+  Ho quindi costruito un emulatore del modello di esecuzione CUDA che gira 
+  sull'host:
+
+  - ho scritto uno cuda_runtime.h finto in cui cudaMalloc è malloc, cudaMemcpy è
+    memcpy, gli event sono no-op;
+  - ogni warp è simulato da 32 thread veri del sistema operativo, con una
+    barriera in mezzo, e __shfl_down_sync è implementata copiando il valore in
+    un buffer condiviso, aspettando la barriera e rileggendo dalla lane sorgente
+    — con la semantica esatta di CUDA, cioè "se la lane sorgente è fuori dal
+    warp, il thread riceve il proprio valore";
+  - l'unica modifica al sorgente è meccanica e automatica: kernel<<<blocks, 
+    threads>>>(args) diventa sim_launch(blocks, threads, kernel, args). Il corpo
+    dei kernel, l'indicizzazione, la riduzione, le
+    local_gemm_create/local_gemm/destroy sono gli stessi identici byte del file 
+    del progetto.
+
+  Il vantaggio è che due bug si autodenunciano. Se il return anticipato non
+  fosse uniforme sul warp, le lane superstiti resterebbero bloccate sulla
+  barriera e il test andrebbe in deadlock invece di dare un numero sbagliato. E
+  il risultato viene confrontato con una moltiplicazione di riferimento
+  calcolata in long double.
+
+  Esito: 38 casi su 38 per entrambi i backend, in double e in float.
+
+  I casi coprono i cinque k della consegna, i k che cadono nel fallback (1, 2,
+  4, 5, 7, 17, 40, 64), n = 1, 31, 32, 33, 63, 64, 65 (i bordi del warp), m = 1,
+  7, 8, 9, 16, 17 (i bordi del blocco da 8 warp), il padding di lda/ldx/ldy, e
+  i blocchi vuoti m=0, n=0, k=0 che nascono quando la griglia MPI è più grande
+  della matrice. Errori relativi ~1e-16 in double, ~1e-7 in float — gli stessi
+  ordini di grandezza dello scalare.
+
+  Ho anche verificato che local_gemm assegna e non accumula: il buffer Y parte
+  da valori sporchi e la funzione viene chiamata due volte di fila, quindi un +=
+  mascherato o un residuo su dY fallirebbe.
+
+  Sul fronte CPU, per essere sicuro che il refactoring della firma di
+  local_gemm_create (ora prende anche ldx e ldy) non abbia rotto niente:
+
+  make check                  -> PASS=24  FAIL=0
+  make PREC=float check       -> PASS=24  FAIL=0
+  make FORCE_GENERIC_K=1 check-> PASS=24  FAIL=0
+  make check-padding          -> PASS=1   FAIL=0
+  make check-cxx              -> ok (simboli non decorati)
+
+  ---
+
+  3. Il difetto che ho trovato e corretto
+
+  __activemask() usata come maschera di __shfl_down_sync. Era in tutti e due i
+  kernel di cuda_warp.cu.
+
+  Perché è sbagliato, in concreto. Fino a Pascal un warp aveva un solo program
+  counter: le 32 lane erano per costruzione nello stesso punto del codice. Da
+  Volta in poi — e la Quadro RTX 5000 è Turing, quindi ci rientra — ogni lane ha
+  il suo program counter e può divergere e riconvergere per conto proprio. La
+  guida CUDA dice esplicitamente che __activemask() restituisce chi è 
+  convergente in quell'istante, e che non forza la convergenza. Se il
+  compilatore decide di non riconvergere le lane su quella riga, due lane dello
+  stesso warp ottengono maschere diverse, le passano a __shfl_down_sync, e
+  quello è comportamento non definito: nella pratica una riduzione che perde
+  termini in modo non riproducibile.
+
+  Il caso peggiore è il fallback runtime, dove la maschera era catturata a riga
+  108 e usata dentro il ciclo su c0, dopo il ciclo su j che diverge davvero (le
+  lane con lane >= n non entrano nemmeno). È esattamente il pattern contro cui
+  NVIDIA mette in guardia.
+
+  La cosa importante: qui la maschera giusta è nota a priori. Il return
+  anticipato è if (warp_id >= m), e warp_id non dipende da lane — o esce tutto
+  il warp o non esce nessuno. Quindi le 32 lane sono sempre tutte vive e la
+  maschera corretta è 0xffffffff, che è anche quella che aveva il codice di
+  riferimento del piano. Ho sostituito in entrambi i kernel e ho lasciato il
+  commento che spiega il perché. I 38 casi ripassano identici.
+
+  ---
+
+  4. Tre cose corrette ma da sapere
+
+  a) Il fallback generico rilegge A ⌈k/4⌉ volte. RUNTIME_TILE è 4, quindi per
+  k=40 la riga di A viene percorsa 10 volte, per k=64 sedici. È lo stesso 
+  identico fenomeno del "Difetto 1" che avete già documentato su scheme_a, ma
+  con una differenza: sulla CPU KB=32 copre tutti i k della consegna in una
+  passata sola, qui i k della consegna passano dai template e non toccano mai
+  questo codice. Quindi non è un problema di misura — è una nota di coerenza.
+  Due strade: alzare RUNTIME_TILE a 8 o 16 (il template K=32 tiene già 32
+  accumulatori per lane, quindi 4 è molto conservativo), oppure lasciarlo e
+  correggere il commento alle righe 91-93, che oggi dice "riusano ogni lettura 
+  di A" — vero dentro un tile, non fra tile diversi. È una decisione vostra, non
+  l'ho toccata.
+
+  b) Il parallelismo disponibile è esattamente m_loc warp. Un warp = una riga di
+  Y. La RTX 5000 ha 48 SM × 32 warp = 1536 warp per essere piena. A M=N=20000
+  ci sono 20000 warp, abbondanti. Ma quando in M5 farete lo sweep su M piccoli,
+  aspettatevi che la curva GFLOPS crolli: non sarà un bug, sarà il grafico che
+  dimostra la soglia di saturazione della GPU. Vale la pena saperlo prima di
+  guardare i numeri, non dopo.
+
+  c) Trappola per M4.3. mpi_matmul fa MPI_Bcast(X_loc, n_loc*k, ...) e
+  MPI_Reduce(Ypart, ..., m_loc*k, ...): quei conteggi sono corretti solo perché
+  layout_init mette ldx = ldy = k. Quando in M4.3 aggiungerete il padding k+1
+  per il conflitto a 32 vie sui banchi di shared memory, quel padding va messo
+  sulla copia device (una ldx_d interna al backend), mai sul layout host —
+  altrimenti le due collettive MPI leggono e scrivono la lunghezza sbagliata. Il
+  gancio esiste già: create riceve ldx/ldy dell'host e il backend è libero di
+  allocare dX con un'altra leading dimension.
+
+  Marginale: in main.c mean_compute = mean_kernel senza guardia > 0, quindi un
+  mean_kernel esattamente nullo darebbe una divisione per zero. Sulla scheda
+  vera non capita (i cudaEvent non tornano mai 0.0 esatto con un lancio in
+  mezzo), ma una riga di guardia costa niente.
+
+  ---
+
+  5. Il piano funzionale: fatto e da fare
+
+  ┌──────┬─────────────────────────────────┬────────────────────────────────┐
+  │      │            Contenuto            │             Stato              │
+  ├──────┼─────────────────────────────────┼────────────────────────────────┤
+  │ M1   │ MPI 1D (Pc=1), pipeline         │ ✅                             │
+  │      │ end-to-end                      │                                │
+  ├──────┼─────────────────────────────────┼────────────────────────────────┤
+  │ M2   │ Griglia 2D (Cart_create + 2×    │ ✅                             │
+  │      │ Cart_sub, bcast + reduce)       │                                │
+  ├──────┼─────────────────────────────────┼────────────────────────────────┤
+  │      │ Kernel locale schema A, misure  │ 🟡 schema A fatto; schema B    │
+  │ M3   │ single-node                     │ rinviato per accordo; OpenMP   │
+  │      │                                 │ non fatto                      │
+  ├──────┼─────────────────────────────────┼────────────────────────────────┤
+  │      │ Impalcatura nvcc +              │ ✅ scritto, ⏳ da validare sul │
+  │ M4.1 │ cuda_naive.cu + accessori di    │  server                        │
+  │      │ timing                          │                                │
+  ├──────┼─────────────────────────────────┼────────────────────────────────┤
+  │ M4.2 │ cuda_warp.cu: template sui 5 k  │ ✅ scritto, ⏳ da validare sul │
+  │      │ + fallback runtime              │  server                        │
+  ├──────┼─────────────────────────────────┼────────────────────────────────┤
+  │ M4.3 │ cuda_warp_smem.cu + padding     │ ❌ prossimo                    │
+  │      │ shared k+1                      │                                │
+  ├──────┼─────────────────────────────────┼────────────────────────────────┤
+  │ M4.4 │ cublas.cu come riferimento      │ ❌                             │
+  │      │ esterno                         │                                │
+  ├──────┼─────────────────────────────────┼────────────────────────────────┤
+  │ M4.5 │ Profilazione Nsight Compute su  │ ❌                             │
+  │      │ cuda_warp                       │                                │
+  ├──────┼─────────────────────────────────┼────────────────────────────────┤
+  │ M5   │ Campagna, roofline, relazione   │ ❌                             │
+  └──────┴─────────────────────────────────┴────────────────────────────────┘
+
+  Criteri di uscita, con i comandi per rieseguirli
+
+  M4.1 — impalcatura. 24/24 con errori relativi ~1e-16, come lo scalare.
+  module load cuda            # oppure NVCC=/usr/local/cuda/bin/nvcc
+  make KERNEL=cuda_naive check
+
+  M4.2 — cuda_warp. 24/24 in double e in float, e almeno 150 GFLOPS a M=N=20000,
+  k=8.
+  make KERNEL=cuda_warp check
+  make KERNEL=cuda_warp PREC=float check
+  mpirun -np 1 ./bin/matmul_mpi-cuda_warp -M 20000 -N 20000 -k 8 --reps 10
+  Il numero da leggere è GFLOPS kernel-only (la colonna gflops_kernel_s del
+  CSV): è quella che esclude H2D e D2H, come la consegna permette. Sulla stessa
+  configurazione cuda_naive dovrebbe stare intorno a 50 GFLOPS — se il rapporto
+  fra i due è ~3-5×, la baseline è calibrata e lo speedup è reale.
+
+  M4.3 — cuda_warp_smem. 24/24 e miglioramento misurabile su k=20 e k=32, 
+  tenendo entrambi i numeri con e senza il padding k+1.
+  make KERNEL=cuda_warp_smem check
+  mpirun -np 1 ./bin/matmul_mpi-cuda_warp_smem -M 20000 -N 20000 -k 32 --reps 10
+  # poi la stessa cosa ricompilata senza padding, e i due numeri vanno entrambi 
+  in relazione
+
+  M4.4 — cuBLAS. src/kernel/cublas.cu con il trucco riga/colonna (Y_cm = X_cm · 
+  A_cm, quindi cublasDgemm(h, N, N, k, m, n, ...)), più -lcublas nel Makefile.
+  Criterio: 24/24 e un numero da mettere in tabella.
+
+  M4.5 — profilazione. ncu su cuda_warp: dram__throughput, sm__throughput,
+  l2__throughput, occupancy per ciascun k, e verifica sul PTX che const +
+  __restrict__ producano ld.global.nc. -lineinfo è già nei NVCCFLAGS.
+
+  M5. Restano aperti: lo script di campagna (le opzioni CLI ci sono tutte, manca
+  il ciclo), STREAM sul server — è il primo dato in assoluto, senza banda
+  misurata non c'è roofline — e il cronometraggio del preprocessing
+  generazione-locale contro scatter-globale.
+
+  ---
+
+  Una nota operativa: il repo era pulito, la mia correzione su
+  src/kernel/cuda_warp.cu è l'unica modifica non committata.
+
+✻ Brewed for 12m 53s · done 0:25
+
+※ recap: Goal: finish the CUDA backend for the MPI matrix-multivector project. M4.1 and M4.2 are written and verified locally; I fixed an unsafe shuffle mask in cuda_warp.cu. Next: write cuda_warp_smem.cu for M4.3. (disable recaps in /config)
+
+❯ quindi domani mi consigli di eseguire prima sul server del dipartimento e poi 
+  di andare avanti con l'implementazione?                                       
+
+● Sì, server prima. Ma non per "spuntare i criteri di uscita": per un motivo più
+  forte, che riguarda proprio M4.3.
+
+  Perché l'ordine conta
+
+  M4.3 (cuda_warp_smem) non è un pezzo nuovo, è un'ottimizzazione di M4.2. E il
+  suo criterio di uscita è "miglioramento misurabile su k=20 e k=32": senza i
+  numeri di cuda_warp su k=20 e k=32 quel criterio non è nemmeno formulabile.
+  Scrivereste un kernel senza sapere contro cosa deve vincere.
+
+  C'è di più, ed è il punto che vale davvero. La giustificazione di M4.3 è
+  un'ipotesi: "ogni warp percorre tutta X, quindi il traffico L2 satura". Ma dal
+  conto del roofline, in FP64 la RTX 5000 è compute-bound già da k≥6 (intensità
+  k/4 = 1,5 FLOP/byte contro un ginocchio a 0,78). Se domani cuda_warp in
+  double vi dà ~340 GFLOPS su un tetto teorico di ~348, la shared memory non può
+  migliorare niente: sareste al limite fisico della scheda, e il collo di
+  bottiglia non è il traffico su X. Passereste mezza giornata a scrivere un
+  kernel che per costruzione guadagna zero.
+
+  È esattamente lo stesso ragionamento che avete già fatto sulla CPU: lì avete
+  deciso di non ottimizzare oltre perché eravate memory-bound e lo sapevate dal
+  roofline. Qui il roofline vi dice l'opposto, ed è il motivo per cui i dati
+  vanno raccolti prima.
+
+  Cosa fare sul server, in quest'ordine
+
+  1. La macchina, prima del vostro codice (~30 min)
+
+  deviceQuery          # conferma sm_75, 48 SM, VRAM, clock
+  bandwidthTest        # banda H2D/D2H reale sul PCIe
+  # STREAM sulla CPU  <- il dato che manca da M5, e senza cui non c'è roofline 
+  CPU
+
+  Questi tre numeri sono la cosa più costosa da tornare a prendere e la più
+  economica da raccogliere. Sono anche l'unico modo per trasformare i "~348
+  GFLOPS teorici" in un tetto che potete difendere all'orale.
+
+  2. La compilazione è già informazione
+
+  module load cuda     # verificate il nome esatto del modulo
+  make -B KERNEL=cuda_warp EXTRA_NVCCFLAGS='-Xptxas -v'
+
+  -Xptxas -v vi stampa registri per thread e spill per ogni istanza del
+  template. Il caso da guardare è K=32 in double: 32 accumulatori × 2 registri a
+  32 bit = 64 registri solo di accumulatori. Se lì compaiono degli spill in
+  local memory, quello è un risultato da relazione (è il vincolo di occupancy
+  che il piano vi diceva di documentare per ogni kernel e per ogni k) — e cambia
+  anche la priorità delle ottimizzazioni successive.
+
+  3. I criteri di uscita di M4.1 e M4.2
+
+  make KERNEL=cuda_naive check
+  make KERNEL=cuda_warp check
+  make KERNEL=cuda_warp PREC=float check
+
+  Le 24 configurazioni girano con -np 4 su griglie 2×2, 1×4, 4×1: se passano,
+  avete dimostrato che MPI e CUDA si integrano correttamente, e lo scrivete in
+  relazione. Poi si misura a P=1, perché con MPS disattivato è l'unica
+  configurazione sensata.
+
+  4. Le misure che decidono M4.3 (~1 ora)
+
+  for k in 3 6 8 20 32; do
+    mpirun -np 1 ./bin/matmul_mpi-cuda_naive -M 20000 -N 20000 -k $k --reps 10
+  --csv
+    mpirun -np 1 ./bin/matmul_mpi-cuda_warp  -M 20000 -N 20000 -k $k --reps 10
+  --csv
+  done
+
+  Non solo k=8: tutti e cinque, perché la domanda a cui dovete rispondere è
+  "quanto sono lontano dal tetto, e a quale k". E guardate anche t_local − 
+  t_kernel (la colonna dell'overhead trasferimenti): vi dice se le pinned memory
+  sono un esperimento sensato o una perdita di tempo.
+
+  5. Già che siete lì: il profiler (~30 min)
+
+  ncu --set full -o warp_k32 ./bin/matmul_mpi-cuda_warp -M 20000 -N 20000 -k 32
+  --reps 1
+
+  Il piano metteva M4.5 dopo M4.3, ma quello era prima di avere dati. Con
+  l2__throughput in mano sapete se l'ipotesi di M4.3 è vera o falsa invece di
+  scommetterci mezza giornata. Il profilo si può anche solo salvare e riguardare
+  a casa con calma.
+
+  La regola di decisione che ne esce
+
+  cuda_warp in FP64 a k=20/32: vicino a ~348 GFLOPS
+  Cosa fare: M4.3 in double è inutile e potete dimostrarlo. Spostatela su FP32,
+  dove il problema torna memory-bound (ginocchio a 25 FLOP/byte, intensità k/2)
+   e la shared memory ha senso. Oppure saltatela e andate su M4.4 + M4.5.
+  ────────────────────────────────────────
+  cuda_warp in FP64 a k=20/32: ben sotto (150-250)
+  Cosa fare: L'ipotesi L2 regge: il profilo ve lo conferma e M4.3 ha un
+  bersaglio
+  numerico.
+
+  In entrambi i casi avete un risultato. "Non abbiamo scritto il kernel smem
+  perché il roofline dimostra che eravamo già al tetto" è un'affermazione molto
+  più forte di un kernel in più che guadagna il 2%.
+
+  Se la giornata va male
+
+  Le cose che possono farvi tornare a mani vuote sono tutte di build, ed è
+  meglio saperle prima:
+
+  - nvcc non nel PATH → il Makefile ve lo dice esplicitamente e vi suggerisce
+    NVCC=/usr/local/cuda/bin/nvcc.
+  - -lcudart non trovato al link → il Makefile deduce CUDA_HOME dal percorso di
+    nvcc; se il modulo lo mette altrove, passatelo a mano: make 
+    CUDA_HOME=/opt/cuda KERNEL=cuda_warp.
+  - -march=native che non piace al compilatore host del server → si spegne con
+    ARCHFLAGS=.
+  - VRAM insufficiente: a M=N=20000 in double A pesa 3,2 GB, ci sta larga; a
+    40000 sono 12,8 GB su 15,55 e il messaggio del backend vi dirà esattamente
+    quanto manca invece di un OOM criptico.
+
+  Se il primo mezz'ora si incarta sulla build, il resto della giornata è
+  comunque salvo: scrivete M4.3 lì, con il codice davanti.
+
+  Prima di partire
+
+  Committate la correzione della maschera del warp shuffle — è l'unica cosa non
+  committata, ed è proprio quella che non volete scoprire di aver lasciato
+  indietro mentre il git pull sul server tira giù la versione vecchia.
+
+✻ Crunched for 1m 8s · done 1:04

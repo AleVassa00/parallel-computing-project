@@ -24,6 +24,9 @@ make check-padding  # --a-mode global con lda = n_loc + 8
 make KERNEL=<nome>  # seleziona src/kernel/<nome>.c oppure .cu come local_gemm
 make KERNEL=cuda_naive check   # backend CUDA (richiede nvcc: solo sul server)
 make KERNEL=cuda_warp check    # warp-per-row, template sui cinque k richiesti
+make KERNEL=cuda_warp_smem check          # tile di X in shared memory
+make KERNEL=cuda_warp_smem SMEM_PAD=0 check   # la stessa cosa senza padding
+make KERNEL=cublas check       # riferimento esterno (aggiunge -lcublas da solo)
 ```
 
 Ogni configurazione ha un binario con nome proprio, cosi' una build non puo'
@@ -39,6 +42,9 @@ aggiunge un suffisso:
 | `make TEST_A_PADDING=8` | `bin/matmul_mpi-pad8` |
 | `make KERNEL=cuda_naive` | `bin/matmul_mpi-cuda_naive` |
 | `make KERNEL=cuda_warp` | `bin/matmul_mpi-cuda_warp` |
+| `make KERNEL=cuda_warp_smem` | `bin/matmul_mpi-cuda_warp_smem` |
+| `make KERNEL=cuda_warp_smem SMEM_PAD=0` | `bin/matmul_mpi-cuda_warp_smem-smempad0` |
+| `make KERNEL=cublas` | `bin/matmul_mpi-cublas` |
 
 La riga finale di `make` ricorda sempre quale binario e' stato prodotto e con
 quali variabili.
@@ -114,11 +120,61 @@ ridotti nel warp con `__shfl_down_sync`; la lane 0 scrive la riga di Y. I casi
 `k=3,6,8,20,32` sono istanze template distinte, mentre ogni altro k attraversa
 un fallback runtime a tile di quattro colonne, senza un limite massimo su k.
 
+`cuda_warp_smem` e' `cuda_warp` con **una sola variabile cambiata**: da dove
+arrivano gli elementi di X. In `cuda_warp` ogni warp percorre tutta X, quindi
+il traffico in lettura su X vale `m*n*k` elementi contro gli `m*n` di A: non
+arriva in DRAM (X sta in L2) ma satura la banda L2, e cresce con k. Qui gli 8
+warp di un blocco, che allo stesso passo `j` vogliono le stesse righe di X, ne
+stagiano cooperativamente un tile `TJ x k` in shared memory e lo riusano: il
+traffico verso L2 si divide per il numero di warp per blocco. Tutto il resto
+(ordine dei cicli, lettura singola di A, k accumulatori in registro, riduzione
+con `__shfl_down_sync`, i cinque k come template) resta identico, ed e' questo
+che rende il confronto una misura e non un aneddoto.
+
+La riga del tile in shared memory e' lunga `k + SMEM_PAD` scalari. Il motivo e'
+il conflitto sui banchi: un double occupa due dei 32 banchi da 32 bit, la lane
+`l` legge a stride `2*(k+SMEM_PAD)` banchi, e per `k=32` senza padding lo
+stride e' 64 banchi, cioe' 0 (mod 32) — tutte e 32 le lane sullo stesso banco,
+conflitto a 32 vie. E' l'analogo esatto del padding `LDA = N+24` gia' studiato
+contro i conflict miss di L1 sulla CPU: stesso fenomeno, altra gerarchia. Il
+padding e' un knob proprio perche' i due numeri vanno misurati entrambi, e i
+due binari coesistono:
+
+```bash
+make KERNEL=cuda_warp_smem              # padding k+1, bin/...-cuda_warp_smem
+make KERNEL=cuda_warp_smem SMEM_PAD=0   # bin/...-cuda_warp_smem-smempad0
+mpirun -np 1 ./bin/matmul_mpi-cuda_warp_smem          -M 20000 -N 20000 -k 32 --reps 10
+mpirun -np 1 ./bin/matmul_mpi-cuda_warp_smem-smempad0 -M 20000 -N 20000 -k 32 --reps 10
+```
+
+`TJ` non e' una costante: il tile pesa `TJ*(k+SMEM_PAD)*sizeof(scalar_t)` e k si
+conosce solo a runtime, quindi TJ viene scelto dal budget di shared memory per
+blocco (16 KiB) e la memoria e' allocata dinamicamente al lancio. Il budget non
+e' il massimo di 48 KiB per una ragione di occupancy: con 64 KiB di shared per
+SM, 16 KiB per blocco lasciano risiedere 4 blocchi (32 warp) per SM, 48 KiB ne
+lascerebbero uno solo.
+
+`cublas` non e' una proposta ma il **riferimento esterno**: serve a rispondere
+con un numero misurato sulla stessa macchina e la stessa pipeline alla domanda
+"perche' non avete chiamato una libreria". Entra nel progetto come un backend
+qualsiasi, dietro la stessa interfaccia, cosi' che i tempi siano confrontabili
+con gli altri. cuBLAS e' column-major e il progetto e' row-major, ma nessuna
+trasposizione e' necessaria: una matrice `PxQ` row-major con leading dimension
+`ld` e' gia', bit per bit, la `QxP` column-major con la stessa `ld`, quindi
+`Y_cm = X_cm * A_cm` e la chiamata e' `cublas<t>gemm(h, N, N, k, m, n, ...)`
+con `dX` e `dA` in quest'ordine. L'attesa e' che vada male, ed e' il risultato:
+con `k <= 32` un GEMM general-purpose non ammortizza il proprio percorso.
+
 Validazione completa e controllo dei registri sul server:
 
 ```bash
 make KERNEL=cuda_warp check
 make KERNEL=cuda_warp PREC=float check
+make KERNEL=cuda_warp_smem check
+make KERNEL=cuda_warp_smem PREC=float check
+make KERNEL=cuda_warp_smem SMEM_PAD=0 check
+make KERNEL=cublas check
+make KERNEL=cublas PREC=float check
 make -B KERNEL=cuda_warp EXTRA_NVCCFLAGS='-Xptxas -v'
 ```
 
