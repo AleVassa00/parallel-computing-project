@@ -20,9 +20,9 @@
  * Le due protezioni qui sotto rendono l'header includibile da entrambi i lati.
  * Il target `make check-cxx` verifica che la proprieta' resti vera. */
 #if defined(__cplusplus)
-#define SCPA_RESTRICT __restrict__
+#define RESTRICT __restrict__
 #else
-#define SCPA_RESTRICT restrict
+#define RESTRICT restrict
 #endif
 
 #if defined(__cplusplus)
@@ -50,16 +50,14 @@ extern "C" {
  * Lo stato vive in un contesto OPACO e non in variabili statiche del modulo:
  * cosi' e' esplicito nel tipo chi possiede la copia di A, non esiste
  * inizializzazione globale nascosta, e il backend resta riutilizzabile. */
-typedef struct local_gemm_ctx local_gemm_t;
+typedef struct local_gemm_context local_gemm_t;
 
 /* Prepara il backend per una A fissa, m x n con leading dimension lda, e per
  * buffer X/Y con leading dimension ldx/ldy. A deve essere gia' popolata e deve
  * restare valida fino a local_gemm_destroy. Per CUDA tutte le allocazioni e la
  * copia H2D di A terminano qui, fuori dalle repetition. Non ritorna mai NULL:
  * in caso di errore termina il job. */
-local_gemm_t *local_gemm_create(int m, int n, int k,
-                                const scalar_t *A, int lda,
-                                int ldx, int ldy);
+local_gemm_t *local_gemm_create(int m, int n, int k, const scalar_t *A_loc, int lda, int ldx, int ldy);
 
 /* Y = A * X       (assegnazione, NON accumulo)
  *
@@ -74,9 +72,7 @@ local_gemm_t *local_gemm_create(int m, int n, int k,
  * Le leading dimension di X e Y restano parametri e non coincidono
  * necessariamente con k: e' il gancio per il padding anti-conflict-miss
  * senza toccare ne' il kernel ne' il codice chiamante. */
-void local_gemm(local_gemm_t *ctx,
-                const scalar_t *SCPA_RESTRICT X, int ldx,
-                scalar_t *SCPA_RESTRICT Y, int ldy);
+void local_gemm(local_gemm_t *ctx, const scalar_t *RESTRICT X, int ldx, scalar_t *RESTRICT Y, int ldy);
 
 /* Rilascia le risorse del backend (per CUDA: la copia di A in VRAM).
  * Tollera ctx == NULL. */

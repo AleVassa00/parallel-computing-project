@@ -10,18 +10,18 @@
  * Il tempo di fase include l'attesa dei processi in ritardo: e' voluto, e'
  * esattamente il costo che si paga sul cammino critico. */
 typedef struct {
-    double t_bcast;
-    double t_local;
-    double t_reduce;
-    double t_total;
+    double bcast_time;
+    double local_phase_time;
+    double reduce_time;
+    double total_time;
     /* Tempo usato per la metrica ufficiale. Coincide con t_total sui backend
      * CPU; su CUDA sostituisce la fase locale con il solo t_kernel, escludendo
      * H2D/D2H ma conservando le due comunicazioni MPI. */
-    double t_official;
+    double official_time;
     /* Tempo del solo kernel, chiesto al backend. Su CPU e' negativo
      * ("non applicabile": la risposta e' gia' t_local); su CUDA e' il tempo
      * misurato dai cudaEvent. */
-    double t_kernel;
+    double kernel_time;
 } matmul_time_t;
 
 /* Y = A*X distribuito. Tutti i processi eseguono lo stesso codice.
@@ -44,11 +44,11 @@ typedef struct {
  * Y_loc: significativo solo sulla colonna 0; puo' essere NULL altrove.
  *        Volutamente distinto da Ypart, cosi' non serve MPI_IN_PLACE.
  * t:     puo' essere NULL se non interessa la scomposizione dei tempi. */
-void mpi_matmul(const grid_t *g, const layout_t *l,
-                local_gemm_t *kern,
+void mpi_matmul(const grid_t *grid, const layout_t *layout,
+                local_gemm_t *local_gemm_context,
                 scalar_t *X_loc,
-                scalar_t *Ypart,
-                scalar_t *Y_loc,
-                matmul_time_t *t);
+                scalar_t *Y_loc_part,
+                scalar_t *Y_row_col0,
+                matmul_time_t *times_struct_rep);
 
 #endif /* SCPA_MATMUL_MPI_H */

@@ -38,10 +38,10 @@
  * su c0 e' degenere e A viene letta una volta sola. */
 #define KB 32
 
-static void kernel_generic(int m, int n, int k,
-                           const scalar_t *restrict A, int lda,
-                           const scalar_t *restrict X, int ldx,
-                           scalar_t *restrict Y, int ldy)
+static void kernel_generic(int m_loc, int n_loc, int k,
+                           const scalar_t *restrict A_loc, int lda,
+                           const scalar_t *restrict X_loc, int ldx,
+                           scalar_t *restrict Y_part_loc, int ldy)
 {
     int c0;
 
@@ -49,18 +49,18 @@ static void kernel_generic(int m, int n, int k,
         const int cw = (k - c0 < KB) ? (k - c0) : KB;
         int i;
 
-        for (i = 0; i < m; i++) {
-            const scalar_t *restrict arow = A + (size_t)i * (size_t)lda;
-            scalar_t *restrict yrow = Y + (size_t)i * (size_t)ldy + c0;
+        for (i = 0; i < m_loc; i++) {
+            const scalar_t *restrict arow = A_loc + (size_t)i * (size_t)lda;
+            scalar_t *restrict yrow = Y_part_loc + (size_t)i * (size_t)ldy + c0;
             scalar_t acc[KB];
             int j, c;
 
             for (c = 0; c < cw; c++)
                 acc[c] = (scalar_t)0;
 
-            for (j = 0; j < n; j++) {
+            for (j = 0; j < n_loc; j++) {
                 const scalar_t a = arow[j];
-                const scalar_t *restrict xrow = X + (size_t)j * (size_t)ldx + c0;
+                const scalar_t *restrict xrow = X_loc + (size_t)j * (size_t)ldx + c0;
                 for (c = 0; c < cw; c++)
                     acc[c] += a * xrow[c];
             }
@@ -89,22 +89,22 @@ static void kernel_generic(int m, int n, int k,
 #define STORE_ACC(c)   yrow[c] = acc##c;
 
 #define DEFINE_FIXED_KERNEL(K, COLS)                                         \
-    static void kernel_k##K(int m, int n,                                    \
-                            const scalar_t *restrict A, int lda,              \
-                            const scalar_t *restrict X, int ldx,              \
-                            scalar_t *restrict Y, int ldy)                    \
+    static void kernel_k##K(int m_loc, int n_loc,                                    \
+                            const scalar_t *restrict A_loc, int lda,              \
+                            const scalar_t *restrict X_loc, int ldx,              \
+                            scalar_t *restrict Y_loc_part, int ldy)                    \
     {                                                                         \
         int i;                                                                \
-        for (i = 0; i < m; i++) {                                             \
+        for (i = 0; i < m_loc; i++) {                                             \
             const scalar_t *restrict arow =                                   \
-                A + (size_t)i * (size_t)lda;                                  \
-            scalar_t *restrict yrow = Y + (size_t)i * (size_t)ldy;            \
+                A_loc + (size_t)i * (size_t)lda;                                  \
+            scalar_t *restrict yrow = Y_loc_part + (size_t)i * (size_t)ldy;            \
             int j;                                                            \
             COLS(DECLARE_ACC)                                                 \
-            for (j = 0; j < n; j++) {                                         \
-                const scalar_t a = arow[j];                                   \
+            for (j = 0; j < n_loc; j++) {                                         \
+                const scalar_t a = arow[j];                                   \ 
                 const scalar_t *restrict xrow =                               \
-                    X + (size_t)j * (size_t)ldx;                              \
+                    X_loc + (size_t)j * (size_t)ldx;                              \
                 COLS(UPDATE_ACC)                                              \
             }                                                                 \
             COLS(STORE_ACC)                                                   \
@@ -137,81 +137,80 @@ DEFINE_FIXED_KERNEL(32, COLS_32)
  * degli altri backend, perche' e' qui che il backend CUDA terra' il puntatore
  * alla copia di A in VRAM: da quel lato create() e' una cudaMemcpy H2D che
  * deve avvenire UNA volta sola, fuori dalla regione cronometrata. */
-struct local_gemm_ctx {
-    int m, n, k;
+struct local_gemm_context {
+    int m_loc, n_loc, k;
     int lda;
     int ldx, ldy;
-    const scalar_t *A;
+    const scalar_t *A_loc;
     double t_setup;   /* misurato davvero, anche se qui e' ~1 us: il confronto
                        * con il backend CUDA ha senso solo se lo stesso numero
                        * viene dallo stesso punto del codice in entrambi. */
 };
 
-local_gemm_t *local_gemm_create(int m, int n, int k,
-                                const scalar_t *A, int lda,
-                                int ldx, int ldy)
+local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_loc, int lda, int ldx, int ldy)
 {
-    local_gemm_t *ctx;
+    local_gemm_t *local_gemm_context;
     const double t0 = now_seconds();
 
-    if (m < 0 || n < 0 || k < 0)
-        die("local_gemm_create: invalid local block %dx%d with k=%d", m, n, k);
-    if (lda < n)
-        die("local_gemm_create: lda %d is smaller than n %d", lda, n);
+    if (m_loc < 0 || n_loc < 0 || k < 0)
+        die("local_gemm_create: invalid local block %dx%d with k=%d", m_loc, n_loc, k);
+    if (lda < n_loc)
+        die("local_gemm_create: lda %d is smaller than n %d", lda, n_loc);
     if (ldx < k || ldy < k)
         die("local_gemm_create: ldx %d and ldy %d must both be at least k=%d",
             ldx, ldy, k);
-    if (n > 0 && m > 0 && A == NULL)
-        die("local_gemm_create: A is NULL for a non-empty %dx%d block", m, n);
+    if (n_loc > 0 && m_loc > 0 && A_loc == NULL)
+        die("local_gemm_create: A is NULL for a non-empty %dx%d block", m_loc, n_loc);
 
-    ctx = xmalloc(sizeof *ctx);
-    ctx->m = m;
-    ctx->n = n;
-    ctx->k = k;
-    ctx->lda = lda;
-    ctx->ldx = ldx;
-    ctx->ldy = ldy;
-    ctx->A = A;
-    ctx->t_setup = now_seconds() - t0;
-    return ctx;
+    local_gemm_context = xmalloc(sizeof *local_gemm_context);
+    local_gemm_context->m = m_loc;
+    local_gemm_context->n = n_loc;
+    local_gemm_context->k = k;
+    local_gemm_context->lda = lda;
+    local_gemm_context->ldx = ldx;
+    local_gemm_context->ldy = ldy;
+    local_gemm_context->A = A_loc;
+    local_gemm_context->t_setup = now_seconds() - t0;
+    return local_gemm_context;
 }
 
-void local_gemm(local_gemm_t *ctx,
-                const scalar_t *SCPA_RESTRICT X, int ldx,
-                scalar_t *SCPA_RESTRICT Y, int ldy)
+void local_gemm(local_gemm_t *local_gemm_context, const scalar_t * RESTRICT X_loc, int ldx, scalar_t * RESTRICT Y_loc_part, int ldy)
 {
     /* Copie locali: il puntatore ad A torna a essere restrict all'interno di
      * questa funzione, cosi' i kernel specializzati ricevono la stessa
      * garanzia di non aliasing che avevano quando A era un parametro. */
-    const scalar_t *SCPA_RESTRICT A = ctx->A;
-    const int m = ctx->m, n = ctx->n, k = ctx->k, lda = ctx->lda;
+    const scalar_t *RESTRICT A_loc = local_gemm_context->A_loc;
+    const int m_loc = local_gemm_context->m_loc,
+              n_loc = local_gemm_context->n_loc,
+              k = local_gemm_context->k,
+              lda = local_gemm_context->lda;
 
-    if (ldx != ctx->ldx || ldy != ctx->ldy)
+    if (ldx != local_gemm_context->ldx || ldy != local_gemm_context->ldy)
         die("local_gemm: leading dimensions changed between calls "
             "(ldx %d -> %d, ldy %d -> %d)",
-            ctx->ldx, ldx, ctx->ldy, ldy);
+            local_gemm_context->ldx, ldx, local_gemm_context->ldy, ldy);
 
 #ifdef FORCE_GENERIC_K
-    kernel_generic(m, n, k, A, lda, X, ldx, Y, ldy);
+    kernel_generic(m_loc, n_loc, k, A_loc, lda, X_loc, ldx, Y_loc_part, ldy);
 #else
     switch (k) {
     case 3:
-        kernel_k3(m, n, A, lda, X, ldx, Y, ldy);
+        kernel_k3(m_loc, n_loc, A_loc, lda, X_loc, ldx, Y_loc_part, ldy);
         break;
     case 6:
-        kernel_k6(m, n, A, lda, X, ldx, Y, ldy);
+        kernel_k6(m_loc, n_loc, A_loc, lda, X_loc, ldx, Y_loc_part, ldy);
         break;
     case 8:
-        kernel_k8(m, n, A, lda, X, ldx, Y, ldy);
+        kernel_k8(m_loc, n_loc, A_loc, lda, X_loc, ldx, Y_loc_part, ldy);
         break;
     case 20:
-        kernel_k20(m, n, A, lda, X, ldx, Y, ldy);
+        kernel_k20(m_loc, n_loc, A_loc, lda, X_loc, ldx, Y_loc_part, ldy);
         break;
     case 32:
-        kernel_k32(m, n, A, lda, X, ldx, Y, ldy);
+        kernel_k32(m_loc, n_loc, A_loc, lda, X_loc, ldx, Y_loc_part, ldy);
         break;
     default:
-        kernel_generic(m, n, k, A, lda, X, ldx, Y, ldy);
+        kernel_generic(m_loc, n_loc, k, A_loc, lda, X_loc, ldx, Y_loc_part, ldy);
         break;
     }
 #endif

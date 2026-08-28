@@ -25,7 +25,7 @@ void grid_default_shape(int p, int *pr, int *pc)
  * 
  * La griglia e' divisa in righe e colonne per permettere Broadcast e Reduce lungo le due dimensioni.
  */
-void grid_create(MPI_Comm comm, int pr, int pc, grid_t *g)
+void grid_create(MPI_Comm comm, int pr, int pc, grid_t *grid)
 {
     int dims[2], periods[2] = { 0, 0 }, coords[2];
     int remain_row[2], remain_col[2];
@@ -43,45 +43,45 @@ void grid_create(MPI_Comm comm, int pr, int pc, grid_t *g)
      * per aderire alla topologia fisica.
      * Da qui in poi l'unico rank valido e' quello di g->grid.
     */
-    MPI_Cart_create(comm, 2, dims, periods, 1, &g->grid);
-    MPI_Comm_rank(g->grid, &g->rank);
-    MPI_Cart_coords(g->grid, g->rank, 2, coords);
+    MPI_Cart_create(comm, 2, dims, periods, 1, &grid->grid);
+    MPI_Comm_rank(grid->grid, &grid->rank);
+    MPI_Cart_coords(grid->grid, grid->rank, 2, coords);
 
-    g->nprocs = size;
-    g->pr = pr;
-    g->pc = pc;
-    g->my_row = coords[0];
-    g->my_col = coords[1];
+    grid->nprocs = size;
+    grid->pr = pr;
+    grid->pc = pc;
+    grid->my_row = coords[0];
+    grid->my_col = coords[1];
 
     /* row: si tiene fissa la dimensione 0 (riga) e si lascia variare la 1 */
     remain_row[0] = 0;
     remain_row[1] = 1;
-    MPI_Cart_sub(g->grid, remain_row, &g->row);
+    MPI_Cart_sub(grid->grid, remain_row, &grid->row);
 
     /* col: si lascia variare la dimensione 0 (riga), fissa la colonna */
     remain_col[0] = 1;
     remain_col[1] = 0;
-    MPI_Cart_sub(g->grid, remain_col, &g->col);
+    MPI_Cart_sub(grid->grid, remain_col, &grid->col);
 
     /* Il codice conta su questa proprieta': in un sotto-comunicatore con una
      * sola dimensione residua i rank sono ordinati per coordinata crescente,
      * quindi il rank 0 di col e' il processo di riga 0 (root del broadcast di
      * X) e il rank 0 di row e' il processo di colonna 0 (root della reduce di
      * Y). Il assert la rende un'ipotesi verificata anziche' sperata. */
-    MPI_Comm_rank(g->row, &sub_rank);
-    if (sub_rank != g->my_col)
-        die("row_comm rank %d != grid column %d", sub_rank, g->my_col);
-    MPI_Comm_rank(g->col, &sub_rank);
-    if (sub_rank != g->my_row)
-        die("col_comm rank %d != grid row %d", sub_rank, g->my_row);
+    MPI_Comm_rank(grid->row, &sub_rank);
+    if (sub_rank != grid->my_col)
+        die("row_comm rank %d != grid column %d", sub_rank, grid->my_col);
+    MPI_Comm_rank(grid->col, &sub_rank);
+    if (sub_rank != grid->my_row)
+        die("col_comm rank %d != grid row %d", sub_rank, grid->my_row);
 }
 
-void grid_free(grid_t *g)
+void grid_free(grid_t *grid)
 {
-    if (g->row != MPI_COMM_NULL)
-        MPI_Comm_free(&g->row);
-    if (g->col != MPI_COMM_NULL)
-        MPI_Comm_free(&g->col);
-    if (g->grid != MPI_COMM_NULL)
-        MPI_Comm_free(&g->grid);
+    if (grid->row != MPI_COMM_NULL)
+        MPI_Comm_free(&grid->row);
+    if (grid->col != MPI_COMM_NULL)
+        MPI_Comm_free(&grid->col);
+    if (grid->grid != MPI_COMM_NULL)
+        MPI_Comm_free(&grid->grid);
 }

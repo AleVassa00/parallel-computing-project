@@ -33,7 +33,7 @@ typedef struct {
     int M, N, k;
     int pr, pc;       /* 0 = forma della griglia scelta automaticamente */
     int pr_given, pc_given;
-    int reps, warmup;
+    int reps, warmup_reps;
     uint64_t seed;
     int check;
     int csv;
@@ -109,59 +109,59 @@ static uint64_t arg_seed(int argc, char **argv, int *i)
 
 /* Tutti i processi vedono lo stesso argv e prendono quindi le stesse
  * decisioni: nessun bisogno di distribuire le opzioni. */
-static void parse_args(int argc, char **argv, opts_t *o, int rank)
+static void parse_args(int argc, char **argv, opts_t *options, int rank)
 {
     int i;
 
-    o->M = 1024;
-    o->N = 1024;
-    o->k = 8;
-    o->pr = 0;
-    o->pc = 0;
-    o->pr_given = 0;
-    o->pc_given = 0;
-    o->reps = 10;
-    o->warmup = 2;
-    o->seed = GEN_DEFAULT_SEED;
-    o->check = 0;
-    o->csv = 0;
-    o->a_mode = A_MODE_LOCAL;
+    options->M = 1024;
+    options->N = 1024;
+    options->k = 8;
+    options->pr = 0;
+    options->pc = 0;
+    options->pr_given = 0;
+    options->pc_given = 0;
+    options->reps = 10;
+    options->warmup_reps = 2;
+    options->seed = GEN_DEFAULT_SEED;
+    options->check = 0;
+    options->csv = 0;
+    options->a_mode = A_MODE_LOCAL;
 
     for (i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-M"))
-            o->M = arg_int(argc, argv, &i, "-M");
+            options->M = arg_int(argc, argv, &i, "-M");
         else if (!strcmp(argv[i], "-N"))
-            o->N = arg_int(argc, argv, &i, "-N");
+            options->N = arg_int(argc, argv, &i, "-N");
         else if (!strcmp(argv[i], "-k"))
-            o->k = arg_int(argc, argv, &i, "-k");
+            options->k = arg_int(argc, argv, &i, "-k");
         else if (!strcmp(argv[i], "--pr")) {
-            o->pr = arg_int(argc, argv, &i, "--pr");
-            o->pr_given = 1;
+            options->pr = arg_int(argc, argv, &i, "--pr");
+            options->pr_given = 1;
         } else if (!strcmp(argv[i], "--pc")) {
-            o->pc = arg_int(argc, argv, &i, "--pc");
-            o->pc_given = 1;
+            options->pc = arg_int(argc, argv, &i, "--pc");
+            options->pc_given = 1;
         }
         else if (!strcmp(argv[i], "--reps"))
-            o->reps = arg_int(argc, argv, &i, "--reps");
+            options->reps = arg_int(argc, argv, &i, "--reps");
         else if (!strcmp(argv[i], "--warmup"))
-            o->warmup = arg_int(argc, argv, &i, "--warmup");
+            options->warmup_reps = arg_int(argc, argv, &i, "--warmup");
         else if (!strcmp(argv[i], "--seed"))
-            o->seed = arg_seed(argc, argv, &i);
+            options->seed = arg_seed(argc, argv, &i);
         else if (!strcmp(argv[i], "--a-mode")) {
             const char *mode;
             if (i + 1 >= argc)
                 die("option --a-mode requires a value");
             mode = argv[++i];
             if (!strcmp(mode, "local"))
-                o->a_mode = A_MODE_LOCAL;
+                options->a_mode = A_MODE_LOCAL;
             else if (!strcmp(mode, "global"))
-                o->a_mode = A_MODE_GLOBAL;
+                options->a_mode = A_MODE_GLOBAL;
             else
                 die("invalid --a-mode '%s' (expected local or global)", mode);
         } else if (!strcmp(argv[i], "--check"))
-            o->check = 1;
+            options->check = 1;
         else if (!strcmp(argv[i], "--csv"))
-            o->csv = 1;
+            options->csv = 1;
         else if (!strcmp(argv[i], "--csv-header")) {
             if (rank == 0)
                 printf("%s\n", CSV_HEADER);
@@ -176,15 +176,15 @@ static void parse_args(int argc, char **argv, opts_t *o, int rank)
             die("unknown option '%s' (try --help)", argv[i]);
     }
 
-    if (o->M < 1 || o->N < 1 || o->k < 1)
-        die("M, N and k must be positive (got %d, %d, %d)", o->M, o->N, o->k);
-    if (o->reps < 1)
+    if (options->M < 1 || options->N < 1 || options->k < 1)
+        die("M, N and k must be positive (got %d, %d, %d)", options->M, options->N, options->k);
+    if (options->reps < 1)
         die("--reps must be positive");
-    if (o->warmup < 0)
+    if (options->warmup_reps < 0)
         die("--warmup must be non-negative");
-    if (o->pr_given && o->pr < 1)
+    if (options->pr_given && options->pr < 1)
         die("--pr must be positive");
-    if (o->pc_given && o->pc < 1)
+    if (options->pc_given && options->pc < 1)
         die("--pc must be positive");
 }
 
@@ -205,44 +205,48 @@ static double vec_mean(const double *v, int n)
 
 int main(int argc, char **argv)
 {
-    opts_t o;
-    grid_t g;
-    layout_t lay;
-    scalar_t *A_loc, *A_global = NULL, *X_loc, *Ypart, *Y_loc = NULL;
-    local_gemm_t *kern;
-    double *t_bc, *t_lo, *t_re, *t_tot, *t_of, *t_ke, *t_tr, *sorted;
-    double mean_bcast, mean_local, mean_reduce, mean_total, mean_official;
-    double mean_kernel, mean_compute, mean_transfer_runtime = -1.0;
-    double median_total, min_total, gflops, gflops_compute, rel_err = -1.0;
-    double gflops_kernel = -1.0, t_setup;
-    int world_rank, world_size, r;
+    opts_t options;
+    grid_t grid;
+    layout_t layout;
+
+    scalar_t *A_loc, *X_loc, *Y_loc_part;
+    scalar_t *A_global_root = NULL, *Y_row_col0 = NULL;
+
+    local_gemm_t *local_gemm_context;
+
+    double *bcast_times, *local_phase_times, *reduce_times, *total_times, *official_times, *kernel_times, *non_kernel_local_times, *sorted_total_times;
+    double mean_bcast_time, mean_local_phase_time, mean_reduce_time, mean_total_time, mean_official_time;
+    double mean_kernel_time, mean_compute_time, mean_non_kernel_local_time  = -1.0;
+    double median_total_time, min_total_time, gflops, gflops_compute, rel_err = -1.0;
+    double gflops_kernel = -1.0, setup_time;
+    int world_rank, world_size, rep;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
-    parse_args(argc, argv, &o, world_rank);
+    parse_args(argc, argv, &options, world_rank);
 
     /* 
      * Se l'utente non ha specificato la forma della griglia, la calcolo in modo
      * da renderla il più quadrata possibile. Se invece ha specificato solo una
      * dimensione, calcolo l'altra in modo da usare tutti i processi.
     */
-    if (!o.pr_given && !o.pc_given) {
-        grid_default_shape(world_size, &o.pr, &o.pc);
-    } else if (!o.pr_given) {
-        if (world_size % o.pc != 0)
+    if (!options.pr_given && !options.pc_given) {
+        grid_default_shape(world_size, &options.pr, &options.pc);
+    } else if (!options.pr_given) {
+        if (world_size % options.pc != 0)
             die("--pc %d does not divide P=%d; cannot infer --pr",
-                o.pc, world_size);
-        o.pr = world_size / o.pc;
-    } else if (!o.pc_given) {
-        if (world_size % o.pr != 0)
+                options.pc, world_size);
+        options.pr = world_size / options.pc;
+    } else if (!options.pc_given) {
+        if (world_size % options.pr != 0)
             die("--pr %d does not divide P=%d; cannot infer --pc",
-                o.pr, world_size);
-        o.pc = world_size / o.pr;
-    } else if ((long long)o.pr * (long long)o.pc != world_size) {
+                options.pr, world_size);
+        options.pc = world_size / options.pr;
+    } else if ((long long)options.pr * (long long)options.pc != world_size) {
         die("invalid grid shape %dx%d for %d processes (pr*pc must equal P)",
-            o.pr, o.pc, world_size);
+            options.pr, options.pc, world_size);
     }
 
     /*
@@ -251,42 +255,42 @@ int main(int argc, char **argv)
     * MPI_COMM_WORLD. Il layout locale e' calcolato a partire dalle dimensioni
     * globali e dalla forma della griglia.
     */
-    grid_create(MPI_COMM_WORLD, o.pr, o.pc, &g);
+    grid_create(MPI_COMM_WORLD, options.pr, options.pc, &grid);
 
     /* Stabiliamo le porzioni di ogni matrice per il processo corrente.*/
-    layout_init(&lay, &g, o.M, o.N, o.k);
+    layout_init(&layout, &grid, options.M, options.N, options.k);
 
     /* Avviso se la griglia e' piu' grande della matrice: alcuni processi non
      * possiedono dati, ma partecipano comunque alla computazione.
      */
-    if (g.rank == 0 && (o.pr > o.M || o.pc > o.N))
+    if (grid.rank == 0 && (options.pr > options.M || options.pc > options.N))
         fprintf(stderr,
                 "warning: grid %dx%d is larger than the matrix %dx%d, "
-                "some processes own no data\n", o.pr, o.pc, o.M, o.N);
+                "some processes own no data\n", options.pr, options.pc, options.M, options.N);
 
     /* Allocazione dei blocchi locali. */
-    A_loc = xmalloc((size_t)lay.m_loc * lay.lda * sizeof *A_loc);
-    X_loc = xmalloc((size_t)lay.n_loc * lay.ldx * sizeof *X_loc);
-    Ypart = xmalloc((size_t)lay.m_loc * lay.ldy * sizeof *Ypart);
-    if (g.my_col == 0)
-        Y_loc = xmalloc((size_t)lay.m_loc * lay.ldy * sizeof *Y_loc);
+    A_loc = xmalloc((size_t)layout.m_loc * layout.lda * sizeof *A_loc);
+    X_loc = xmalloc((size_t)layout.n_loc * layout.ldx * sizeof *X_loc);
+    Y_loc_part = xmalloc((size_t)layout.m_loc * layout.ldy * sizeof *Y_loc_part);
+    if (grid.my_col == 0)
+        Y_row_col0 = xmalloc((size_t)layout.m_loc * layout.ldy * sizeof *Y_row_col0);
 
-    if (o.a_mode == A_MODE_LOCAL) {
+    if (options.a_mode == A_MODE_LOCAL) {
         /* Modalita' predefinita: ogni processo genera direttamente il proprio
          * blocco e fa anche il first touch delle proprie pagine. */
-        gen_block_A(A_loc, lay.lda, lay.m_loc, lay.n_loc,
-                    lay.row0, lay.col0, lay.N, o.seed);
+        gen_block_A(A_loc, layout.lda, layout.m_loc, layout.n_loc,
+                    layout.row0, layout.col0, layout.N, options.seed);
     } else {
         /* Modalita' alternativa: soltanto il grid rank 0 materializza la
          * matrice globale. Lo stesso generatore e gli stessi indici globali
          * garantiscono valori identici alla generazione locale. */
-        if (g.rank == 0) {
-            A_global = xmalloc((size_t)lay.M * (size_t)lay.N * sizeof *A_global);
-            gen_block_A(A_global, lay.N, lay.M, lay.N, 0, 0, lay.N, o.seed);
+        if (grid.rank == 0) {
+            A_global_root = xmalloc((size_t)layout.M * (size_t)layout.N * sizeof *A_global_root);
+            gen_block_A(A_global_root, layout.N, layout.M, layout.N, 0, 0, layout.N, options.seed);
         }
-        distribute_global_A(&g, &lay, A_global, A_loc);
-        xfree(A_global);
-        A_global = NULL;
+        distribute_global_A(&grid, &layout, A_global_root, A_loc);
+        xfree(A_global_root);
+        A_global_root = NULL;
     }
 
     /* Preparazione del backend: e' PREPROCESSING, quindi sta fuori dalla
@@ -296,147 +300,146 @@ int main(int argc, char **argv)
      * Forma e leading dimension vengono dal layout una volta sola: il kernel
      * non puo' piu' essere invocato con dimensioni diverse da quelle con cui
      * A e' stata preparata. */
-    kern = local_gemm_create(lay.m_loc, lay.n_loc, lay.k,
-                             A_loc, lay.lda, lay.ldx, lay.ldy);
+    local_gemm_context = local_gemm_create(layout.m_loc, layout.n_loc, layout.k, A_loc, layout.lda, layout.ldx, layout.ldy);
 
     /* X e' collocata sulla riga 0 della griglia: solo quei processi la
      * generano. Ogni mpi_matmul la replica lungo le colonne come prima fase
      * del prodotto distribuito. */
-    if (g.my_row == 0)
-        gen_block_X(X_loc, lay.ldx, lay.n_loc, lay.k, lay.col0, o.seed);
+    if (grid.my_row == 0)
+        gen_block_X(X_loc, layout.ldx, layout.n_loc, layout.k, layout.col0, options.seed);
 
-    t_bc = xmalloc((size_t)o.reps * sizeof *t_bc);
-    t_tot = xmalloc((size_t)o.reps * sizeof *t_tot);
-    t_lo = xmalloc((size_t)o.reps * sizeof *t_lo);
-    t_re = xmalloc((size_t)o.reps * sizeof *t_re);
-    t_of = xmalloc((size_t)o.reps * sizeof *t_of);
-    t_ke = xmalloc((size_t)o.reps * sizeof *t_ke);
-    t_tr = xmalloc((size_t)o.reps * sizeof *t_tr);
-    sorted = xmalloc((size_t)o.reps * sizeof *sorted);
+    bcast_times = xmalloc((size_t)options.reps * sizeof *bcast_times);
+    total_times = xmalloc((size_t)options.reps * sizeof *total_times);
+    local_phase_times = xmalloc((size_t)options.reps * sizeof *local_phase_times);
+    reduce_times = xmalloc((size_t)options.reps * sizeof *reduce_times);
+    official_times = xmalloc((size_t)options.reps * sizeof *official_times);
+    kernel_times = xmalloc((size_t)options.reps * sizeof *kernel_times);
+    non_kernel_local_times = xmalloc((size_t)options.reps * sizeof *non_kernel_local_times);
+    sorted_total_times = xmalloc((size_t)options.reps * sizeof *sorted_total_times);
 
-    for (r = 0; r < o.warmup; r++)
-        mpi_matmul(&g, &lay, kern, X_loc, Ypart, Y_loc, NULL);
+    for (rep = 0; rep < options.warmup_reps; rep++)
+        mpi_matmul(&grid, &layout, local_gemm_context, X_loc, Y_loc_part, Y_row_col0, NULL);
 
-    for (r = 0; r < o.reps; r++) {
-        matmul_time_t tt;
+    for (rep = 0; rep < options.reps; rep++) {
+        matmul_time_t times_struct_rep;
         /* barriera prima di ogni ripetizione: senza, un processo in anticipo
          * comincerebbe a cronometrare mentre gli altri sono ancora indietro */
-        MPI_Barrier(g.grid);
-        mpi_matmul(&g, &lay, kern, X_loc, Ypart, Y_loc, &tt);
-        t_bc[r] = tt.t_bcast;
-        t_tot[r] = tt.t_total;
-        t_lo[r] = tt.t_local;
-        t_re[r] = tt.t_reduce;
-        t_of[r] = tt.t_official;
-        t_ke[r] = tt.t_kernel;
-        t_tr[r] = (tt.t_kernel >= 0.0) ? tt.t_local - tt.t_kernel : -1.0;
+        MPI_Barrier(grid.grid);
+        mpi_matmul(&grid, &layout, local_gemm_context, X_loc, Y_loc_part, Y_row_col0, &times_struct_rep);
+        bcast_times[rep] = times_struct_rep.t_bcast;
+        total_times[rep] = times_struct_rep.t_total;
+        local_phase_times[rep] = times_struct_rep.t_local;
+        reduce_times[rep] = times_struct_rep.t_reduce;
+        official_times[rep] = times_struct_rep.t_official;
+        kernel_times[rep] = times_struct_rep.t_kernel;
+        non_kernel_local_times[rep] = (times_struct_rep.t_kernel >= 0.0) ? times_struct_rep.t_local - times_struct_rep.t_kernel : -1.0;
     }
 
     /* Il tempo di una invocazione e' il MASSIMO fra i processi, non quello del
      * rank 0: l'operazione e' finita quando ha finito l'ultimo. Le riduzioni
      * si fanno alla fine, su tutto il vettore, per non disturbare le misure. */
-    MPI_Reduce(g.rank == 0 ? MPI_IN_PLACE : t_bc, t_bc, o.reps,
-               MPI_DOUBLE, MPI_MAX, 0, g.grid);
-    MPI_Reduce(g.rank == 0 ? MPI_IN_PLACE : t_lo, t_lo, o.reps,
-               MPI_DOUBLE, MPI_MAX, 0, g.grid);
-    MPI_Reduce(g.rank == 0 ? MPI_IN_PLACE : t_re, t_re, o.reps,
-               MPI_DOUBLE, MPI_MAX, 0, g.grid);
-    MPI_Reduce(g.rank == 0 ? MPI_IN_PLACE : t_tot, t_tot, o.reps,
-               MPI_DOUBLE, MPI_MAX, 0, g.grid);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : bcast_times, bcast_times, options.reps,
+               MPI_DOUBLE, MPI_MAX, 0, grid.grid);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : local_phase_times, local_phase_times, options.reps,
+               MPI_DOUBLE, MPI_MAX, 0, grid.grid);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : reduce_times, reduce_times, options.reps,
+               MPI_DOUBLE, MPI_MAX, 0, grid.grid);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : total_times, total_times, options.reps,
+               MPI_DOUBLE, MPI_MAX, 0, grid.grid);
     /* t_official e' costruito LOCALMENTE per ogni repetition e solo dopo si
      * prende il massimo: sommare medie/massimi delle singole fasi non darebbe
      * il cammino critico di una vera invocazione. */
-    MPI_Reduce(g.rank == 0 ? MPI_IN_PLACE : t_of, t_of, o.reps,
-               MPI_DOUBLE, MPI_MAX, 0, g.grid);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : official_times, official_times, options.reps,
+               MPI_DOUBLE, MPI_MAX, 0, grid.grid);
     /* Stesso criterio per il tempo di kernel e per il preprocessing: conta il
      * processo piu' lento, non il rank 0. Il sentinella negativo dei backend di
      * CPU sopravvive al massimo, perche' li' e' negativo su tutti i rank. */
-    MPI_Reduce(g.rank == 0 ? MPI_IN_PLACE : t_ke, t_ke, o.reps,
-               MPI_DOUBLE, MPI_MAX, 0, g.grid);
-    MPI_Reduce(g.rank == 0 ? MPI_IN_PLACE : t_tr, t_tr, o.reps,
-               MPI_DOUBLE, MPI_MAX, 0, g.grid);
-    t_setup = local_gemm_setup_seconds(kern);
-    MPI_Reduce(g.rank == 0 ? MPI_IN_PLACE : &t_setup, &t_setup, 1,
-               MPI_DOUBLE, MPI_MAX, 0, g.grid);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : kernel_times, kernel_times, options.reps,
+               MPI_DOUBLE, MPI_MAX, 0, grid.grid);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : non_kernel_local_times, non_kernel_local_times, options.reps,
+               MPI_DOUBLE, MPI_MAX, 0, grid.grid);
+    setup_time = local_gemm_setup_seconds(local_gemm_context);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &setup_time, &setup_time, 1,
+               MPI_DOUBLE, MPI_MAX, 0, grid.grid);
 
-    if (o.check)
-        rel_err = check_against_serial(&g, &lay, Y_loc, o.seed);
+    if (options.check)
+        rel_err = check_against_serial(&grid, &layout, Y_row_col0, options.seed);
 
-    if (g.rank == 0) {
-        memcpy(sorted, t_tot, (size_t)o.reps * sizeof *sorted);
-        qsort(sorted, (size_t)o.reps, sizeof *sorted, cmp_double);
-        mean_bcast = vec_mean(t_bc, o.reps);
-        mean_local = vec_mean(t_lo, o.reps);
-        mean_reduce = vec_mean(t_re, o.reps);
-        mean_total = vec_mean(t_tot, o.reps);
-        mean_official = vec_mean(t_of, o.reps);
-        mean_kernel = vec_mean(t_ke, o.reps);
-        mean_transfer_runtime = vec_mean(t_tr, o.reps);
-        mean_compute = (mean_kernel >= 0.0) ? mean_kernel : mean_local;
-        median_total = (o.reps % 2) ? sorted[o.reps / 2]
-                                    : 0.5 * (sorted[o.reps / 2 - 1] + sorted[o.reps / 2]);
-        min_total = sorted[0];
+    if (grid.rank == 0) {
+        memcpy(sorted_total_times, total_times, (size_t)options.reps * sizeof *sorted_total_times);
+        qsort(sorted_total_times, (size_t)options.reps, sizeof *sorted_total_times, cmp_double);
+        mean_bcast_time = vec_mean(bcast_times, options.reps);
+        mean_local_phase_time = vec_mean(local_phase_times, options.reps);
+        mean_reduce_time = vec_mean(reduce_times, options.reps);
+        mean_total_time = vec_mean(total_times, options.reps);
+        mean_official_time = vec_mean(official_times, options.reps);
+        mean_kernel_time = vec_mean(kernel_times, options.reps);
+        mean_non_kernel_local_time  = vec_mean(non_kernel_local_times, options.reps);
+        mean_compute_time = (mean_kernel_time >= 0.0) ? mean_kernel_time : mean_local_phase_time;
+        median_total_time = (options.reps % 2) ? sorted_total_times[options.reps / 2]
+                                    : 0.5 * (sorted_total_times[options.reps / 2 - 1] + sorted_total_times[options.reps / 2]);
+        min_total_time = sorted_total_times[0];
 
         /* Metrica ufficiale: prodotto MPI completo, ma senza i trasferimenti
          * CUDA come richiesto dalla traccia. Su CPU mean_official coincide con
          * il totale end-to-end misurato direttamente. */
-        gflops = 2.0 * (double)o.M * (double)o.N * (double)o.k
-                  / mean_official / 1.0e9;
-        gflops_compute = 2.0 * (double)o.M * (double)o.N * (double)o.k
-                          / mean_compute / 1.0e9;
+        gflops = 2.0 * (double)options.M * (double)options.N * (double)options.k
+                  / mean_official_time / 1.0e9;
+        gflops_compute = 2.0 * (double)options.M * (double)options.N * (double)options.k
+                          / mean_compute_time / 1.0e9;
         /* Solo se il backend sa distinguere il kernel dai trasferimenti.
          * Questa e' la colonna che, sul backend CUDA, esclude H2D e D2H come
          * la consegna consente esplicitamente di fare. */
-        if (mean_kernel > 0.0) {
+        if (mean_kernel_time > 0.0) {
             /* Alias CUDA esplicito, mantenuto nel CSV per distinguere a colpo
              * d'occhio le righe GPU. Il valore coincide con gflops_compute. */
             gflops_kernel = gflops_compute;
         }
 
-        if (o.csv) {
+        if (options.csv) {
             printf("%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,"
                    "%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,"
                    "%.6f,%.6f,%.6f,%.3e\n",
-                   kernel_name(), SCALAR_NAME, a_mode_name(o.a_mode),
-                   o.M, o.N, o.k, g.nprocs, g.pr, g.pc, o.reps,
-                   mean_bcast, mean_local, mean_reduce, mean_total,
-                   mean_official, median_total, min_total, mean_kernel,
-                   mean_transfer_runtime, t_setup,
+                   kernel_name(), SCALAR_NAME, a_mode_name(options.a_mode),
+                   options.M, options.N, options.k, grid.nprocs, grid.pr, grid.pc, options.reps,
+                   mean_bcast_time, mean_local_phase_time, mean_reduce_time, mean_total_time,
+                   mean_official_time, median_total_time, min_total_time, mean_kernel_time,
+                   mean_non_kernel_local_time , setup_time,
                    gflops, gflops_compute, gflops_kernel, rel_err);
         } else {
-            double bytes_A = (double)o.M * o.N * sizeof(scalar_t);
+            double bytes_A = (double)options.M * options.N * sizeof(scalar_t);
             printf("matmul_mpi  M=%d N=%d k=%d  grid=%dx%d (P=%d)  %s  kernel=%s  A=%s\n",
-                   o.M, o.N, o.k, g.pr, g.pc, g.nprocs, SCALAR_NAME,
-                   kernel_name(), a_mode_name(o.a_mode));
+                   options.M, options.N, options.k, grid.pr, grid.pc, grid.nprocs, SCALAR_NAME,
+                   kernel_name(), a_mode_name(options.a_mode));
             printf("  local block  A %dx%d   X %dx%d   Y %dx%d      A total %.1f MiB\n",
-                   lay.m_loc, lay.n_loc, lay.n_loc, lay.k, lay.m_loc, lay.k,
+                   layout.m_loc, layout.n_loc, layout.n_loc, layout.k, layout.m_loc, layout.k,
                    bytes_A / 1048576.0);
             printf("  reps=%d warmup=%d seed=%llu\n",
-                   o.reps, o.warmup, (unsigned long long)o.seed);
-            printf("  Bcast mean              %.3f ms\n", mean_bcast * 1e3);
-            printf("  Local mean              %.3f ms\n", mean_local * 1e3);
-            printf("  Reduce mean             %.3f ms\n", mean_reduce * 1e3);
+                   options.reps, options.warmup_reps, (unsigned long long)options.seed);
+            printf("  Bcast mean              %.3f ms\n", mean_bcast_time * 1e3);
+            printf("  Local mean              %.3f ms\n", mean_local_phase_time * 1e3);
+            printf("  Reduce mean             %.3f ms\n", mean_reduce_time * 1e3);
             printf("  Total mean (end-to-end) %.3f ms   median %.3f ms   min %.3f ms\n",
-                   mean_total * 1e3, median_total * 1e3, min_total * 1e3);
-            if (mean_kernel >= 0.0) {
+                   mean_total_time * 1e3, median_total_time * 1e3, min_total_time * 1e3);
+            if (mean_kernel_time >= 0.0) {
                 printf("  Official mean           %.3f ms   (GPU transfers excluded)\n",
-                       mean_official * 1e3);
-                printf("  Kernel mean             %.3f ms\n", mean_kernel * 1e3);
+                       mean_official_time * 1e3);
+                printf("  Kernel mean             %.3f ms\n", mean_kernel_time * 1e3);
                 printf("  Transfer/runtime ovh.   %.3f ms\n",
-                       mean_transfer_runtime * 1e3);
+                       mean_non_kernel_local_time  * 1e3);
             } else {
                 printf("  Official mean           %.3f ms   (same as end-to-end)\n",
-                       mean_official * 1e3);
+                       mean_official_time * 1e3);
             }
             printf("  Backend setup           %.3f ms   (preprocessing, fuori dalla misura)\n",
-                   t_setup * 1e3);
+                   setup_time * 1e3);
             printf("  GFLOPS MPI              %.3f\n", gflops);
             printf("  GFLOPS compute-only     %.3f\n", gflops_compute);
             if (gflops_kernel > 0.0)
                 printf("  GFLOPS kernel-only      %.3f\n", gflops_kernel);
             printf("                          (2*M*N*k = %.3f GFLOP; official T = official mean)\n",
-                   2.0 * (double)o.M * (double)o.N * (double)o.k / 1e9);
-            if (o.check)
+                   2.0 * (double)options.M * (double)options.N * (double)options.k / 1e9);
+            if (options.check)
                 printf("  validation              relative L2 error %.3e   [%s]\n",
                        rel_err, (rel_err <= SCALAR_CHECK_TOL) ? "PASS" : "FAIL");
         }
@@ -444,23 +447,23 @@ int main(int argc, char **argv)
     }
 
     /* prima il backend, poi la memoria di A: il contesto la referenzia */
-    local_gemm_destroy(kern);
+    local_gemm_destroy(local_gemm_context);
     xfree(A_loc);
-    xfree(A_global);
+    xfree(A_global_root);
     xfree(X_loc);
-    xfree(Ypart);
-    xfree(Y_loc);
-    xfree(t_bc);
-    xfree(t_tot);
-    xfree(t_lo);
-    xfree(t_re);
-    xfree(t_of);
-    xfree(t_ke);
-    xfree(t_tr);
-    xfree(sorted);
-    grid_free(&g);
+    xfree(Y_loc_part);
+    xfree(Y_row_col0);
+    xfree(bcast_times);
+    xfree(total_times);
+    xfree(local_phase_times);
+    xfree(reduce_times);
+    xfree(official_times);
+    xfree(kernel_times);
+    xfree(non_kernel_local_times);
+    xfree(sorted_total_times);
+    grid_free(&grid);
     MPI_Finalize();
 
     /* esito non nullo se la validazione fallisce: utile negli script */
-    return (o.check && rel_err > SCALAR_CHECK_TOL) ? EXIT_FAILURE : EXIT_SUCCESS;
+    return (options.check && rel_err > SCALAR_CHECK_TOL) ? EXIT_FAILURE : EXIT_SUCCESS;
 }
