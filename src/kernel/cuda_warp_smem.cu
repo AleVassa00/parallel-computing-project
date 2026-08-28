@@ -97,7 +97,27 @@
     } while (0)
 
 #define WARP_SIZE 32
-#define BLOCK_THREADS 256
+
+/* Thread per blocco.
+ *
+ * 256 e' il default: 8 warp, e un DIVISORE di 1024, il massimo di thread
+ * residenti per SM su Turing (sm_75) - quattro blocchi riempiono l'SM, mentre
+ * 192 o 384 si fermerebbero a 960 e 768 thread su 1024.
+ *
+ * Come in cuda_warp il multiplo di 32 e' un requisito di CORRETTEZZA:
+ * WARPS_PER_BLOCK decide quante righe di Y elabora un blocco e la riduzione
+ * finale e' interna al warp. Qui BLOCK_THREADS governa anche il caricamento
+ * COOPERATIVO del tile di X in shared memory (il passo del ciclo di load), ma
+ * non la sua DIMENSIONE, che dipende solo da tj e k: cambiare BLOCK non altera
+ * quindi il budget di shared memory ne' il risultato.
+ * Il valore si sostituisce dal Makefile con BLOCK=<n> (SCPA_BLOCK_THREADS). */
+#ifndef SCPA_BLOCK_THREADS
+#define SCPA_BLOCK_THREADS 256
+#endif
+#if SCPA_BLOCK_THREADS < 32 || SCPA_BLOCK_THREADS > 1024 || (SCPA_BLOCK_THREADS % 32) != 0
+#error "SCPA_BLOCK_THREADS deve essere un multiplo di 32 compreso fra 32 e 1024"
+#endif
+#define BLOCK_THREADS SCPA_BLOCK_THREADS
 #define WARPS_PER_BLOCK (BLOCK_THREADS / WARP_SIZE)
 #define RUNTIME_TILE 4
 #define BYTES_PER_GIB 1073741824.0
@@ -530,16 +550,25 @@ double local_gemm_setup_seconds(const local_gemm_t *ctx)
     return (ctx != NULL) ? ctx->t_setup : 0.0;
 }
 
-/* Il nome porta il padding: nella tabella dei risultati le due varianti non
- * possono essere confuse fra loro. */
+/* Il nome porta il padding e la dimensione del blocco quando non sono quelli di
+ * default: nella tabella dei risultati le varianti non possono essere confuse
+ * fra loro, e uno sweep su BLOCK resta leggibile nel CSV. */
 #define SCPA_STR_(x) #x
 #define SCPA_STR(x)  SCPA_STR_(x)
 
+#if SCPA_SMEM_PAD == 1
+#define SCPA_PAD_SUFFIX ""
+#else
+#define SCPA_PAD_SUFFIX "(pad" SCPA_STR(SCPA_SMEM_PAD) ")"
+#endif
+
+#if SCPA_BLOCK_THREADS == 256
+#define SCPA_BLK_SUFFIX ""
+#else
+#define SCPA_BLK_SUFFIX "(blk" SCPA_STR(SCPA_BLOCK_THREADS) ")"
+#endif
+
 const char *kernel_name(void)
 {
-#if SCPA_SMEM_PAD == 1
-    return "cuda_warp_smem";
-#else
-    return "cuda_warp_smem(pad" SCPA_STR(SCPA_SMEM_PAD) ")";
-#endif
+    return "cuda_warp_smem" SCPA_PAD_SUFFIX SCPA_BLK_SUFFIX;
 }

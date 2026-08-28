@@ -67,10 +67,29 @@
                 cudaGetErrorName(err_), cudaGetErrorString(err_));            \
     } while (0)
 
-/* 256 thread per blocco: 8 warp, divisore di 1024, valore neutro che non
- * pregiudica l'occupancy su Turing. Non e' un parametro da ottimizzare qui:
- * lo diventa nel kernel di M4.2. */
-#define BLOCK_THREADS 256
+/* Thread per blocco.
+ *
+ * 256 e' il default e non e' un numero arbitrario: sono 8 warp, ed e' un
+ * DIVISORE di 1024, che su Turing (sm_75) e' il massimo di thread residenti per
+ * SM. Con blocchi da 256 ne stanno 4 per SM e l'SM e' pieno; con 192 o 384 -
+ * altre due scelte comuni - ne starebbero 5 e 2, cioe' 960 e 768 thread su
+ * 1024. Deve inoltre restare un multiplo di 32: un blocco che non lo e' spreca
+ * le corsie dell'ultimo warp in OGNI blocco, non solo nell'ultimo.
+ *
+ * Qui i thread non cooperano (niente shared, niente __syncthreads), quindi la
+ * dimensione del blocco non cambia il risultato: cambia solo come lo scheduler
+ * riempie gli SM. Il valore si sostituisce dal Makefile con BLOCK=<n>, che
+ * definisce SCPA_BLOCK_THREADS, cosi' la sensibilita' del kernel a questo
+ * parametro si MISURA invece di darla per buona. Ogni valore produce un binario
+ * con nome proprio e un kernel_name() distinto: le righe di uno sweep restano
+ * distinguibili nel CSV. */
+#ifndef SCPA_BLOCK_THREADS
+#define SCPA_BLOCK_THREADS 256
+#endif
+#if SCPA_BLOCK_THREADS < 32 || SCPA_BLOCK_THREADS > 1024 || (SCPA_BLOCK_THREADS % 32) != 0
+#error "SCPA_BLOCK_THREADS deve essere un multiplo di 32 compreso fra 32 e 1024"
+#endif
+#define BLOCK_THREADS SCPA_BLOCK_THREADS
 
 #define BYTES_PER_GIB 1073741824.0
 
@@ -328,7 +347,18 @@ double local_gemm_setup_seconds(const local_gemm_t *ctx)
     return (ctx != NULL) ? ctx->t_setup : 0.0;
 }
 
+/* Il nome porta la dimensione del blocco quando non e' quella di default: nel
+ * CSV le righe di uno sweep su BLOCK devono restare distinguibili fra loro. */
+#define SCPA_STR_(x) #x
+#define SCPA_STR(x)  SCPA_STR_(x)
+
+#if SCPA_BLOCK_THREADS == 256
+#define SCPA_BLK_SUFFIX ""
+#else
+#define SCPA_BLK_SUFFIX "(blk" SCPA_STR(SCPA_BLOCK_THREADS) ")"
+#endif
+
 const char *kernel_name(void)
 {
-    return "cuda_naive";
+    return "cuda_naive" SCPA_BLK_SUFFIX;
 }

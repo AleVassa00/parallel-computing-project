@@ -23,7 +23,25 @@
     } while (0)
 
 #define WARP_SIZE 32
-#define BLOCK_THREADS 256
+
+/* Thread per blocco.
+ *
+ * 256 e' il default: 8 warp, e un DIVISORE di 1024, il massimo di thread
+ * residenti per SM su Turing (sm_75) - quattro blocchi riempiono l'SM, mentre
+ * 192 o 384 si fermerebbero a 960 e 768 thread su 1024.
+ *
+ * Qui, a differenza del backend naive, il multiplo di 32 e' un requisito di
+ * CORRETTEZZA e non solo di efficienza: WARPS_PER_BLOCK determina quante righe
+ * di Y elabora un blocco, e la riduzione finale e' un __shfl_down_sync interno
+ * al warp. Un blocco non multiplo di 32 spezzerebbe un warp fra due righe.
+ * Il valore si sostituisce dal Makefile con BLOCK=<n> (SCPA_BLOCK_THREADS). */
+#ifndef SCPA_BLOCK_THREADS
+#define SCPA_BLOCK_THREADS 256
+#endif
+#if SCPA_BLOCK_THREADS < 32 || SCPA_BLOCK_THREADS > 1024 || (SCPA_BLOCK_THREADS % 32) != 0
+#error "SCPA_BLOCK_THREADS deve essere un multiplo di 32 compreso fra 32 e 1024"
+#endif
+#define BLOCK_THREADS SCPA_BLOCK_THREADS
 #define WARPS_PER_BLOCK (BLOCK_THREADS / WARP_SIZE)
 #define RUNTIME_TILE 4
 #define BYTES_PER_GIB 1073741824.0
@@ -351,7 +369,18 @@ double local_gemm_setup_seconds(const local_gemm_t *ctx)
     return (ctx != NULL) ? ctx->t_setup : 0.0;
 }
 
+/* Il nome porta la dimensione del blocco quando non e' quella di default: nel
+ * CSV le righe di uno sweep su BLOCK devono restare distinguibili fra loro. */
+#define SCPA_STR_(x) #x
+#define SCPA_STR(x)  SCPA_STR_(x)
+
+#if SCPA_BLOCK_THREADS == 256
+#define SCPA_BLK_SUFFIX ""
+#else
+#define SCPA_BLK_SUFFIX "(blk" SCPA_STR(SCPA_BLOCK_THREADS) ")"
+#endif
+
 const char *kernel_name(void)
 {
-    return "cuda_warp";
+    return "cuda_warp" SCPA_BLK_SUFFIX;
 }
