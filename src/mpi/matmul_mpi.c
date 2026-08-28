@@ -12,7 +12,7 @@ void mpi_matmul(const grid_t *grid, const layout_t *layout, local_gemm_t *local_
 
     /* 1. In g->col il rank 0 coincide, per l'invariante verificato da
      *    grid_create(), con la coordinata cartesiana di riga 0. */
-    MPI_Bcast(X_loc, x_count, SCALAR_MPI_TYPE, 0, grid->col);
+    MPI_Bcast(X_loc, x_count, SCALAR_MPI_TYPE, 0, grid->col_comm);
     t1 = MPI_Wtime();
 
     /* 2. Contributo locale: righe [row0, row0+m_loc) di Y, limitatamente alle
@@ -28,7 +28,7 @@ void mpi_matmul(const grid_t *grid, const layout_t *layout, local_gemm_t *local_
      *    root = rank 0 di row, cioe' il processo di colonna 0, che e' gia' il
      *    proprietario designato di quella porzione di Y: nessuna
      *    ridistribuzione finale. */
-    MPI_Reduce(Y_loc_part, Y_row_col0, y_count, SCALAR_MPI_TYPE, MPI_SUM, 0, grid->row);
+    MPI_Reduce(Y_loc_part, Y_row_col0, y_count, SCALAR_MPI_TYPE, MPI_SUM, 0, grid->row_comm);
     t3 = MPI_Wtime();
 
     if (times_struct_rep != NULL) {

@@ -1,5 +1,9 @@
 obj/
 bin/
+.idea/
+
+.DS_Store
+
 *.o
 *.d
 *.csv

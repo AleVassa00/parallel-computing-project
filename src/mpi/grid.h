@@ -16,9 +16,9 @@
  * Sono due informazioni indipendenti: e' per questo che la comunicazione si
  * spezza in una verticale e una orizzontale. */
 typedef struct {
-    MPI_Comm grid; /* cartesiano 2D, con reorder */
-    MPI_Comm row;  /* processi con la stessa coordinata di RIGA (varia la colonna) */
-    MPI_Comm col;  /* processi con la stessa coordinata di COLONNA (varia la riga) */
+    MPI_Comm grid_comm; /* cartesiano 2D, con reorder */
+    MPI_Comm row_comm;  /* processi con la stessa coordinata di RIGA (varia la colonna) */
+    MPI_Comm col_comm;  /* processi con la stessa coordinata di COLONNA (varia la riga) */
 
     int nprocs;
     int rank;      /* rank in grid: NON usare mai quello di MPI_COMM_WORLD,

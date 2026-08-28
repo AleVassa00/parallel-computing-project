@@ -104,7 +104,7 @@ static __global__ void naive_kernel(int m, int n, int k,
 }
 
 /* Stato del backend: le tre copie in VRAM, i due event e i tempi. */
-struct local_gemm_ctx {
+struct local_gemm_context {
     int m, n, k;
     int lda;
     int ldx, ldy;
@@ -255,8 +255,8 @@ local_gemm_t *local_gemm_create(int m, int n, int k,
 }
 
 void local_gemm(local_gemm_t *ctx,
-                const scalar_t *SCPA_RESTRICT X, int ldx,
-                scalar_t *SCPA_RESTRICT Y, int ldy)
+                const scalar_t *RESTRICT X, int ldx,
+                scalar_t *RESTRICT Y, int ldy)
 {
     const int m = ctx->m, n = ctx->n, k = ctx->k;
     const long long threads = (long long)m * (long long)k;

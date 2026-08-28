@@ -102,7 +102,7 @@ static void kernel_generic(int m_loc, int n_loc, int k,
             int j;                                                            \
             COLS(DECLARE_ACC)                                                 \
             for (j = 0; j < n_loc; j++) {                                         \
-                const scalar_t a = arow[j];                                   \ 
+                const scalar_t a = arow[j];                                   \
                 const scalar_t *restrict xrow =                               \
                     X_loc + (size_t)j * (size_t)ldx;                              \
                 COLS(UPDATE_ACC)                                              \
@@ -163,13 +163,13 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
         die("local_gemm_create: A is NULL for a non-empty %dx%d block", m_loc, n_loc);
 
     local_gemm_context = xmalloc(sizeof *local_gemm_context);
-    local_gemm_context->m = m_loc;
-    local_gemm_context->n = n_loc;
+    local_gemm_context->m_loc = m_loc;
+    local_gemm_context->n_loc = n_loc;
     local_gemm_context->k = k;
     local_gemm_context->lda = lda;
     local_gemm_context->ldx = ldx;
     local_gemm_context->ldy = ldy;
-    local_gemm_context->A = A_loc;
+    local_gemm_context->A_loc = A_loc;
     local_gemm_context->t_setup = now_seconds() - t0;
     return local_gemm_context;
 }

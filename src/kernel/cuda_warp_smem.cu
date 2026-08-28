@@ -355,7 +355,7 @@ static void launch_smem_kernel(int m, int n, int k,
 /* ---------------------------------------------------------------------------
  * Contesto e ciclo di vita: identici a cuda_warp
  * ------------------------------------------------------------------------ */
-struct local_gemm_ctx {
+struct local_gemm_context {
     int m, n, k;
     int lda, ldx, ldy;
     scalar_t *dA, *dX, *dY;
@@ -474,8 +474,8 @@ local_gemm_t *local_gemm_create(int m, int n, int k,
 }
 
 void local_gemm(local_gemm_t *ctx,
-                const scalar_t *SCPA_RESTRICT X, int ldx,
-                scalar_t *SCPA_RESTRICT Y, int ldy)
+                const scalar_t *RESTRICT X, int ldx,
+                scalar_t *RESTRICT Y, int ldy)
 {
     const int m = ctx->m, n = ctx->n, k = ctx->k;
     float ms = 0.0f;

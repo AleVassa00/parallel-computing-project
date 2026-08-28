@@ -30,7 +30,7 @@ double check_against_serial(const grid_t *g, const layout_t *l,
          * nessun buffer di packing */
         MPI_Gatherv(Y_loc, l->m_loc * l->k, SCALAR_MPI_TYPE,
                     Y_all, counts, displs, SCALAR_MPI_TYPE,
-                    0, g->col);
+                    0, g->col_comm);
     }
 
     if (g->rank == 0) {
@@ -61,6 +61,6 @@ double check_against_serial(const grid_t *g, const layout_t *l,
     xfree(displs);
 
     /* tutti i processi devono poter decidere allo stesso modo l'esito */
-    MPI_Bcast(&err, 1, MPI_DOUBLE, 0, g->grid);
+    MPI_Bcast(&err, 1, MPI_DOUBLE, 0, g->grid_comm);
     return err;
 }

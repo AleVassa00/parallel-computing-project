@@ -324,43 +324,38 @@ int main(int argc, char **argv)
         matmul_time_t times_struct_rep;
         /* barriera prima di ogni ripetizione: senza, un processo in anticipo
          * comincerebbe a cronometrare mentre gli altri sono ancora indietro */
-        MPI_Barrier(grid.grid);
+        MPI_Barrier(grid.grid_comm);
+
         mpi_matmul(&grid, &layout, local_gemm_context, X_loc, Y_loc_part, Y_row_col0, &times_struct_rep);
-        bcast_times[rep] = times_struct_rep.t_bcast;
-        total_times[rep] = times_struct_rep.t_total;
-        local_phase_times[rep] = times_struct_rep.t_local;
-        reduce_times[rep] = times_struct_rep.t_reduce;
-        official_times[rep] = times_struct_rep.t_official;
-        kernel_times[rep] = times_struct_rep.t_kernel;
-        non_kernel_local_times[rep] = (times_struct_rep.t_kernel >= 0.0) ? times_struct_rep.t_local - times_struct_rep.t_kernel : -1.0;
+        bcast_times[rep] = times_struct_rep.bcast_time;
+        total_times[rep] = times_struct_rep.total_time;
+        local_phase_times[rep] = times_struct_rep.local_phase_time;
+        reduce_times[rep] = times_struct_rep.reduce_time;
+        official_times[rep] = times_struct_rep.official_time;
+        kernel_times[rep] = times_struct_rep.kernel_time;
+        non_kernel_local_times[rep] = (times_struct_rep.kernel_time >= 0.0) ? times_struct_rep.local_phase_time - times_struct_rep.kernel_time : -1.0;
     }
 
     /* Il tempo di una invocazione e' il MASSIMO fra i processi, non quello del
      * rank 0: l'operazione e' finita quando ha finito l'ultimo. Le riduzioni
      * si fanno alla fine, su tutto il vettore, per non disturbare le misure. */
-    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : bcast_times, bcast_times, options.reps,
-               MPI_DOUBLE, MPI_MAX, 0, grid.grid);
-    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : local_phase_times, local_phase_times, options.reps,
-               MPI_DOUBLE, MPI_MAX, 0, grid.grid);
-    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : reduce_times, reduce_times, options.reps,
-               MPI_DOUBLE, MPI_MAX, 0, grid.grid);
-    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : total_times, total_times, options.reps,
-               MPI_DOUBLE, MPI_MAX, 0, grid.grid);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : bcast_times, bcast_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : local_phase_times, local_phase_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : reduce_times, reduce_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : total_times, total_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
     /* t_official e' costruito LOCALMENTE per ogni repetition e solo dopo si
      * prende il massimo: sommare medie/massimi delle singole fasi non darebbe
      * il cammino critico di una vera invocazione. */
-    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : official_times, official_times, options.reps,
-               MPI_DOUBLE, MPI_MAX, 0, grid.grid);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : official_times, official_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
     /* Stesso criterio per il tempo di kernel e per il preprocessing: conta il
      * processo piu' lento, non il rank 0. Il sentinella negativo dei backend di
      * CPU sopravvive al massimo, perche' li' e' negativo su tutti i rank. */
-    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : kernel_times, kernel_times, options.reps,
-               MPI_DOUBLE, MPI_MAX, 0, grid.grid);
-    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : non_kernel_local_times, non_kernel_local_times, options.reps,
-               MPI_DOUBLE, MPI_MAX, 0, grid.grid);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : kernel_times, kernel_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : non_kernel_local_times, non_kernel_local_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
+
     setup_time = local_gemm_setup_seconds(local_gemm_context);
-    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &setup_time, &setup_time, 1,
-               MPI_DOUBLE, MPI_MAX, 0, grid.grid);
+
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &setup_time, &setup_time, 1, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
 
     if (options.check)
         rel_err = check_against_serial(&grid, &layout, Y_row_col0, options.seed);

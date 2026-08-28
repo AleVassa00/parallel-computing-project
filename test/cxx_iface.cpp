@@ -4,7 +4,7 @@
  * esattamente come lo vede questo file. Non c'e' bisogno di avere CUDA
  * installato per accorgersi in anticipo di una rottura: bastano due proprieta'
  *   1. l'header deve essere PARSABILE da C++  -> `restrict` va scritto
- *      `__restrict__`, ed e' cio' che fa la macro SCPA_RESTRICT;
+ *      `__restrict__`, ed e' cio' che fa la macro RESTRICT;
  *   2. i simboli devono conservare il LINKAGE C -> senza extern "C" il name
  *      mangling li rinominerebbe e il link con gli oggetti prodotti da mpicc
  *      fallirebbe.

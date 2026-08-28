@@ -71,7 +71,7 @@ void distribute_global_A(const grid_t *grid, const layout_t *layout, const scala
         int r, c;
 
         if (A_global == NULL)
-            mpi_abort_error(grid->grid, MPI_ERR_BUFFER,
+            mpi_abort_error(grid->grid_comm, MPI_ERR_BUFFER,
                             "A_global is NULL on grid rank 0");
 
         for (r = 0; r < grid->pr; r++) {
@@ -81,13 +81,13 @@ void distribute_global_A(const grid_t *grid, const layout_t *layout, const scala
             for (c = 0; c < grid->pc; c++) {
                 const int col0 = block_start(layout->N, grid->pc, c);
                 const int n_loc = block_size(layout->N, grid->pc, c);
-                const int count = block_element_count(grid->grid, m_loc, n_loc);
+                const int count = block_element_count(grid->grid_comm, m_loc, n_loc);
                 int coords[2] = { r, c };
                 int destination;
 
-                error_code = MPI_Cart_rank(grid->grid, coords, &destination);
+                error_code = MPI_Cart_rank(grid->grid_comm, coords, &destination);
                 if (error_code != MPI_SUCCESS)
-                    mpi_abort_error(grid->grid, error_code, "MPI_Cart_rank");
+                    mpi_abort_error(grid->grid_comm, error_code, "MPI_Cart_rank");
 
                 /* Nessun messaggio e nessun datatype per un blocco vuoto.
                  * Il processo destinatario segue la stessa condizione. */
@@ -110,32 +110,32 @@ void distribute_global_A(const grid_t *grid, const layout_t *layout, const scala
                     error_code = MPI_Type_vector(m_loc, n_loc, layout->N,
                                                  SCALAR_MPI_TYPE, &block_type);
                     if (error_code != MPI_SUCCESS)
-                        mpi_abort_error(grid->grid, error_code, "MPI_Type_vector");
+                        mpi_abort_error(grid->grid_comm, error_code, "MPI_Type_vector");
 
                     error_code = MPI_Type_commit(&block_type);
                     if (error_code != MPI_SUCCESS) {
                         MPI_Type_free(&block_type);
-                        mpi_abort_error(grid->grid, error_code, "MPI_Type_commit");
+                        mpi_abort_error(grid->grid_comm, error_code, "MPI_Type_commit");
                     }
 
                     /* MPI_Send e' bloccante: al ritorno il buffer globale e il
                      * datatype non sono piu' in uso e il tipo puo' essere
                      * liberato immediatamente. */
                     error_code = MPI_Send(start, 1, block_type, destination,
-                                          TAG_DISTRIBUTE_A, grid->grid);
+                                          TAG_DISTRIBUTE_A, grid->grid_comm);
                     if (error_code != MPI_SUCCESS) {
                         MPI_Type_free(&block_type);
-                        mpi_abort_error(grid->grid, error_code, "MPI_Send(A block)");
+                        mpi_abort_error(grid->grid_comm, error_code, "MPI_Send(A block)");
                     }
 
                     error_code = MPI_Type_free(&block_type);
                     if (error_code != MPI_SUCCESS)
-                        mpi_abort_error(grid->grid, error_code, "MPI_Type_free");
+                        mpi_abort_error(grid->grid_comm, error_code, "MPI_Type_free");
                 }
             }
         }
     } else {
-        const int count = block_element_count(grid->grid, layout->m_loc, layout->n_loc);
+        const int count = block_element_count(grid->grid_comm, layout->m_loc, layout->n_loc);
 
         if (count > 0) {
             MPI_Datatype recv_type = MPI_DATATYPE_NULL;
@@ -146,24 +146,24 @@ void distribute_global_A(const grid_t *grid, const layout_t *layout, const scala
             error_code = MPI_Type_vector(layout->m_loc, layout->n_loc, layout->lda,
                                          SCALAR_MPI_TYPE, &recv_type);
             if (error_code != MPI_SUCCESS)
-                mpi_abort_error(grid->grid, error_code,
+                mpi_abort_error(grid->grid_comm, error_code,
                                 "MPI_Type_vector(local A block)");
             error_code = MPI_Type_commit(&recv_type);
             if (error_code != MPI_SUCCESS) {
                 MPI_Type_free(&recv_type);
-                mpi_abort_error(grid->grid, error_code,
+                mpi_abort_error(grid->grid_comm, error_code,
                                 "MPI_Type_commit(local A block)");
             }
 
             error_code = MPI_Recv(A_loc, 1, recv_type, root,
-                                  TAG_DISTRIBUTE_A, grid->grid, &status);
+                                  TAG_DISTRIBUTE_A, grid->grid_comm, &status);
             if (error_code != MPI_SUCCESS) {
                 MPI_Type_free(&recv_type);
-                mpi_abort_error(grid->grid, error_code, "MPI_Recv(A block)");
+                mpi_abort_error(grid->grid_comm, error_code, "MPI_Recv(A block)");
             }
             error_code = MPI_Type_free(&recv_type);
             if (error_code != MPI_SUCCESS)
-                mpi_abort_error(grid->grid, error_code,
+                mpi_abort_error(grid->grid_comm, error_code,
                                 "MPI_Type_free(local A block)");
         }
     }
