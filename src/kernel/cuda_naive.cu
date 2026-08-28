@@ -74,25 +74,32 @@
 
 #define BYTES_PER_GIB 1073741824.0
 
-static __global__ void naive_kernel(int m, int n, int k,
-                                    const scalar_t *__restrict__ A, int lda,
-                                    const scalar_t *__restrict__ X, int ldx,
-                                    scalar_t *__restrict__ Y, int ldy)
+static __global__ void naive_kernel(int m, int n, int k, const scalar_t *__restrict__ A, int lda, const scalar_t *__restrict__ X, int ldx, scalar_t *__restrict__ Y, int ldy)
 {
     const long long tid = (long long)blockIdx.x * blockDim.x + threadIdx.x;
     const long long total = (long long)m * (long long)k;
+
     int i, c, j;
+
     const scalar_t *arow;
+
     scalar_t acc = (scalar_t)0;
 
     /* La griglia e' arrotondata al blocco: gli ultimi thread non hanno lavoro. */
     if (tid >= total)
         return;
 
-    i = (int)(tid / k);
-    c = (int)(tid % k);
-    arow = A + (size_t)i * (size_t)lda;
+    i = (int)(tid / k); // riga di Y di cui si è responsabili -> corrisponde anche alla riga di A
+    c = (int)(tid % k); // colonna di Y di cui si è responsabili -> corrisponde anche alla colonna di X
 
+    arow = A + (size_t)i * (size_t)lda; // selezioniamo la riga corrispondente di A
+
+    /* Prodotto riga per colonna
+     * Una volta fissata la riga di A e la colonna di X
+     * viene calcolato il prodotto riga per colonna, scorrendo gli elementi
+     * con l'indice j
+     * A[i][j] * X[j][c]
+     */
     for (j = 0; j < n; j++)
         acc += arow[j] * X[(size_t)j * (size_t)ldx + c];
 
@@ -136,6 +143,7 @@ static int pick_device(void)
         local_rank_env = getenv("MV2_COMM_WORLD_LOCAL_RANK");    /* MVAPICH */
     if (local_rank_env == NULL)
         local_rank_env = getenv("SLURM_LOCALID");                /* Slurm   */
+
     local_rank = (local_rank_env != NULL) ? strtol(local_rank_env, NULL, 10) : 0;
     if (local_rank < 0)
         local_rank = 0;
@@ -170,40 +178,38 @@ static size_t nonzero(size_t bytes)
     return (bytes != 0) ? bytes : 1;
 }
 
-local_gemm_t *local_gemm_create(int m, int n, int k,
-                                const scalar_t *A, int lda,
-                                int ldx, int ldy)
+local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_loc, int lda, int ldx, int ldy)
 {
-    local_gemm_t *ctx;
+    local_gemm_t *local_gemm_context;
     size_t bytes_A, bytes_X, bytes_Y, need, free_b = 0, total_b = 0;
     const double t0 = now_seconds();
 
     /* Stessi controlli del backend scalare: l'interfaccia e' una sola, e i suoi
      * invarianti non possono dipendere da chi la implementa. */
-    if (m < 0 || n < 0 || k < 0)
-        die("local_gemm_create: invalid local block %dx%d with k=%d", m, n, k);
-    if (lda < n)
-        die("local_gemm_create: lda %d is smaller than n %d", lda, n);
+    if (m_loc < 0 || n_loc < 0 || k < 0)
+        die("local_gemm_create: invalid local block %dx%d with k=%d", m_loc, n_loc, k);
+    if (lda < n_loc)
+        die("local_gemm_create: lda %d is smaller than n %d", lda, n_loc);
     if (ldx < k || ldy < k)
         die("local_gemm_create: ldx %d and ldy %d must both be at least k=%d",
             ldx, ldy, k);
-    if (n > 0 && m > 0 && A == NULL)
-        die("local_gemm_create: A is NULL for a non-empty %dx%d block", m, n);
+    if (n_loc > 0 && m_loc > 0 && A_loc == NULL)
+        die("local_gemm_create: A is NULL for a non-empty %dx%d block", m_loc, n_loc);
 
-    ctx = (local_gemm_t *)xmalloc(sizeof *ctx);
-    ctx->m = m;
-    ctx->n = n;
-    ctx->k = k;
-    ctx->lda = lda;
-    ctx->ldx = ldx;
-    ctx->ldy = ldy;
-    ctx->dA = NULL;
-    ctx->dX = NULL;
-    ctx->dY = NULL;
-    ctx->t_last = -1.0;
+    local_gemm_context = (local_gemm_t *)xmalloc(sizeof *local_gemm_context);
+    local_gemm_context->m = m_loc;
+    local_gemm_context->n = n_loc;
+    local_gemm_context->k = k;
+    local_gemm_context->lda = lda;
+    local_gemm_context->ldx = ldx;
+    local_gemm_context->ldy = ldy;
+    local_gemm_context->dA = NULL;
+    local_gemm_context->dX = NULL;
+    local_gemm_context->dY = NULL;
+    local_gemm_context->t_last = -1.0;
 
-    ctx->device = pick_device();
-    CUDA_CHECK(cudaSetDevice(ctx->device));
+    local_gemm_context->device = pick_device();
+    CUDA_CHECK(cudaSetDevice(local_gemm_context->device));
 
     /* I runtime recenti inizializzano il contesto gia' in cudaSetDevice;
      * cudaFree(0) forza l'inizializzazione nei runtime precedenti ed e' un
@@ -211,9 +217,9 @@ local_gemm_t *local_gemm_create(int m, int n, int k,
      * preprocessing, e non nella prima local_gemm con --warmup 0. */
     CUDA_CHECK(cudaFree(0));
 
-    bytes_A = (size_t)m * (size_t)lda * sizeof(scalar_t);
-    bytes_X = (size_t)n * (size_t)ldx * sizeof(scalar_t);
-    bytes_Y = (size_t)m * (size_t)ldy * sizeof(scalar_t);
+    bytes_A = (size_t)m_loc * (size_t)lda * sizeof(scalar_t);
+    bytes_X = (size_t)n_loc * (size_t)ldx * sizeof(scalar_t);
+    bytes_Y = (size_t)m_loc * (size_t)ldy * sizeof(scalar_t);
 
     /* A e' l'oggetto grande: 40000x40000 in double sono 12.8 GiB contro i 15.5
      * GiB della Quadro RTX 5000. Meglio un messaggio che dice quanto manca che
@@ -226,82 +232,75 @@ local_gemm_t *local_gemm_create(int m, int n, int k,
             "but the local block needs about %.2f GiB "
             "(A %dx%d, X %dx%d, Y %dx%d in %s): use more MPI processes "
             "or a smaller M/N",
-            ctx->device, (double)free_b / BYTES_PER_GIB,
+            local_gemm_context->device, (double)free_b / BYTES_PER_GIB,
             (double)total_b / BYTES_PER_GIB, (double)need / BYTES_PER_GIB,
-            m, n, n, k, m, k, SCALAR_NAME);
+            m_loc, n_loc, n_loc, k, m_loc, k, SCALAR_NAME);
 
-    CUDA_CHECK(cudaMalloc((void **)&ctx->dA, nonzero(bytes_A)));
+    CUDA_CHECK(cudaMalloc((void **)&local_gemm_context->dA, nonzero(bytes_A)));
     if (bytes_A > 0)
-        CUDA_CHECK(cudaMemcpy(ctx->dA, A, bytes_A, cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(local_gemm_context->dA, A_loc, bytes_A, cudaMemcpyHostToDevice));
 
     /* Anche X e Y vengono dimensionate qui: nessuna cudaMalloc puo' quindi
      * cadere nella prima repetition, neppure con --warmup 0. */
-    CUDA_CHECK(cudaMalloc((void **)&ctx->dX, nonzero(bytes_X)));
-    CUDA_CHECK(cudaMalloc((void **)&ctx->dY, nonzero(bytes_Y)));
-    CUDA_CHECK(cudaMemset(ctx->dY, 0, nonzero(bytes_Y)));
+    CUDA_CHECK(cudaMalloc((void **)&local_gemm_context->dX, nonzero(bytes_X)));
+    CUDA_CHECK(cudaMalloc((void **)&local_gemm_context->dY, nonzero(bytes_Y)));
+    CUDA_CHECK(cudaMemset(local_gemm_context->dY, 0, nonzero(bytes_Y)));
 
     /* Gli event vanno creati una volta sola: crearli e distruggerli a ogni
      * invocazione sarebbe una chiamata al driver dentro la misura. */
-    CUDA_CHECK(cudaEventCreate(&ctx->ev_start));
-    CUDA_CHECK(cudaEventCreate(&ctx->ev_stop));
+    CUDA_CHECK(cudaEventCreate(&local_gemm_context->ev_start));
+    CUDA_CHECK(cudaEventCreate(&local_gemm_context->ev_stop));
 
     /* Le copie H2D da memoria paginabile possono ritornare prima che il DMA
      * sia terminato. Questa sincronizzazione garantisce che tutto il setup sia
      * davvero concluso prima di uscire dalla regione di preprocessing. */
     CUDA_CHECK(cudaDeviceSynchronize());
 
-    ctx->t_setup = now_seconds() - t0;
-    return ctx;
+    local_gemm_context->t_setup = now_seconds() - t0;
+    return local_gemm_context;
 }
 
-void local_gemm(local_gemm_t *ctx,
-                const scalar_t *RESTRICT X, int ldx,
-                scalar_t *RESTRICT Y, int ldy)
+void local_gemm(local_gemm_t *local_gemm_context, const scalar_t *RESTRICT X_loc, int ldx, scalar_t *RESTRICT Y_loc_part, int ldy)
 {
-    const int m = ctx->m, n = ctx->n, k = ctx->k;
-    const long long threads = (long long)m * (long long)k;
+    const int m_loc = local_gemm_context->m, n_loc = local_gemm_context->n, k = local_gemm_context->k;
+    const long long threads = (long long)m_loc * (long long)k;
     float ms = 0.0f;
 
-    if (ldx != ctx->ldx || ldy != ctx->ldy)
+    // Guardia: le leading dimension non possono cambiare fra le chiamate
+    if (ldx != local_gemm_context->ldx || ldy != local_gemm_context->ldy)
         die("cuda_naive: leading dimensions changed between calls "
             "(ldx %d -> %d, ldy %d -> %d)",
-            ctx->ldx, ldx, ctx->ldy, ldy);
+            local_gemm_context->ldx, ldx, local_gemm_context->ldy, ldy);
 
-    /* H2D di X: una fetta n x k, cioe' pochi MiB. E' dentro l'invocazione
-     * perche' X e' il risultato del MPI_Bcast appena concluso. */
-    if (n > 0 && k > 0)
-        CUDA_CHECK(cudaMemcpy(ctx->dX, X,
-                              (size_t)n * (size_t)ldx * sizeof(scalar_t),
-                              cudaMemcpyHostToDevice));
+    /* H2D di X_loc: una "fetta" n_loc x k, cioe' pochi MiB. E' dentro l'invocazione
+     * perche' X_loc e' il risultato del MPI_Bcast appena concluso. */
+    if (n_loc > 0 && k > 0)
+        CUDA_CHECK(cudaMemcpy(local_gemm_context->dX, X_loc, (size_t)n_loc * (size_t)ldx * sizeof(scalar_t), cudaMemcpyHostToDevice));
 
     /* Gli event delimitano il SOLO kernel: quello che sta fra i due record e'
      * cio' che finisce in t_kernel e quindi in gflops_kernel. */
-    CUDA_CHECK(cudaEventRecord(ctx->ev_start, 0));
+    CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_start, 0));
     if (threads > 0) {
         const int blocks = (int)((threads + BLOCK_THREADS - 1) / BLOCK_THREADS);
-        naive_kernel<<<blocks, BLOCK_THREADS>>>(m, n, k,
-                                                ctx->dA, ctx->lda,
-                                                ctx->dX, ldx,
-                                                ctx->dY, ldy);
+        naive_kernel<<<blocks, BLOCK_THREADS>>>(m_loc, n_loc, k, local_gemm_context->dA, local_gemm_context->lda, local_gemm_context->dX, ldx, local_gemm_context->dY, ldy);
         /* Un lancio fallito non lancia eccezioni: si legge cosi'. */
         CUDA_CHECK(cudaGetLastError());
     }
-    CUDA_CHECK(cudaEventRecord(ctx->ev_stop, 0));
+    CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_stop, 0));
 
-    /* D2H di Y. Essendo sullo stream di default con memoria paginabile, questa
+    /* D2H di Y.
+     * Essendo sullo stream di default con memoria paginabile, questa
      * copia e' anche il punto di sincronizzazione: quando ritorna, il kernel ha
      * finito e Ypart e' pronta per la MPI_Reduce. */
-    if (m > 0 && k > 0)
-        CUDA_CHECK(cudaMemcpy(Y, ctx->dY,
-                              (size_t)m * (size_t)ldy * sizeof(scalar_t),
-                              cudaMemcpyDeviceToHost));
+    if (m_loc > 0 && k > 0)
+        CUDA_CHECK(cudaMemcpy(Y_loc_part, local_gemm_context->dY, (size_t)m_loc * (size_t)ldy * sizeof(scalar_t), cudaMemcpyDeviceToHost));
 
     /* Con blocco locale vuoto non c'e' stata nessuna copia a sincronizzare:
      * l'attesa esplicita sull'event serve comunque, ed e' gratuita quando il
      * lavoro e' gia' concluso. */
-    CUDA_CHECK(cudaEventSynchronize(ctx->ev_stop));
-    CUDA_CHECK(cudaEventElapsedTime(&ms, ctx->ev_start, ctx->ev_stop));
-    ctx->t_last = (double)ms * 1.0e-3;
+    CUDA_CHECK(cudaEventSynchronize(local_gemm_context->ev_stop));
+    CUDA_CHECK(cudaEventElapsedTime(&ms, local_gemm_context->ev_start, local_gemm_context->ev_stop));
+    local_gemm_context->t_last = (double)ms * 1.0e-3;
 }
 
 void local_gemm_destroy(local_gemm_t *ctx)
