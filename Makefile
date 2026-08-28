@@ -10,6 +10,7 @@
 #   make KERNEL=cuda_warp  backend CUDA warp-per-row con dispatch su k
 #   make KERNEL=cuda_warp_smem  come sopra, ma con il tile di X in shared
 #   make KERNEL=cuda_warp_smem SMEM_PAD=0  la stessa cosa senza il padding k+1
+#   make BLOCK=<n>  thread per blocco dei backend CUDA (default 256)
 #   make KERNEL=cublas     riferimento esterno (aggiunge -lcublas da solo)
 #
 # Il backend si sceglie con KERNEL e il Makefile capisce da solo se e' un file C
@@ -48,6 +49,15 @@ TEST_A_PADDING  ?= 0
 # Riguarda solo i backend CUDA che lo leggono, ma entra nel nome della
 # configurazione: le due build coesistono come binari distinti.
 SMEM_PAD        ?= 1
+
+# Thread per blocco dei kernel CUDA. 256 e' il default: 8 warp, e un divisore di
+# 1024, che su Turing e' il massimo di thread residenti per SM. Uno sweep su
+# 64/128/192/256/384/512/1024 misura quanto il kernel dipenda davvero da questo
+# parametro, invece di lasciare la scelta come asserzione non verificata.
+# Deve essere un multiplo di 32: i backend lo impongono con una #error.
+# Come SMEM_PAD entra nel nome della configurazione, cosi' le build coesistono
+# come binari distinti e il CSV riporta un kernel_name() diverso per ciascuna.
+BLOCK           ?= 256
 EXTRA_CFLAGS    ?=
 EXTRA_NVCCFLAGS ?=
 
@@ -78,6 +88,9 @@ CONFIG := $(CONFIG)-pad$(TEST_A_PADDING)
 endif
 ifneq ($(SMEM_PAD),1)
 CONFIG := $(CONFIG)-smempad$(SMEM_PAD)
+endif
+ifneq ($(BLOCK),256)
+CONFIG := $(CONFIG)-blk$(BLOCK)
 endif
 LDLIBS := -lm
 
@@ -134,7 +147,7 @@ ifeq ($(KERNEL_IS_CUDA),1)
 # dato a nvcc direttamente, che non lo conosce: passa al compilatore host con
 # -Xcompiler. -lineinfo serve dopo, per correlare i profili di ncu al sorgente.
 NVCCFLAGS := -O3 -std=c++14 -arch=$(NVCC_ARCH) -Isrc $(PRECDEF) -lineinfo \
-	-DSCPA_SMEM_PAD=$(SMEM_PAD) \
+	-DSCPA_SMEM_PAD=$(SMEM_PAD) -DSCPA_BLOCK_THREADS=$(BLOCK) \
 	-Xcompiler -Wall -Xcompiler -Wextra $(EXTRA_NVCCFLAGS)
 ifneq ($(ARCHFLAGS),)
 NVCCFLAGS += -Xcompiler $(ARCHFLAGS)
@@ -172,7 +185,7 @@ TESTBIN := bin/test_index
 .PHONY: all test check check-mpi check-cxx check-padding padding-run clean
 
 all: $(BIN) $(TESTBIN)
-	@echo "built $(BIN)  [PREC=$(PREC) KERNEL=$(KERNEL) ($(KERNEL_SRC)) FORCE_GENERIC_K=$(FORCE_GENERIC_K) TEST_A_PADDING=$(TEST_A_PADDING) SMEM_PAD=$(SMEM_PAD)]"
+	@echo "built $(BIN)  [PREC=$(PREC) KERNEL=$(KERNEL) ($(KERNEL_SRC)) FORCE_GENERIC_K=$(FORCE_GENERIC_K) TEST_A_PADDING=$(TEST_A_PADDING) SMEM_PAD=$(SMEM_PAD) BLOCK=$(BLOCK)]"
 
 $(OBJDIR)/%.o: src/%.c
 	@mkdir -p $(dir $@)
