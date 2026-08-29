@@ -321,12 +321,14 @@ int main(int argc, char **argv)
         mpi_matmul(&grid, &layout, local_gemm_context, X_loc, Y_loc_part, Y_row_col0, NULL);
 
     for (rep = 0; rep < options.reps; rep++) {
+
         matmul_time_t times_struct_rep;
         /* barriera prima di ogni ripetizione: senza, un processo in anticipo
          * comincerebbe a cronometrare mentre gli altri sono ancora indietro */
         MPI_Barrier(grid.grid_comm);
 
         mpi_matmul(&grid, &layout, local_gemm_context, X_loc, Y_loc_part, Y_row_col0, &times_struct_rep);
+
         bcast_times[rep] = times_struct_rep.bcast_time;
         total_times[rep] = times_struct_rep.total_time;
         local_phase_times[rep] = times_struct_rep.local_phase_time;

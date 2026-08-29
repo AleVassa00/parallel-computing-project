@@ -222,7 +222,7 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k,
                                 const scalar_t *A, int lda,
                                 int ldx, int ldy)
 {
-    local_gemm_t *ctx;
+    local_gemm_t *local_gemm_context;
     size_t bytes_A, bytes_X, bytes_Y, need, free_b = 0, total_b = 0;
     const double t0 = now_seconds();
 
@@ -236,17 +236,17 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k,
     if (n_loc > 0 && m_loc > 0 && A == NULL)
         die("local_gemm_create: A is NULL for a non-empty %dx%d block", m_loc, n_loc);
 
-    ctx = (local_gemm_t *)xmalloc(sizeof *ctx);
-    ctx->m_loc = m_loc;
-    ctx->n_loc = n_loc;
-    ctx->k = k;
-    ctx->lda = lda;
-    ctx->ldx = ldx;
-    ctx->ldy = ldy;
-    ctx->dA_loc = NULL;
-    ctx->dX_loc = NULL;
-    ctx->dY_loc_part = NULL;
-    ctx->t_last = -1.0;
+    local_gemm_context = (local_gemm_t *)xmalloc(sizeof *local_gemm_context);
+    local_gemm_context->m_loc = m_loc;
+    local_gemm_context->n_loc = n_loc;
+    local_gemm_context->k = k;
+    local_gemm_context->lda = lda;
+    local_gemm_context->ldx = ldx;
+    local_gemm_context->ldy = ldy;
+    local_gemm_context->dA_loc = NULL;
+    local_gemm_context->dX_loc = NULL;
+    local_gemm_context->dY_loc_part = NULL;
+    local_gemm_context->t_last = -1.0;
 
     CUDA_CHECK(cudaSetDevice(CUDA_DEVICE_ID));
     CUDA_CHECK(cudaFree(0));
@@ -266,75 +266,75 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k,
             (double)total_b / BYTES_PER_GIB, (double)need / BYTES_PER_GIB,
             m_loc, lda, n_loc, ldx, m_loc, ldy, SCALAR_NAME);
 
-    CUDA_CHECK(cudaMalloc((void **)&ctx->dA_loc, nonzero(bytes_A)));
+    CUDA_CHECK(cudaMalloc((void **)&local_gemm_context->dA_loc, nonzero(bytes_A)));
     if (bytes_A > 0)
-        CUDA_CHECK(cudaMemcpy(ctx->dA_loc, A, bytes_A, cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMalloc((void **)&ctx->dX_loc, nonzero(bytes_X)));
-    CUDA_CHECK(cudaMalloc((void **)&ctx->dY_loc_part, nonzero(bytes_Y)));
-    CUDA_CHECK(cudaMemset(ctx->dY_loc_part, 0, nonzero(bytes_Y)));
-    CUDA_CHECK(cudaEventCreate(&ctx->ev_start));
-    CUDA_CHECK(cudaEventCreate(&ctx->ev_stop));
+        CUDA_CHECK(cudaMemcpy(local_gemm_context->dA_loc, A, bytes_A, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMalloc((void **)&local_gemm_context->dX_loc, nonzero(bytes_X)));
+    CUDA_CHECK(cudaMalloc((void **)&local_gemm_context->dY_loc_part, nonzero(bytes_Y)));
+    CUDA_CHECK(cudaMemset(local_gemm_context->dY_loc_part, 0, nonzero(bytes_Y)));
+    CUDA_CHECK(cudaEventCreate(&local_gemm_context->ev_start));
+    CUDA_CHECK(cudaEventCreate(&local_gemm_context->ev_stop));
     CUDA_CHECK(cudaDeviceSynchronize());
 
-    ctx->t_setup = now_seconds() - t0;
-    return ctx;
+    local_gemm_context->t_setup = now_seconds() - t0;
+    return local_gemm_context;
 }
 
-void local_gemm(local_gemm_t *ctx,
+void local_gemm(local_gemm_t *local_gemm_context,
                 const scalar_t *RESTRICT X, int ldx,
                 scalar_t *RESTRICT Y, int ldy)
 {
-    const int m_loc = ctx->m_loc, n_loc = ctx->n_loc, k = ctx->k;
+    const int m_loc = local_gemm_context->m_loc, n_loc = local_gemm_context->n_loc, k = local_gemm_context->k;
     float ms = 0.0f;
 
-    if (ldx != ctx->ldx || ldy != ctx->ldy)
+    if (ldx != local_gemm_context->ldx || ldy != local_gemm_context->ldy)
         die("cuda_warp: leading dimensions changed between calls "
             "(ldx %d -> %d, ldy %d -> %d)",
-            ctx->ldx, ldx, ctx->ldy, ldy);
+            local_gemm_context->ldx, ldx, local_gemm_context->ldy, ldy);
 
     if (n_loc > 0 && k > 0)
-        CUDA_CHECK(cudaMemcpy(ctx->dX_loc, X,
+        CUDA_CHECK(cudaMemcpy(local_gemm_context->dX_loc, X,
                               (size_t)n_loc * (size_t)ldx * sizeof(scalar_t),
                               cudaMemcpyHostToDevice));
 
-    CUDA_CHECK(cudaEventRecord(ctx->ev_start, 0));
+    CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_start, 0));
     if (m_loc > 0 && k > 0) {
-        launch_warp_kernel(m_loc, n_loc, k, ctx->dA_loc, ctx->lda,
-                           ctx->dX_loc, ldx, ctx->dY_loc_part, ldy);
+        launch_warp_kernel(m_loc, n_loc, k, local_gemm_context->dA_loc, local_gemm_context->lda,
+                           local_gemm_context->dX_loc, ldx, local_gemm_context->dY_loc_part, ldy);
         CUDA_CHECK(cudaGetLastError());
     }
-    CUDA_CHECK(cudaEventRecord(ctx->ev_stop, 0));
+    CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_stop, 0));
 
     if (m_loc > 0 && k > 0)
-        CUDA_CHECK(cudaMemcpy(Y, ctx->dY_loc_part,
+        CUDA_CHECK(cudaMemcpy(Y, local_gemm_context->dY_loc_part,
                               (size_t)m_loc * (size_t)ldy * sizeof(scalar_t),
                               cudaMemcpyDeviceToHost));
 
-    CUDA_CHECK(cudaEventSynchronize(ctx->ev_stop));
-    CUDA_CHECK(cudaEventElapsedTime(&ms, ctx->ev_start, ctx->ev_stop));
-    ctx->t_last = (double)ms * 1.0e-3;
+    CUDA_CHECK(cudaEventSynchronize(local_gemm_context->ev_stop));
+    CUDA_CHECK(cudaEventElapsedTime(&ms, local_gemm_context->ev_start, local_gemm_context->ev_stop));
+    local_gemm_context->t_last = (double)ms * 1.0e-3;
 }
 
-void local_gemm_destroy(local_gemm_t *ctx)
+void local_gemm_destroy(local_gemm_t *local_gemm_context)
 {
-    if (ctx == NULL)
+    if (local_gemm_context == NULL)
         return;
-    if (ctx->dA_loc != NULL) cudaFree(ctx->dA_loc);
-    if (ctx->dX_loc != NULL) cudaFree(ctx->dX_loc);
-    if (ctx->dY_loc_part != NULL) cudaFree(ctx->dY_loc_part);
-    cudaEventDestroy(ctx->ev_start);
-    cudaEventDestroy(ctx->ev_stop);
-    xfree(ctx);
+    if (local_gemm_context->dA_loc != NULL) cudaFree(local_gemm_context->dA_loc);
+    if (local_gemm_context->dX_loc != NULL) cudaFree(local_gemm_context->dX_loc);
+    if (local_gemm_context->dY_loc_part != NULL) cudaFree(local_gemm_context->dY_loc_part);
+    cudaEventDestroy(local_gemm_context->ev_start);
+    cudaEventDestroy(local_gemm_context->ev_stop);
+    xfree(local_gemm_context);
 }
 
-double local_gemm_last_compute_seconds(const local_gemm_t *ctx)
+double local_gemm_last_compute_seconds(const local_gemm_t *local_gemm_context)
 {
-    return (ctx != NULL) ? ctx->t_last : -1.0;
+    return (local_gemm_context != NULL) ? local_gemm_context->t_last : -1.0;
 }
 
-double local_gemm_setup_seconds(const local_gemm_t *ctx)
+double local_gemm_setup_seconds(const local_gemm_t *local_gemm_context)
 {
-    return (ctx != NULL) ? ctx->t_setup : 0.0;
+    return (local_gemm_context != NULL) ? local_gemm_context->t_setup : 0.0;
 }
 
 /* Il nome porta la dimensione del blocco quando non e' quella di default: nel

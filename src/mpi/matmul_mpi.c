@@ -13,6 +13,7 @@ void mpi_matmul(const grid_t *grid, const layout_t *layout, local_gemm_t *local_
     /* 1. In g->col il rank 0 coincide, per l'invariante verificato da
      *    grid_create(), con la coordinata cartesiana di riga 0. */
     MPI_Bcast(X_loc, x_count, SCALAR_MPI_TYPE, 0, grid->col_comm);
+
     t1 = MPI_Wtime();
 
     /* 2. Contributo locale: righe [row0, row0+m_loc) di Y, limitatamente alle

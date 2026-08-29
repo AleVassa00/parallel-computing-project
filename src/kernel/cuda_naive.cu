@@ -284,29 +284,29 @@ void local_gemm(local_gemm_t *local_gemm_context, const scalar_t *RESTRICT X_loc
     local_gemm_context->t_last = (double)ms * 1.0e-3;
 }
 
-void local_gemm_destroy(local_gemm_t *ctx)
+void local_gemm_destroy(local_gemm_t *local_gemm_context)
 {
-    if (ctx == NULL)
+    if (local_gemm_context == NULL)
         return;
 
     /* In chiusura gli errori non si possono piu' gestire in modo utile: si
      * libera quello che c'e' e si esce. */
-    if (ctx->dA_loc != NULL) cudaFree(ctx->dA_loc);
-    if (ctx->dX_loc != NULL) cudaFree(ctx->dX_loc);
-    if (ctx->dY_loc_part != NULL) cudaFree(ctx->dY_loc_part);
-    cudaEventDestroy(ctx->ev_start);
-    cudaEventDestroy(ctx->ev_stop);
-    xfree(ctx);
+    if (local_gemm_context->dA_loc != NULL) cudaFree(local_gemm_context->dA_loc);
+    if (local_gemm_context->dX_loc != NULL) cudaFree(local_gemm_context->dX_loc);
+    if (local_gemm_context->dY_loc_part != NULL) cudaFree(local_gemm_context->dY_loc_part);
+    cudaEventDestroy(local_gemm_context->ev_start);
+    cudaEventDestroy(local_gemm_context->ev_stop);
+    xfree(local_gemm_context);
 }
 
-double local_gemm_last_compute_seconds(const local_gemm_t *ctx)
+double local_gemm_last_compute_seconds(const local_gemm_t *local_gemm_context)
 {
-    return (ctx != NULL) ? ctx->t_last : -1.0;
+    return (local_gemm_context != NULL) ? local_gemm_context->t_last : -1.0;
 }
 
-double local_gemm_setup_seconds(const local_gemm_t *ctx)
+double local_gemm_setup_seconds(const local_gemm_t *local_gemm_context)
 {
-    return (ctx != NULL) ? ctx->t_setup : 0.0;
+    return (local_gemm_context != NULL) ? local_gemm_context->t_setup : 0.0;
 }
 
 /* Il nome porta la dimensione del blocco quando non e' quella di default: nel

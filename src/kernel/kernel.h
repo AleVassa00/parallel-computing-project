@@ -72,10 +72,10 @@ local_gemm_t *local_gemm_create(int m, int n, int k, const scalar_t *A_loc, int 
  * Le leading dimension di X e Y restano parametri e non coincidono
  * necessariamente con k: e' il gancio per il padding anti-conflict-miss
  * senza toccare ne' il kernel ne' il codice chiamante. */
-void local_gemm(local_gemm_t *ctx, const scalar_t *RESTRICT X, int ldx, scalar_t *RESTRICT Y, int ldy);
+void local_gemm(local_gemm_t *local_gemm_context, const scalar_t *RESTRICT X, int ldx, scalar_t *RESTRICT Y, int ldy);
 
 /* Rilascia le risorse del backend (per CUDA: la copia di A in VRAM).
- * Tollera ctx == NULL. */
+ * Tollera local_gemm_context == NULL. */
 void local_gemm_destroy(local_gemm_t *local_gemm_context);
 
 /* ---------------------------------------------------------------------------
