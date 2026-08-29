@@ -205,13 +205,18 @@ I buffer di X e Y vengono allocati in `local_gemm_create`, che riceve anche
 prima di restituire. Di conseguenza nessuna allocazione o coda residua della
 copia di A entra nella prima repetition, neppure con `--warmup 0`.
 
-Ogni rank sceglie la GPU usando il local rank esportato da OpenMPI, MVAPICH o
-Slurm; `SCPA_CUDA_DEVICE` resta disponibile come override esplicito. Se sul
-nodo ci sono piu' rank locali che GPU, il programma avverte che le GPU vengono
-condivise: il risultato resta corretto, ma i tempi `t_kernel` e ufficiali non
-rappresentano il caso one-rank-per-GPU. Per misure confrontabili va quindi
-usato al massimo un rank per GPU, salvo documentare esplicitamente la
-condivisione (per esempio tramite MPS).
+Il server di dipartimento su cui la consegna richiede di misurare ha una sola
+GPU, quindi non c'e' nessun device da scegliere: tutti i rank usano il device 0
+(`CUDA_DEVICE_ID`) e nessuna logica di selezione viene attraversata.
+
+Con piu' rank MPI sullo stesso nodo i contesti CUDA si alternano sulla scheda
+(MPS non attivo). Il risultato resta corretto, ma `t_kernel` comprende anche il
+tempo in cui il contesto di un rank e' sospeso a favore di un altro: con P > 1
+il valore va letto come throughput AGGREGATO della GPU sul problema globale,
+non come tempo di una GPU dedicata. Per caratterizzare il kernel in se' - per
+esempio nel confronto fra i backend o nello sweep su `BLOCK` - conviene quindi
+misurare con `-np 1`, che sulla stessa scheda esegue lo stesso lavoro totale
+senza contesa fra contesti.
 
 Se il blocco locale non entra in VRAM (40000x40000 in double sono 12.8 GiB
 contro i 15.5 GiB della Quadro RTX 5000) il programma si ferma prima di

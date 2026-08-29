@@ -8,9 +8,6 @@
 
 #include <cuda_runtime.h>
 
-#include <stdio.h>
-#include <stdlib.h>
-
 #include "kernel/kernel.h"
 #include "common/util.h"
 
@@ -44,6 +41,19 @@
 #define BLOCK_THREADS SCPA_BLOCK_THREADS
 #define WARPS_PER_BLOCK (BLOCK_THREADS / WARP_SIZE)
 #define RUNTIME_TILE 4
+/* Il server di dipartimento su cui la consegna richiede di misurare ha una
+ * sola GPU: non c'e' nessun device da scegliere, e una logica di selezione
+ * basata sul rank locale MPI sarebbe codice che non puo' mai fare nulla.
+ * Tutti i rank sullo stesso nodo usano quindi il device 0.
+ *
+ * Conseguenza da tenere presente nel leggere le misure: con piu' rank MPI per
+ * GPU i contesti si alternano sulla scheda (MPS non attivo), quindi t_kernel
+ * comprende anche il tempo in cui il contesto di questo rank e' sospeso a
+ * favore di un altro. Per caratterizzare il kernel in se' va usato un rank
+ * singolo; con piu' rank il numero resta valido come throughput AGGREGATO
+ * della GPU sul problema globale, non come tempo di una GPU dedicata. */
+#define CUDA_DEVICE_ID 0
+
 #define BYTES_PER_GIB 1073741824.0
 
 template<int K>
@@ -199,50 +209,9 @@ struct local_gemm_context {
     int lda, ldx, ldy;
     scalar_t *dA_loc, *dX_loc, *dY_loc_part;
     cudaEvent_t ev_start, ev_stop;
-    int device;
     double t_setup;
     double t_last;
 };
-
-static int pick_device(void)
-{
-    const char *env, *local_rank_env, *local_size_env;
-    int ndev = 0;
-    long id, local_rank, local_size;
-
-    CUDA_CHECK(cudaGetDeviceCount(&ndev));
-    if (ndev < 1)
-        die("cuda_warp: no CUDA device available");
-
-    local_rank_env = getenv("OMPI_COMM_WORLD_LOCAL_RANK");
-    if (local_rank_env == NULL)
-        local_rank_env = getenv("MV2_COMM_WORLD_LOCAL_RANK");
-    if (local_rank_env == NULL)
-        local_rank_env = getenv("SLURM_LOCALID");
-    local_rank = (local_rank_env != NULL) ? strtol(local_rank_env, NULL, 10) : 0;
-    if (local_rank < 0)
-        local_rank = 0;
-
-    local_size_env = getenv("OMPI_COMM_WORLD_LOCAL_SIZE");
-    if (local_size_env == NULL)
-        local_size_env = getenv("MV2_COMM_WORLD_LOCAL_SIZE");
-    if (local_size_env == NULL)
-        local_size_env = getenv("SLURM_NTASKS_PER_NODE");
-    local_size = (local_size_env != NULL) ? strtol(local_size_env, NULL, 10) : 1;
-
-    if (local_rank == 0 && local_size > ndev)
-        fprintf(stderr,
-                "warning: %ld local MPI ranks share %d CUDA device(s); "
-                "correctness is preserved, but official/kernel GPU timing "
-                "does not represent one-rank-per-GPU throughput\n",
-                local_size, ndev);
-
-    env = getenv("SCPA_CUDA_DEVICE");
-    id = (env != NULL) ? strtol(env, NULL, 10) : local_rank;
-    if (id < 0)
-        id = 0;
-    return (int)(id % ndev);
-}
 
 static size_t nonzero(size_t bytes)
 {
@@ -279,8 +248,7 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k,
     ctx->dY_loc_part = NULL;
     ctx->t_last = -1.0;
 
-    ctx->device = pick_device();
-    CUDA_CHECK(cudaSetDevice(ctx->device));
+    CUDA_CHECK(cudaSetDevice(CUDA_DEVICE_ID));
     CUDA_CHECK(cudaFree(0));
 
     bytes_A = (size_t)m_loc * (size_t)lda * sizeof(scalar_t);
@@ -294,7 +262,7 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k,
             "but the local block needs about %.2f GiB "
             "(A %dx%d, X %dx%d, Y %dx%d in %s): use more MPI processes "
             "or a smaller M/N",
-            ctx->device, (double)free_b / BYTES_PER_GIB,
+            CUDA_DEVICE_ID, (double)free_b / BYTES_PER_GIB,
             (double)total_b / BYTES_PER_GIB, (double)need / BYTES_PER_GIB,
             m_loc, lda, n_loc, ldx, m_loc, ldy, SCALAR_NAME);
 
