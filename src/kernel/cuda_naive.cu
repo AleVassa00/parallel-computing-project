@@ -164,6 +164,7 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
 {
     local_gemm_t *local_gemm_context;
     size_t bytes_A, bytes_X, bytes_Y, need, free_b = 0, total_b = 0;
+    cudaError_t err;
     const double t0 = now_seconds();
 
     /* Stessi controlli del backend scalare: l'interfaccia e' una sola, e i suoi
@@ -202,29 +203,51 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
     bytes_X = (size_t)n_loc * (size_t)ldx * sizeof(scalar_t);
     bytes_Y = (size_t)m_loc * (size_t)ldy * sizeof(scalar_t);
 
-    /* A e' l'oggetto grande: 40000x40000 in double sono 12.8 GiB contro i 15.5
-     * GiB della Quadro RTX 5000. Meglio un messaggio che dice quanto manca che
-     * un "out of memory" generico a meta' campagna. La stima usa i layout
-     * effettivi di A, X e Y ricevuti dal driver. */
+    /* A e' l'oggetto grande: 40000x40000 in double sono 11.9 GiB sui 16 della
+     * Quadro RTX 5000, e con piu' rank per GPU il totale va moltiplicato per il
+     * numero di rank locali. need somma i layout EFFETTIVI (leading dimension,
+     * non forme logiche) e serve solo a rendere leggibile la diagnosi quando
+     * un'allocazione fallisce: non e' piu' un valore su cui si decide. */
     need = bytes_A + bytes_X + bytes_Y;
-    CUDA_CHECK(cudaMemGetInfo(&free_b, &total_b));
-    if (need + (64u << 20) > free_b)
-        die("cuda_naive: device %d has %.2f GiB free out of %.2f GiB, "
-            "but the local block needs about %.2f GiB "
-            "(A %dx%d, X %dx%d, Y %dx%d in %s): use more MPI processes "
-            "or a smaller M/N",
-            CUDA_DEVICE_ID, (double)free_b / BYTES_PER_GIB,
-            (double)total_b / BYTES_PER_GIB, (double)need / BYTES_PER_GIB,
-            m_loc, n_loc, n_loc, k, m_loc, k, SCALAR_NAME);
 
-    CUDA_CHECK(cudaMalloc((void **)&local_gemm_context->dA_loc, nonzero(bytes_A)));
+    /* Capienza in VRAM: si VERIFICA TENTANDO, non stimando prima.
+     *
+     * Il driver e' l'unico a sapere quanto costano davvero allineamento e
+     * frammentazione, e - su questo server, dove piu' rank MPI condividono
+     * l'unica GPU - quanto hanno allocato gli altri processi un istante fa.
+     * Un controllo preventivo con cudaMemGetInfo confronterebbe una fotografia
+     * gia' obsoleta e andrebbe corretto con un margine arbitrario; qui la
+     * risposta la da' cudaMalloc, che non puo' sbagliarsi.
+     *
+     * La catena si ferma alla prima allocazione che non entra: le successive
+     * non vengono nemmeno tentate, ed err arriva al controllo qui sotto. */
+    err = cudaMalloc((void **)&local_gemm_context->dA_loc, nonzero(bytes_A));
+    if (err == cudaSuccess)
+        err = cudaMalloc((void **)&local_gemm_context->dX_loc, nonzero(bytes_X));
+    if (err == cudaSuccess)
+        err = cudaMalloc((void **)&local_gemm_context->dY_loc_part, nonzero(bytes_Y));
+
+    if (err == cudaErrorMemoryAllocation) {
+        /* Serve solo a comporre il messaggio: se anche questa query fallisse,
+         * i due valori resterebbero a zero e la diagnosi degraderebbe senza
+         * mascherare l'errore vero. Meglio questo del laconico "out of
+         * memory" del runtime, che non dice ne' quanto serviva ne' che fare. */
+        cudaMemGetInfo(&free_b, &total_b);
+        die("%s: out of memory on device %d: the local block needs about "
+            "%.2f GiB (A %dx%d, X %dx%d, Y %dx%d in %s), but only %.2f GiB "
+            "of %.2f GiB were free: use more MPI processes or a smaller M/N",
+            kernel_name(), CUDA_DEVICE_ID, (double)need / BYTES_PER_GIB,
+            m_loc, lda, n_loc, ldx, m_loc, ldy, SCALAR_NAME,
+            (double)free_b / BYTES_PER_GIB, (double)total_b / BYTES_PER_GIB);
+    }
+    CUDA_CHECK(err);
+
+    /* A non cambia mai fra un'invocazione e l'altra: la H2D avviene una volta
+     * sola, qui nel preprocessing. X e Y sono gia' dimensionate sopra, quindi
+     * nessuna cudaMalloc puo' cadere nella prima repetition, neppure con
+     * --warmup 0. */
     if (bytes_A > 0)
         CUDA_CHECK(cudaMemcpy(local_gemm_context->dA_loc, A_loc, bytes_A, cudaMemcpyHostToDevice));
-
-    /* Anche X e Y vengono dimensionate qui: nessuna cudaMalloc puo' quindi
-     * cadere nella prima repetition, neppure con --warmup 0. */
-    CUDA_CHECK(cudaMalloc((void **)&local_gemm_context->dX_loc, nonzero(bytes_X)));
-    CUDA_CHECK(cudaMalloc((void **)&local_gemm_context->dY_loc_part, nonzero(bytes_Y)));
     CUDA_CHECK(cudaMemset(local_gemm_context->dY_loc_part, 0, nonzero(bytes_Y)));
 
     /* Gli event vanno creati una volta sola: crearli e distruggerli a ogni
