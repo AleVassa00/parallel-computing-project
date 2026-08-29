@@ -100,7 +100,7 @@ static __global__ void warp_kernel_fixed(int m_loc, int n_loc, const scalar_t *_
      * comportamento non definito se due lane ne ottengono una diversa. Qui il
      * return sopra e' UNIFORME sul warp (warp_id non dipende da lane), quindi
      * le 32 lane sono tutte vive e la maschera corretta e' nota a priori. */
-    mask = 0xffffffffu;
+    mask = 0xffffffffu; //selezioniamo tutte le lane all'interno del Warp
 #pragma unroll
     for (offset = WARP_SIZE / 2; offset > 0; offset >>= 1) {
 #pragma unroll
