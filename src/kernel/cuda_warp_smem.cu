@@ -142,7 +142,7 @@
  * Kernel specializzato: K e' una costante di compilazione
  * ------------------------------------------------------------------------ */
 template<int K>
-static __global__ void smem_kernel_fixed(int m, int n, int tj,
+static __global__ void smem_kernel_fixed(int m_loc, int n_loc, int tj,
                                          const scalar_t *__restrict__ A,
                                          int lda,
                                          const scalar_t *__restrict__ X,
@@ -159,7 +159,7 @@ static __global__ void smem_kernel_fixed(int m, int n, int tj,
                           + (threadIdx.x >> 5);
     /* Uniforme sul warp: row non dipende da lane. Serve piu' sotto per la
      * maschera delle shuffle. */
-    const bool active = (row < m);
+    const bool active = (row < m_loc);
     const scalar_t *const arow =
         A + (size_t)(active ? row : 0) * (size_t)lda;
     scalar_t acc[K];
@@ -169,8 +169,8 @@ static __global__ void smem_kernel_fixed(int m, int n, int tj,
     for (c = 0; c < K; ++c)
         acc[c] = (scalar_t)0;
 
-    for (j0 = 0; j0 < n; j0 += tj) {
-        const int jcount = (n - j0 < tj) ? (n - j0) : tj;
+    for (j0 = 0; j0 < n_loc; j0 += tj) {
+        const int jcount = (n_loc - j0 < tj) ? (n_loc - j0) : tj;
 
         /* Prima barriera: nessuno sovrascrive il tile finche' tutti i warp
          * del blocco hanno finito di consumare quello precedente. */
@@ -236,7 +236,7 @@ static __global__ void smem_kernel_fixed(int m, int n, int tj,
  * invece che nei registri. Il tile in shared contiene quindi solo le quattro
  * colonne del passo corrente, ed e' minuscolo: TJ x (4 + SMEM_PAD).
  * Non c'e' nessun limite superiore su k. */
-static __global__ void smem_kernel_runtime(int m, int n, int k, int tj,
+static __global__ void smem_kernel_runtime(int m_loc, int n_loc, int k, int tj,
                                            const scalar_t *__restrict__ A,
                                            int lda,
                                            const scalar_t *__restrict__ X,
@@ -251,7 +251,7 @@ static __global__ void smem_kernel_runtime(int m, int n, int k, int tj,
     const int lane = threadIdx.x & (WARP_SIZE - 1);
     const long long row = (long long)blockIdx.x * WARPS_PER_BLOCK
                           + (threadIdx.x >> 5);
-    const bool active = (row < m);
+    const bool active = (row < m_loc);
     const scalar_t *const arow =
         A + (size_t)(active ? row : 0) * (size_t)lda;
     scalar_t acc[RUNTIME_TILE];
@@ -265,8 +265,8 @@ static __global__ void smem_kernel_runtime(int m, int n, int k, int tj,
         for (q = 0; q < RUNTIME_TILE; ++q)
             acc[q] = (scalar_t)0;
 
-        for (j0 = 0; j0 < n; j0 += tj) {
-            const int jcount = (n - j0 < tj) ? (n - j0) : tj;
+        for (j0 = 0; j0 < n_loc; j0 += tj) {
+            const int jcount = (n_loc - j0 < tj) ? (n_loc - j0) : tj;
 
             __syncthreads();
 
@@ -318,7 +318,7 @@ static __global__ void smem_kernel_runtime(int m, int n, int k, int tj,
 
 /* Numero di righe di X per tile: il piu' grande multiplo di 32 che sta nel
  * budget di shared memory, mai piu' delle righe che X ha davvero. */
-static int choose_tj(int row_stride, int n)
+static int choose_tj(int row_stride, int n_loc)
 {
     const long long fit = (long long)SMEM_BUDGET_BYTES
                           / ((long long)row_stride * (long long)sizeof(scalar_t));
@@ -328,21 +328,21 @@ static int choose_tj(int row_stride, int n)
         tj = WARP_SIZE;          /* k grandissimo: almeno un passo di warp */
     if (tj > TJ_MAX)
         tj = TJ_MAX;
-    if (n > 0 && n < tj)
-        tj = ((n + WARP_SIZE - 1) / WARP_SIZE) * WARP_SIZE;
+    if (n_loc > 0 && n_loc < tj)
+        tj = ((n_loc + WARP_SIZE - 1) / WARP_SIZE) * WARP_SIZE;
     return tj;
 }
 
-static void launch_smem_kernel(int m, int n, int k,
+static void launch_smem_kernel(int m_loc, int n_loc, int k,
                                const scalar_t *A, int lda,
                                const scalar_t *X, int ldx,
                                scalar_t *Y, int ldy)
 {
-    const int blocks = (int)(((long long)m + WARPS_PER_BLOCK - 1)
+    const int blocks = (int)(((long long)m_loc + WARPS_PER_BLOCK - 1)
                              / WARPS_PER_BLOCK);
     const int specialized = (k == 3 || k == 6 || k == 8 || k == 20 || k == 32);
     const int row_stride = (specialized ? k : RUNTIME_TILE) + SCPA_SMEM_PAD;
-    const int tj = choose_tj(row_stride, n);
+    const int tj = choose_tj(row_stride, n_loc);
     const size_t smem = (size_t)tj * (size_t)row_stride * sizeof(scalar_t);
 
     if (smem > (size_t)SMEM_MAX_BYTES)
@@ -352,22 +352,22 @@ static void launch_smem_kernel(int m, int n, int k,
 
     switch (k) {
     case 3:
-        smem_kernel_fixed<3><<<blocks, BLOCK_THREADS, smem>>>(m, n, tj, A, lda, X, ldx, Y, ldy);
+        smem_kernel_fixed<3><<<blocks, BLOCK_THREADS, smem>>>(m_loc, n_loc, tj, A, lda, X, ldx, Y, ldy);
         break;
     case 6:
-        smem_kernel_fixed<6><<<blocks, BLOCK_THREADS, smem>>>(m, n, tj, A, lda, X, ldx, Y, ldy);
+        smem_kernel_fixed<6><<<blocks, BLOCK_THREADS, smem>>>(m_loc, n_loc, tj, A, lda, X, ldx, Y, ldy);
         break;
     case 8:
-        smem_kernel_fixed<8><<<blocks, BLOCK_THREADS, smem>>>(m, n, tj, A, lda, X, ldx, Y, ldy);
+        smem_kernel_fixed<8><<<blocks, BLOCK_THREADS, smem>>>(m_loc, n_loc, tj, A, lda, X, ldx, Y, ldy);
         break;
     case 20:
-        smem_kernel_fixed<20><<<blocks, BLOCK_THREADS, smem>>>(m, n, tj, A, lda, X, ldx, Y, ldy);
+        smem_kernel_fixed<20><<<blocks, BLOCK_THREADS, smem>>>(m_loc, n_loc, tj, A, lda, X, ldx, Y, ldy);
         break;
     case 32:
-        smem_kernel_fixed<32><<<blocks, BLOCK_THREADS, smem>>>(m, n, tj, A, lda, X, ldx, Y, ldy);
+        smem_kernel_fixed<32><<<blocks, BLOCK_THREADS, smem>>>(m_loc, n_loc, tj, A, lda, X, ldx, Y, ldy);
         break;
     default:
-        smem_kernel_runtime<<<blocks, BLOCK_THREADS, smem>>>(m, n, k, tj, A, lda, X, ldx, Y, ldy);
+        smem_kernel_runtime<<<blocks, BLOCK_THREADS, smem>>>(m_loc, n_loc, k, tj, A, lda, X, ldx, Y, ldy);
         break;
     }
 }
@@ -376,9 +376,9 @@ static void launch_smem_kernel(int m, int n, int k,
  * Contesto e ciclo di vita: identici a cuda_warp
  * ------------------------------------------------------------------------ */
 struct local_gemm_context {
-    int m, n, k;
+    int m_loc, n_loc, k;
     int lda, ldx, ldy;
-    scalar_t *dA, *dX, *dY;
+    scalar_t *dA_loc, *dX_loc, *dY_loc_part;
     cudaEvent_t ev_start, ev_stop;
     int device;
     double t_setup;
@@ -430,7 +430,7 @@ static size_t nonzero(size_t bytes)
     return (bytes != 0) ? bytes : 1;
 }
 
-local_gemm_t *local_gemm_create(int m, int n, int k,
+local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k,
                                 const scalar_t *A, int lda,
                                 int ldx, int ldy)
 {
@@ -438,35 +438,35 @@ local_gemm_t *local_gemm_create(int m, int n, int k,
     size_t bytes_A, bytes_X, bytes_Y, need, free_b = 0, total_b = 0;
     const double t0 = now_seconds();
 
-    if (m < 0 || n < 0 || k < 0)
-        die("local_gemm_create: invalid local block %dx%d with k=%d", m, n, k);
-    if (lda < n)
-        die("local_gemm_create: lda %d is smaller than n %d", lda, n);
+    if (m_loc < 0 || n_loc < 0 || k < 0)
+        die("local_gemm_create: invalid local block %dx%d with k=%d", m_loc, n_loc, k);
+    if (lda < n_loc)
+        die("local_gemm_create: lda %d is smaller than n %d", lda, n_loc);
     if (ldx < k || ldy < k)
         die("local_gemm_create: ldx %d and ldy %d must both be at least k=%d",
             ldx, ldy, k);
-    if (n > 0 && m > 0 && A == NULL)
-        die("local_gemm_create: A is NULL for a non-empty %dx%d block", m, n);
+    if (n_loc > 0 && m_loc > 0 && A == NULL)
+        die("local_gemm_create: A is NULL for a non-empty %dx%d block", m_loc, n_loc);
 
     ctx = (local_gemm_t *)xmalloc(sizeof *ctx);
-    ctx->m = m;
-    ctx->n = n;
+    ctx->m_loc = m_loc;
+    ctx->n_loc = n_loc;
     ctx->k = k;
     ctx->lda = lda;
     ctx->ldx = ldx;
     ctx->ldy = ldy;
-    ctx->dA = NULL;
-    ctx->dX = NULL;
-    ctx->dY = NULL;
+    ctx->dA_loc = NULL;
+    ctx->dX_loc = NULL;
+    ctx->dY_loc_part = NULL;
     ctx->t_last = -1.0;
 
     ctx->device = pick_device();
     CUDA_CHECK(cudaSetDevice(ctx->device));
     CUDA_CHECK(cudaFree(0));
 
-    bytes_A = (size_t)m * (size_t)lda * sizeof(scalar_t);
-    bytes_X = (size_t)n * (size_t)ldx * sizeof(scalar_t);
-    bytes_Y = (size_t)m * (size_t)ldy * sizeof(scalar_t);
+    bytes_A = (size_t)m_loc * (size_t)lda * sizeof(scalar_t);
+    bytes_X = (size_t)n_loc * (size_t)ldx * sizeof(scalar_t);
+    bytes_Y = (size_t)m_loc * (size_t)ldy * sizeof(scalar_t);
     need = bytes_A + bytes_X + bytes_Y;
 
     CUDA_CHECK(cudaMemGetInfo(&free_b, &total_b));
@@ -477,14 +477,14 @@ local_gemm_t *local_gemm_create(int m, int n, int k,
             "or a smaller M/N",
             ctx->device, (double)free_b / BYTES_PER_GIB,
             (double)total_b / BYTES_PER_GIB, (double)need / BYTES_PER_GIB,
-            m, lda, n, ldx, m, ldy, SCALAR_NAME);
+            m_loc, lda, n_loc, ldx, m_loc, ldy, SCALAR_NAME);
 
-    CUDA_CHECK(cudaMalloc((void **)&ctx->dA, nonzero(bytes_A)));
+    CUDA_CHECK(cudaMalloc((void **)&ctx->dA_loc, nonzero(bytes_A)));
     if (bytes_A > 0)
-        CUDA_CHECK(cudaMemcpy(ctx->dA, A, bytes_A, cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMalloc((void **)&ctx->dX, nonzero(bytes_X)));
-    CUDA_CHECK(cudaMalloc((void **)&ctx->dY, nonzero(bytes_Y)));
-    CUDA_CHECK(cudaMemset(ctx->dY, 0, nonzero(bytes_Y)));
+        CUDA_CHECK(cudaMemcpy(ctx->dA_loc, A, bytes_A, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMalloc((void **)&ctx->dX_loc, nonzero(bytes_X)));
+    CUDA_CHECK(cudaMalloc((void **)&ctx->dY_loc_part, nonzero(bytes_Y)));
+    CUDA_CHECK(cudaMemset(ctx->dY_loc_part, 0, nonzero(bytes_Y)));
     CUDA_CHECK(cudaEventCreate(&ctx->ev_start));
     CUDA_CHECK(cudaEventCreate(&ctx->ev_stop));
     CUDA_CHECK(cudaDeviceSynchronize());
@@ -497,7 +497,7 @@ void local_gemm(local_gemm_t *ctx,
                 const scalar_t *RESTRICT X, int ldx,
                 scalar_t *RESTRICT Y, int ldy)
 {
-    const int m = ctx->m, n = ctx->n, k = ctx->k;
+    const int m_loc = ctx->m_loc, n_loc = ctx->n_loc, k = ctx->k;
     float ms = 0.0f;
 
     if (ldx != ctx->ldx || ldy != ctx->ldy)
@@ -505,22 +505,22 @@ void local_gemm(local_gemm_t *ctx,
             "(ldx %d -> %d, ldy %d -> %d)",
             ctx->ldx, ldx, ctx->ldy, ldy);
 
-    if (n > 0 && k > 0)
-        CUDA_CHECK(cudaMemcpy(ctx->dX, X,
-                              (size_t)n * (size_t)ldx * sizeof(scalar_t),
+    if (n_loc > 0 && k > 0)
+        CUDA_CHECK(cudaMemcpy(ctx->dX_loc, X,
+                              (size_t)n_loc * (size_t)ldx * sizeof(scalar_t),
                               cudaMemcpyHostToDevice));
 
     CUDA_CHECK(cudaEventRecord(ctx->ev_start, 0));
-    if (m > 0 && k > 0) {
-        launch_smem_kernel(m, n, k, ctx->dA, ctx->lda,
-                           ctx->dX, ldx, ctx->dY, ldy);
+    if (m_loc > 0 && k > 0) {
+        launch_smem_kernel(m_loc, n_loc, k, ctx->dA_loc, ctx->lda,
+                           ctx->dX_loc, ldx, ctx->dY_loc_part, ldy);
         CUDA_CHECK(cudaGetLastError());
     }
     CUDA_CHECK(cudaEventRecord(ctx->ev_stop, 0));
 
-    if (m > 0 && k > 0)
-        CUDA_CHECK(cudaMemcpy(Y, ctx->dY,
-                              (size_t)m * (size_t)ldy * sizeof(scalar_t),
+    if (m_loc > 0 && k > 0)
+        CUDA_CHECK(cudaMemcpy(Y, ctx->dY_loc_part,
+                              (size_t)m_loc * (size_t)ldy * sizeof(scalar_t),
                               cudaMemcpyDeviceToHost));
 
     CUDA_CHECK(cudaEventSynchronize(ctx->ev_stop));
@@ -532,9 +532,9 @@ void local_gemm_destroy(local_gemm_t *ctx)
 {
     if (ctx == NULL)
         return;
-    if (ctx->dA != NULL) cudaFree(ctx->dA);
-    if (ctx->dX != NULL) cudaFree(ctx->dX);
-    if (ctx->dY != NULL) cudaFree(ctx->dY);
+    if (ctx->dA_loc != NULL) cudaFree(ctx->dA_loc);
+    if (ctx->dX_loc != NULL) cudaFree(ctx->dX_loc);
+    if (ctx->dY_loc_part != NULL) cudaFree(ctx->dY_loc_part);
     cudaEventDestroy(ctx->ev_start);
     cudaEventDestroy(ctx->ev_stop);
     xfree(ctx);

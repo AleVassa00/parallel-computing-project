@@ -1,7 +1,6 @@
 obj/
 bin/
 .idea/
-
 .DS_Store
 
 *.o

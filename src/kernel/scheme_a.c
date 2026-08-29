@@ -216,11 +216,11 @@ void local_gemm(local_gemm_t *local_gemm_context, const scalar_t * RESTRICT X_lo
 #endif
 }
 
-void local_gemm_destroy(local_gemm_t *ctx)
+void local_gemm_destroy(local_gemm_t *local_gemm_context)
 {
     /* Nessuna risorsa esterna da rilasciare: A appartiene al chiamante.
      * Il backend CUDA fara' qui la cudaFree della copia in VRAM. */
-    xfree(ctx);
+    xfree(local_gemm_context);
 }
 
 /* Su CPU il kernel E' l'invocazione: non esiste un tempo di calcolo distinto
@@ -228,15 +228,15 @@ void local_gemm_destroy(local_gemm_t *ctx)
  * un numero che il chiamante ha gia'. Il valore negativo dice "non applicabile"
  * e il driver lo riporta come tale, cosi' nel CSV si vede a colpo d'occhio
  * quali righe vengono da un backend con trasferimenti e quali no. */
-double local_gemm_last_compute_seconds(const local_gemm_t *ctx)
+double local_gemm_last_compute_seconds(const local_gemm_t *local_gemm_context)
 {
-    (void)ctx;
+    (void)local_gemm_context;
     return -1.0;
 }
 
-double local_gemm_setup_seconds(const local_gemm_t *ctx)
+double local_gemm_setup_seconds(const local_gemm_t *local_gemm_context)
 {
-    return (ctx != NULL) ? ctx->t_setup : 0.0;
+    return (local_gemm_context != NULL) ? local_gemm_context->t_setup : 0.0;
 }
 
 const char *kernel_name(void)

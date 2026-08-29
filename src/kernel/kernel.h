@@ -76,7 +76,7 @@ void local_gemm(local_gemm_t *ctx, const scalar_t *RESTRICT X, int ldx, scalar_t
 
 /* Rilascia le risorse del backend (per CUDA: la copia di A in VRAM).
  * Tollera ctx == NULL. */
-void local_gemm_destroy(local_gemm_t *ctx);
+void local_gemm_destroy(local_gemm_t *local_gemm_context);
 
 /* ---------------------------------------------------------------------------
  * Canali di misura del backend
@@ -105,7 +105,7 @@ void local_gemm_destroy(local_gemm_t *ctx);
  * Restituisce un valore NEGATIVO se il backend non distingue il kernel dal
  * resto dell'invocazione (e' il caso dei backend di CPU: li' la risposta e'
  * gia' t_local) oppure se local_gemm non e' ancora stata chiamata. */
-double local_gemm_last_compute_seconds(const local_gemm_t *ctx);
+double local_gemm_last_compute_seconds(const local_gemm_t *local_gemm_context);
 
 /* Tempo speso in preparazione, in secondi: tutto cio' che e' avvenuto una
  * volta sola fuori dalla regione cronometrata. Per un backend di CPU e' circa
@@ -113,7 +113,7 @@ double local_gemm_last_compute_seconds(const local_gemm_t *ctx);
  * sincronizzazione finale, cioe' proprio il costo che la scelta di separare
  * create da local_gemm ha tolto dal cammino misurato. Va riportato, non
  * nascosto. */
-double local_gemm_setup_seconds(const local_gemm_t *ctx);
+double local_gemm_setup_seconds(const local_gemm_t *local_gemm_context);
 
 /* Nome del backend attivo, per l'intestazione delle misure. */
 const char *kernel_name(void);

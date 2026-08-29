@@ -93,10 +93,10 @@
 
 #define BYTES_PER_GIB 1073741824.0
 
-static __global__ void naive_kernel(int m, int n, int k, const scalar_t *__restrict__ A, int lda, const scalar_t *__restrict__ X, int ldx, scalar_t *__restrict__ Y, int ldy)
+static __global__ void naive_kernel(int m_loc, int n_loc, int k, const scalar_t *__restrict__ A, int lda, const scalar_t *__restrict__ X, int ldx, scalar_t *__restrict__ Y, int ldy)
 {
     const long long tid = (long long)blockIdx.x * blockDim.x + threadIdx.x;
-    const long long total = (long long)m * (long long)k;
+    const long long total = (long long)m_loc * (long long)k;
 
     int i, c, j;
 
@@ -119,7 +119,7 @@ static __global__ void naive_kernel(int m, int n, int k, const scalar_t *__restr
      * con l'indice j
      * A[i][j] * X[j][c]
      */
-    for (j = 0; j < n; j++)
+    for (j = 0; j < n_loc; j++)
         acc += arow[j] * X[(size_t)j * (size_t)ldx + c];
 
     /* Assegnazione, non accumulo: e' il contratto di local_gemm. Con n == 0 il
@@ -131,12 +131,12 @@ static __global__ void naive_kernel(int m, int n, int k, const scalar_t *__restr
 
 /* Stato del backend: le tre copie in VRAM, i due event e i tempi. */
 struct local_gemm_context {
-    int m, n, k;
+    int m_loc, n_loc, k;
     int lda;
     int ldx, ldy;
-    scalar_t *dA;
-    scalar_t *dX;
-    scalar_t *dY;
+    scalar_t *dA_loc;
+    scalar_t *dX_loc;
+    scalar_t *dY_loc_part;
     cudaEvent_t ev_start, ev_stop;
     int device;
     double t_setup;      /* preprocessing: contesto + cudaMalloc + H2D di A */
@@ -216,15 +216,15 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
         die("local_gemm_create: A is NULL for a non-empty %dx%d block", m_loc, n_loc);
 
     local_gemm_context = (local_gemm_t *)xmalloc(sizeof *local_gemm_context);
-    local_gemm_context->m = m_loc;
-    local_gemm_context->n = n_loc;
+    local_gemm_context->m_loc = m_loc;
+    local_gemm_context->n_loc = n_loc;
     local_gemm_context->k = k;
     local_gemm_context->lda = lda;
     local_gemm_context->ldx = ldx;
     local_gemm_context->ldy = ldy;
-    local_gemm_context->dA = NULL;
-    local_gemm_context->dX = NULL;
-    local_gemm_context->dY = NULL;
+    local_gemm_context->dA_loc = NULL;
+    local_gemm_context->dX_loc = NULL;
+    local_gemm_context->dY_loc_part = NULL;
     local_gemm_context->t_last = -1.0;
 
     local_gemm_context->device = pick_device();
@@ -255,15 +255,15 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
             (double)total_b / BYTES_PER_GIB, (double)need / BYTES_PER_GIB,
             m_loc, n_loc, n_loc, k, m_loc, k, SCALAR_NAME);
 
-    CUDA_CHECK(cudaMalloc((void **)&local_gemm_context->dA, nonzero(bytes_A)));
+    CUDA_CHECK(cudaMalloc((void **)&local_gemm_context->dA_loc, nonzero(bytes_A)));
     if (bytes_A > 0)
-        CUDA_CHECK(cudaMemcpy(local_gemm_context->dA, A_loc, bytes_A, cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(local_gemm_context->dA_loc, A_loc, bytes_A, cudaMemcpyHostToDevice));
 
     /* Anche X e Y vengono dimensionate qui: nessuna cudaMalloc puo' quindi
      * cadere nella prima repetition, neppure con --warmup 0. */
-    CUDA_CHECK(cudaMalloc((void **)&local_gemm_context->dX, nonzero(bytes_X)));
-    CUDA_CHECK(cudaMalloc((void **)&local_gemm_context->dY, nonzero(bytes_Y)));
-    CUDA_CHECK(cudaMemset(local_gemm_context->dY, 0, nonzero(bytes_Y)));
+    CUDA_CHECK(cudaMalloc((void **)&local_gemm_context->dX_loc, nonzero(bytes_X)));
+    CUDA_CHECK(cudaMalloc((void **)&local_gemm_context->dY_loc_part, nonzero(bytes_Y)));
+    CUDA_CHECK(cudaMemset(local_gemm_context->dY_loc_part, 0, nonzero(bytes_Y)));
 
     /* Gli event vanno creati una volta sola: crearli e distruggerli a ogni
      * invocazione sarebbe una chiamata al driver dentro la misura. */
@@ -281,7 +281,7 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
 
 void local_gemm(local_gemm_t *local_gemm_context, const scalar_t *RESTRICT X_loc, int ldx, scalar_t *RESTRICT Y_loc_part, int ldy)
 {
-    const int m_loc = local_gemm_context->m, n_loc = local_gemm_context->n, k = local_gemm_context->k;
+    const int m_loc = local_gemm_context->m_loc, n_loc = local_gemm_context->n_loc, k = local_gemm_context->k;
     const long long threads = (long long)m_loc * (long long)k;
     float ms = 0.0f;
 
@@ -294,14 +294,14 @@ void local_gemm(local_gemm_t *local_gemm_context, const scalar_t *RESTRICT X_loc
     /* H2D di X_loc: una "fetta" n_loc x k, cioe' pochi MiB. E' dentro l'invocazione
      * perche' X_loc e' il risultato del MPI_Bcast appena concluso. */
     if (n_loc > 0 && k > 0)
-        CUDA_CHECK(cudaMemcpy(local_gemm_context->dX, X_loc, (size_t)n_loc * (size_t)ldx * sizeof(scalar_t), cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(local_gemm_context->dX_loc, X_loc, (size_t)n_loc * (size_t)ldx * sizeof(scalar_t), cudaMemcpyHostToDevice));
 
     /* Gli event delimitano il SOLO kernel: quello che sta fra i due record e'
      * cio' che finisce in t_kernel e quindi in gflops_kernel. */
     CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_start, 0));
     if (threads > 0) {
         const int blocks = (int)((threads + BLOCK_THREADS - 1) / BLOCK_THREADS);
-        naive_kernel<<<blocks, BLOCK_THREADS>>>(m_loc, n_loc, k, local_gemm_context->dA, local_gemm_context->lda, local_gemm_context->dX, ldx, local_gemm_context->dY, ldy);
+        naive_kernel<<<blocks, BLOCK_THREADS>>>(m_loc, n_loc, k, local_gemm_context->dA_loc, local_gemm_context->lda, local_gemm_context->dX_loc, ldx, local_gemm_context->dY_loc_part, ldy);
         /* Un lancio fallito non lancia eccezioni: si legge cosi'. */
         CUDA_CHECK(cudaGetLastError());
     }
@@ -312,7 +312,7 @@ void local_gemm(local_gemm_t *local_gemm_context, const scalar_t *RESTRICT X_loc
      * copia e' anche il punto di sincronizzazione: quando ritorna, il kernel ha
      * finito e Ypart e' pronta per la MPI_Reduce. */
     if (m_loc > 0 && k > 0)
-        CUDA_CHECK(cudaMemcpy(Y_loc_part, local_gemm_context->dY, (size_t)m_loc * (size_t)ldy * sizeof(scalar_t), cudaMemcpyDeviceToHost));
+        CUDA_CHECK(cudaMemcpy(Y_loc_part, local_gemm_context->dY_loc_part, (size_t)m_loc * (size_t)ldy * sizeof(scalar_t), cudaMemcpyDeviceToHost));
 
     /* Con blocco locale vuoto non c'e' stata nessuna copia a sincronizzare:
      * l'attesa esplicita sull'event serve comunque, ed e' gratuita quando il
@@ -329,9 +329,9 @@ void local_gemm_destroy(local_gemm_t *ctx)
 
     /* In chiusura gli errori non si possono piu' gestire in modo utile: si
      * libera quello che c'e' e si esce. */
-    if (ctx->dA != NULL) cudaFree(ctx->dA);
-    if (ctx->dX != NULL) cudaFree(ctx->dX);
-    if (ctx->dY != NULL) cudaFree(ctx->dY);
+    if (ctx->dA_loc != NULL) cudaFree(ctx->dA_loc);
+    if (ctx->dX_loc != NULL) cudaFree(ctx->dX_loc);
+    if (ctx->dY_loc_part != NULL) cudaFree(ctx->dY_loc_part);
     cudaEventDestroy(ctx->ev_start);
     cudaEventDestroy(ctx->ev_stop);
     xfree(ctx);
