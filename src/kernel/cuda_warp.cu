@@ -8,6 +8,7 @@
 
 #include <cuda_runtime.h>
 
+#include "../../../../../../../Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/resource.h"
 #include "kernel/kernel.h"
 #include "common/util.h"
 
@@ -35,9 +36,11 @@
 #ifndef SCPA_BLOCK_THREADS
 #define SCPA_BLOCK_THREADS 256
 #endif
+
 #if SCPA_BLOCK_THREADS < 32 || SCPA_BLOCK_THREADS > 1024 || (SCPA_BLOCK_THREADS % 32) != 0
 #error "SCPA_BLOCK_THREADS deve essere un multiplo di 32 compreso fra 32 e 1024"
 #endif
+
 #define BLOCK_THREADS SCPA_BLOCK_THREADS
 #define WARPS_PER_BLOCK (BLOCK_THREADS / WARP_SIZE)
 #define RUNTIME_TILE 4
@@ -57,19 +60,16 @@
 #define BYTES_PER_GIB 1073741824.0
 
 template<int K>
-static __global__ void warp_kernel_fixed(int m_loc, int n_loc,
-                                         const scalar_t *__restrict__ A,
-                                         int lda,
-                                         const scalar_t *__restrict__ X,
-                                         int ldx,
-                                         scalar_t *__restrict__ Y,
-                                         int ldy)
+static __global__ void warp_kernel_fixed(int m_loc, int n_loc, const scalar_t *__restrict__ A_loc, int lda, const scalar_t *__restrict__ X_loc, int ldx, scalar_t *__restrict__ Y_loc_part, int ldy)
 {
-    const long long global_thread =
-        (long long)blockIdx.x * (long long)blockDim.x + threadIdx.x;
+    const long long global_thread = (long long)blockIdx.x * (long long)blockDim.x + threadIdx.x;
+
     const long long warp_id = global_thread / WARP_SIZE;
+
     const int lane = threadIdx.x & (WARP_SIZE - 1);
+
     scalar_t acc[K];
+
     const scalar_t *arow;
     unsigned mask;
     int c, j, offset;
@@ -79,7 +79,7 @@ static __global__ void warp_kernel_fixed(int m_loc, int n_loc,
     if (warp_id >= m_loc)
         return;
 
-    arow = A + (size_t)warp_id * (size_t)lda;
+    arow = A_loc + (size_t)warp_id * (size_t)lda;
 
 #pragma unroll
     for (c = 0; c < K; ++c)
@@ -87,7 +87,7 @@ static __global__ void warp_kernel_fixed(int m_loc, int n_loc,
 
     for (j = lane; j < n_loc; j += WARP_SIZE) {
         const scalar_t a = arow[j];
-        const scalar_t *xrow = X + (size_t)j * (size_t)ldx;
+        const scalar_t *xrow = X_loc + (size_t)j * (size_t)ldx;
 #pragma unroll
         for (c = 0; c < K; ++c)
             acc[c] += a * xrow[c];
@@ -109,7 +109,7 @@ static __global__ void warp_kernel_fixed(int m_loc, int n_loc,
     }
 
     if (lane == 0) {
-        scalar_t *yrow = Y + (size_t)warp_id * (size_t)ldy;
+        scalar_t *yrow = Y_loc_part + (size_t)warp_id * (size_t)ldy;
 #pragma unroll
         for (c = 0; c < K; ++c)
             yrow[c] = acc[c];
@@ -173,33 +173,28 @@ static __global__ void warp_kernel_runtime(int m_loc, int n_loc, int k,
     }
 }
 
-static void launch_warp_kernel(int m_loc, int n_loc, int k,
-                               const scalar_t *A, int lda,
-                               const scalar_t *X, int ldx,
-                               scalar_t *Y, int ldy)
-{
-    const int blocks = (int)(((long long)m_loc + WARPS_PER_BLOCK - 1)
-                             / WARPS_PER_BLOCK);
+static void launch_warp_kernel(int m_loc, int n_loc, int k, const scalar_t *A_loc, int lda, const scalar_t *X_loc, int ldx, scalar_t *Y_loc_part, int ldy) {
+
+    const int blocks = (int)(((long long)m_loc + WARPS_PER_BLOCK - 1) / WARPS_PER_BLOCK);
 
     switch (k) {
     case 3:
-        warp_kernel_fixed<3><<<blocks, BLOCK_THREADS>>>(m_loc, n_loc, A, lda, X, ldx, Y, ldy);
+        warp_kernel_fixed<3><<<blocks, BLOCK_THREADS>>>(m_loc, n_loc, A_loc, lda, X_loc, ldx, Y_loc_part, ldy);
         break;
     case 6:
-        warp_kernel_fixed<6><<<blocks, BLOCK_THREADS>>>(m_loc, n_loc, A, lda, X, ldx, Y, ldy);
+        warp_kernel_fixed<6><<<blocks, BLOCK_THREADS>>>(m_loc, n_loc, A_loc, lda, X_loc, ldx, Y_loc_part, ldy);
         break;
     case 8:
-        warp_kernel_fixed<8><<<blocks, BLOCK_THREADS>>>(m_loc, n_loc, A, lda, X, ldx, Y, ldy);
+        warp_kernel_fixed<8><<<blocks, BLOCK_THREADS>>>(m_loc, n_loc, A_loc, lda, X_loc, ldx, Y_loc_part, ldy);
         break;
     case 20:
-        warp_kernel_fixed<20><<<blocks, BLOCK_THREADS>>>(m_loc, n_loc, A, lda, X, ldx, Y, ldy);
+        warp_kernel_fixed<20><<<blocks, BLOCK_THREADS>>>(m_loc, n_loc, A_loc, lda, X_loc, ldx, Y_loc_part, ldy);
         break;
     case 32:
-        warp_kernel_fixed<32><<<blocks, BLOCK_THREADS>>>(m_loc, n_loc, A, lda, X, ldx, Y, ldy);
+        warp_kernel_fixed<32><<<blocks, BLOCK_THREADS>>>(m_loc, n_loc, A_loc, lda, X_loc, ldx, Y_loc_part, ldy);
         break;
     default:
-        warp_kernel_runtime<<<blocks, BLOCK_THREADS>>>(m_loc, n_loc, k,
-                                                       A, lda, X, ldx, Y, ldy);
+        warp_kernel_runtime<<<blocks, BLOCK_THREADS>>>(m_loc, n_loc, k, A_loc, lda, X_loc, ldx, Y_loc_part, ldy);
         break;
     }
 }
@@ -213,13 +208,12 @@ struct local_gemm_context {
     double t_last;
 };
 
-static size_t nonzero(size_t bytes)
-{
+static size_t nonzero(size_t bytes) {
     return (bytes != 0) ? bytes : 1;
 }
 
-local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_loc, int lda, int ldx, int ldy)
-{
+local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_loc, int lda, int ldx, int ldy) {
+
     local_gemm_t *local_gemm_context;
     size_t bytes_A, bytes_X, bytes_Y, need, free_b = 0, total_b = 0;
     cudaError_t err;
@@ -293,52 +287,47 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
      * --warmup 0. */
     if (bytes_A > 0)
         CUDA_CHECK(cudaMemcpy(local_gemm_context->dA_loc, A_loc, bytes_A, cudaMemcpyHostToDevice));
+
     CUDA_CHECK(cudaMemset(local_gemm_context->dY_loc_part, 0, nonzero(bytes_Y)));
+
     CUDA_CHECK(cudaEventCreate(&local_gemm_context->ev_start));
     CUDA_CHECK(cudaEventCreate(&local_gemm_context->ev_stop));
+
     CUDA_CHECK(cudaDeviceSynchronize());
 
     local_gemm_context->t_setup = now_seconds() - t0;
     return local_gemm_context;
 }
 
-void local_gemm(local_gemm_t *local_gemm_context,
-                const scalar_t *RESTRICT X, int ldx,
-                scalar_t *RESTRICT Y, int ldy)
-{
+void local_gemm(local_gemm_t *local_gemm_context, const scalar_t *RESTRICT X_loc, int ldx, scalar_t *RESTRICT Y_loc_part, int ldy) {
+
     const int m_loc = local_gemm_context->m_loc, n_loc = local_gemm_context->n_loc, k = local_gemm_context->k;
+
     float ms = 0.0f;
 
     if (ldx != local_gemm_context->ldx || ldy != local_gemm_context->ldy)
-        die("cuda_warp: leading dimensions changed between calls "
-            "(ldx %d -> %d, ldy %d -> %d)",
-            local_gemm_context->ldx, ldx, local_gemm_context->ldy, ldy);
+        die("cuda_warp: leading dimensions changed between calls " "(ldx %d -> %d, ldy %d -> %d)", local_gemm_context->ldx, ldx, local_gemm_context->ldy, ldy);
 
     if (n_loc > 0 && k > 0)
-        CUDA_CHECK(cudaMemcpy(local_gemm_context->dX_loc, X,
-                              (size_t)n_loc * (size_t)ldx * sizeof(scalar_t),
-                              cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(local_gemm_context->dX_loc, X_loc, (size_t)n_loc * (size_t)ldx * sizeof(scalar_t), cudaMemcpyHostToDevice));
 
     CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_start, 0));
     if (m_loc > 0 && k > 0) {
-        launch_warp_kernel(m_loc, n_loc, k, local_gemm_context->dA_loc, local_gemm_context->lda,
-                           local_gemm_context->dX_loc, ldx, local_gemm_context->dY_loc_part, ldy);
+        launch_warp_kernel(m_loc, n_loc, k, local_gemm_context->dA_loc, local_gemm_context->lda, local_gemm_context->dX_loc, ldx, local_gemm_context->dY_loc_part, ldy);
         CUDA_CHECK(cudaGetLastError());
     }
     CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_stop, 0));
 
     if (m_loc > 0 && k > 0)
-        CUDA_CHECK(cudaMemcpy(Y, local_gemm_context->dY_loc_part,
-                              (size_t)m_loc * (size_t)ldy * sizeof(scalar_t),
-                              cudaMemcpyDeviceToHost));
+        CUDA_CHECK(cudaMemcpy(Y_loc_part, local_gemm_context->dY_loc_part, (size_t)m_loc * (size_t)ldy * sizeof(scalar_t), cudaMemcpyDeviceToHost));
 
     CUDA_CHECK(cudaEventSynchronize(local_gemm_context->ev_stop));
     CUDA_CHECK(cudaEventElapsedTime(&ms, local_gemm_context->ev_start, local_gemm_context->ev_stop));
+
     local_gemm_context->t_last = (double)ms * 1.0e-3;
 }
 
-void local_gemm_destroy(local_gemm_t *local_gemm_context)
-{
+void local_gemm_destroy(local_gemm_t *local_gemm_context) {
     if (local_gemm_context == NULL)
         return;
     if (local_gemm_context->dA_loc != NULL) cudaFree(local_gemm_context->dA_loc);
