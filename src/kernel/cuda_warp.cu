@@ -8,7 +8,6 @@
 
 #include <cuda_runtime.h>
 
-#include "../../../../../../../Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/resource.h"
 #include "kernel/kernel.h"
 #include "common/util.h"
 
