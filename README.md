@@ -53,13 +53,26 @@ Esecuzione:
 
 ```bash
 mpirun -np 4 ./bin/matmul_mpi -M 8000 -N 8000 -k 8 \
-       --pr 2 --pc 2 --reps 10 --a-mode local
+       --pr 2 --pc 2 --reps 10 --a-mode local --x-mode local
 ```
 
-`--a-mode local` e' il comportamento predefinito: ogni processo genera il
-proprio blocco di A dagli indici globali. Con `--a-mode global`, il grid rank 0
-genera invece A completa e la distribuisce sulla griglia cartesiana 2D tramite
-`MPI_Type_vector`. Le due modalita' producono gli stessi valori locali.
+Le modalita' di inizializzazione di A e X sono indipendenti; sono quindi valide
+tutte e quattro le combinazioni `local/local`, `local/global`, `global/local` e
+`global/global`. Entrambe hanno `local` come default e producono gli stessi
+elementi globali a parita' di seed.
+
+Con `--a-mode local` ogni processo genera il proprio blocco 2D di A. Con
+`--a-mode global`, invece, il grid rank 0 materializza A completa: i sottoblocchi
+2D non sono contigui nella matrice row-major e vengono descritti e distribuiti
+tramite `MPI_Type_vector`.
+
+Con `--x-mode local` i processi della grid row 0 generano direttamente le
+proprie righe di X. Con `--x-mode global` il grid rank 0 materializza la X
+compatta `N x k` e un `MPI_Scatterv` ne distribuisce i blocchi di righe contigui
+soltanto sulla grid row 0. Il successivo `MPI_Bcast` lungo ogni `col_comm` resta
+identico nelle due modalita'. Generazione e distribuzione iniziali di A e X sono
+preprocessing escluso dai tempi ufficiali: `global` rappresenta un input
+inizialmente centralizzato, non una modalita' dichiarata piu' performante.
 
 Sul server di dipartimento il binding e' obbligatorio, altrimenti le misure
 sono rumore:
@@ -71,12 +84,14 @@ mpirun -np 20 --bind-to core --map-by core --report-bindings \
 
 Opzioni principali: `-M -N -k`, `--pr --pc` (forma della griglia, default la
 fattorizzazione piu' quadrata di P), `--reps --warmup`, `--seed`,
-`--a-mode local|global`, `--check` (validazione contro il seriale), `--csv` /
-`--csv-header` per la campagna di misura. `--help` per l'elenco completo.
+`--a-mode local|global`, `--x-mode local|global`, `--check` (validazione contro
+il seriale), `--csv` / `--csv-header` per la campagna di misura. `--help` per
+l'elenco completo.
 
 Una invocazione del prodotto MPI esegue, nell'ordine, `MPI_Bcast` della fetta
 di X lungo il column communicator, `local_gemm`, e `MPI_Reduce(MPI_SUM)` lungo
-il row communicator. Generazione/distribuzione di A resta preprocessing.
+il row communicator. Generazione e distribuzione iniziale di A e X restano
+preprocessing.
 
 Il kernel locale ha un ciclo di vita in tre fasi, perche' A non cambia mai fra
 un'invocazione e l'altra mentre X e Y cambiano sempre:
@@ -100,7 +115,7 @@ Il Makefile riconosce da solo se il backend e' C o CUDA: se esiste
 linkato con `-lcudart`. Non c'e' nessun flag da ricordarsi.
 
 ```bash
-make KERNEL=cuda_naive check      # 24 validazioni contro il seriale, su GPU
+make KERNEL=cuda_naive check      # suite di validazione contro il seriale, su GPU
 mpirun -np 1 ./bin/matmul_mpi-cuda_naive -M 10000 -N 10000 -k 32 --reps 10
 ```
 

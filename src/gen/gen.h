@@ -11,8 +11,9 @@
  * degli indici GLOBALI, non lo stato di un generatore sequenziale.
  *
  * Conseguenze:
- *  - ogni processo genera direttamente il proprio blocco locale, senza che la
- *    matrice globale venga mai materializzata e senza alcuno scatter di A;
+ *  - ogni processo puo' generare direttamente il proprio blocco locale, senza
+ *    materializzare la matrice globale; le modalita' globali alternative
+ *    producono gli stessi elementi prima di distribuirli;
  *  - il contenuto di A e X non dipende dalla forma della griglia, quindi
  *    confrontare i risultati fra griglie diverse verifica gratuitamente la
  *    correttezza della distribuzione;

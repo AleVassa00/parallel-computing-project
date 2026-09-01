@@ -44,6 +44,15 @@ void layout_init(layout_t *l, const grid_t *g, int M, int N, int k);
 void distribute_global_A(const grid_t *g, const layout_t *l,
                          const scalar_t *A_global, scalar_t *A_loc);
 
+/* Distribuisce X_global, presente soltanto sul grid rank 0 e compatta
+ * row-major con leading dimension k, fra i processi della sola grid row 0.
+ * Ogni process-grid column riceve le righe globali [col0, col0+n_loc) tramite
+ * MPI_Scatterv su row_comm. Se X_loc ha ldx > k, il ricevente descrive lo
+ * stride locale con un datatype derivato; il buffer sorgente resta contiguo.
+ * I processi fuori dalla grid row 0 non partecipano ad alcuna collettiva. */
+void distribute_global_X(const grid_t *g, const layout_t *l,
+                         const scalar_t *X_global, scalar_t *X_loc);
+
 /* Vettori counts/displs (in ELEMENTI, non byte) per le collettive a lunghezza
  * variabile su Y lungo la colonna 0 della griglia: pezzi di righe consecutive
  * di Y, contigui perche' Y e' row-major con k contiguo. */

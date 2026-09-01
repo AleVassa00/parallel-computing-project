@@ -2,9 +2,9 @@
  *
  *   mpirun -np P ./bin/matmul_mpi -M .. -N .. -k .. --pr .. --pc ..
  *
- * La modalita' predefinita genera A localmente su ciascun processo; la
- * modalita' alternativa genera A globale sul grid rank 0 e la distribuisce.
- * Entrambi i percorsi sono preprocessing, escluso dalla misura del kernel. */
+ * Le modalita' predefinite generano localmente i blocchi di A e X; le modalita'
+ * alternative materializzano il rispettivo input sul grid rank 0 e lo
+ * distribuiscono. Tutti questi percorsi sono preprocessing. */
 
 #include <mpi.h>
 
@@ -29,6 +29,11 @@ typedef enum {
     A_MODE_GLOBAL
 } a_mode_t;
 
+typedef enum {
+    X_MODE_LOCAL,
+    X_MODE_GLOBAL
+} x_mode_t;
+
 typedef struct {
     int M, N, k;
     int pr, pc;       /* 0 = forma della griglia scelta automaticamente */
@@ -38,10 +43,11 @@ typedef struct {
     int check;
     int csv;
     a_mode_t a_mode;
+    x_mode_t x_mode;
 } opts_t;
 
 static const char *CSV_HEADER =
-    "kernel,scalar,a_mode,M,N,k,P,pr,pc,reps,"
+    "kernel,scalar,a_mode,x_mode,M,N,k,P,pr,pc,reps,"
     "t_bcast_mean_s,t_local_mean_s,t_reduce_mean_s,t_total_mean_s,"
     "t_official_mean_s,t_total_median_s,t_total_min_s,t_kernel_mean_s,"
     "t_transfer_runtime_overhead_mean_s,t_setup_s,"
@@ -50,6 +56,11 @@ static const char *CSV_HEADER =
 static const char *a_mode_name(a_mode_t mode)
 {
     return mode == A_MODE_GLOBAL ? "global" : "local";
+}
+
+static const char *x_mode_name(x_mode_t mode)
+{
+    return mode == X_MODE_GLOBAL ? "global" : "local";
 }
 
 static void usage(const char *prog)
@@ -65,6 +76,8 @@ static void usage(const char *prog)
     printf("  --seed <u64>    generator seed                   (default %llu)\n",
            (unsigned long long)GEN_DEFAULT_SEED);
     printf("  --a-mode <mode> generate A locally or distribute global A\n");
+    printf("                    local (default), global\n");
+    printf("  --x-mode <mode> generate X slices locally or distribute global X\n");
     printf("                    local (default), global\n");
     printf("  --check         validate against the serial reference\n");
     printf("  --csv           print one CSV row instead of the report\n");
@@ -126,6 +139,7 @@ static void parse_args(int argc, char **argv, opts_t *options, int rank)
     options->check = 0;
     options->csv = 0;
     options->a_mode = A_MODE_LOCAL;
+    options->x_mode = X_MODE_LOCAL;
 
     for (i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-M"))
@@ -158,6 +172,17 @@ static void parse_args(int argc, char **argv, opts_t *options, int rank)
                 options->a_mode = A_MODE_GLOBAL;
             else
                 die("invalid --a-mode '%s' (expected local or global)", mode);
+        } else if (!strcmp(argv[i], "--x-mode")) {
+            const char *mode;
+            if (i + 1 >= argc)
+                die("option --x-mode requires a value");
+            mode = argv[++i];
+            if (!strcmp(mode, "local"))
+                options->x_mode = X_MODE_LOCAL;
+            else if (!strcmp(mode, "global"))
+                options->x_mode = X_MODE_GLOBAL;
+            else
+                die("invalid --x-mode '%s' (expected local or global)", mode);
         } else if (!strcmp(argv[i], "--check"))
             options->check = 1;
         else if (!strcmp(argv[i], "--csv"))
@@ -210,7 +235,8 @@ int main(int argc, char **argv)
     layout_t layout;
 
     scalar_t *A_loc, *X_loc, *Y_loc_part;
-    scalar_t *A_global_root = NULL, *Y_row_col0 = NULL;
+    scalar_t *A_global_root = NULL, *X_global_root = NULL;
+    scalar_t *Y_row_col0 = NULL;
 
     local_gemm_t *local_gemm_context;
 
@@ -302,11 +328,29 @@ int main(int argc, char **argv)
      * A e' stata preparata. */
     local_gemm_context = local_gemm_create(layout.m_loc, layout.n_loc, layout.k, A_loc, layout.lda, layout.ldx, layout.ldy);
 
-    /* X e' collocata sulla riga 0 della griglia: solo quei processi la
-     * generano. Ogni mpi_matmul la replica lungo le colonne come prima fase
-     * del prodotto distribuito. */
-    if (grid.my_row == 0)
-        gen_block_X(X_loc, layout.ldx, layout.n_loc, layout.k, layout.col0, options.seed);
+    /* X e' inizialmente collocata sulla sola riga 0 della griglia. In modalita'
+     * local ogni processo di quella riga genera la propria fetta; in modalita'
+     * global il grid rank 0 genera X compatta e la distribuisce sulla riga 0.
+     * In entrambi i casi mpi_matmul esegue poi lo stesso broadcast verticale. */
+    if (options.x_mode == X_MODE_LOCAL) {
+        if (grid.my_row == 0)
+            gen_block_X(X_loc, layout.ldx, layout.n_loc, layout.k,
+                        layout.col0, options.seed);
+    } else {
+        /* MPI_Scatterv usa conteggi e displacement int. Controllare prima
+         * dell'allocazione evita di materializzare un buffer non distribuibile. */
+        if (layout.N > INT_MAX / layout.k)
+            die("global X element count exceeds the MPI int count range");
+        if (grid.rank == 0) {
+            X_global_root = xmalloc((size_t)layout.N * (size_t)layout.k
+                                    * sizeof *X_global_root);
+            gen_block_X(X_global_root, layout.k, layout.N, layout.k,
+                        0, options.seed);
+        }
+        distribute_global_X(&grid, &layout, X_global_root, X_loc);
+        xfree(X_global_root);
+        X_global_root = NULL;
+    }
 
     bcast_times = xmalloc((size_t)options.reps * sizeof *bcast_times);
     total_times = xmalloc((size_t)options.reps * sizeof *total_times);
@@ -394,10 +438,11 @@ int main(int argc, char **argv)
         }
 
         if (options.csv) {
-            printf("%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,"
+            printf("%s,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,"
                    "%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,"
                    "%.6f,%.6f,%.6f,%.3e\n",
                    kernel_name(), SCALAR_NAME, a_mode_name(options.a_mode),
+                   x_mode_name(options.x_mode),
                    options.M, options.N, options.k, grid.nprocs, grid.pr, grid.pc, options.reps,
                    mean_bcast_time, mean_local_phase_time, mean_reduce_time, mean_total_time,
                    mean_official_time, median_total_time, min_total_time, mean_kernel_time,
@@ -405,9 +450,10 @@ int main(int argc, char **argv)
                    gflops, gflops_compute, gflops_kernel, rel_err);
         } else {
             double bytes_A = (double)options.M * options.N * sizeof(scalar_t);
-            printf("matmul_mpi  M=%d N=%d k=%d  grid=%dx%d (P=%d)  %s  kernel=%s  A=%s\n",
+            printf("matmul_mpi  M=%d N=%d k=%d  grid=%dx%d (P=%d)  %s  kernel=%s  A=%s X=%s\n",
                    options.M, options.N, options.k, grid.pr, grid.pc, grid.nprocs, SCALAR_NAME,
-                   kernel_name(), a_mode_name(options.a_mode));
+                   kernel_name(), a_mode_name(options.a_mode),
+                   x_mode_name(options.x_mode));
             printf("  local block  A %dx%d   X %dx%d   Y %dx%d      A total %.1f MiB\n",
                    layout.m_loc, layout.n_loc, layout.n_loc, layout.k, layout.m_loc, layout.k,
                    bytes_A / 1048576.0);
@@ -448,6 +494,7 @@ int main(int argc, char **argv)
     xfree(A_loc);
     xfree(A_global_root);
     xfree(X_loc);
+    xfree(X_global_root);
     xfree(Y_loc_part);
     xfree(Y_row_col0);
     xfree(bcast_times);
