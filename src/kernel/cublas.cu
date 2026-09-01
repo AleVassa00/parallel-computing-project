@@ -140,9 +140,7 @@ static size_t nonzero(size_t bytes)
     return (bytes != 0) ? bytes : 1;
 }
 
-local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k,
-                                const scalar_t *A, int lda,
-                                int ldx, int ldy)
+local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_loc, int lda, int ldx, int ldy)
 {
     local_gemm_t *local_gemm_context;
     size_t bytes_A, bytes_X, bytes_Y, need, free_b = 0, total_b = 0;
@@ -156,7 +154,7 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k,
     if (ldx < k || ldy < k)
         die("local_gemm_create: ldx %d and ldy %d must both be at least k=%d",
             ldx, ldy, k);
-    if (n_loc > 0 && m_loc > 0 && A == NULL)
+    if (n_loc > 0 && m_loc > 0 && A_loc == NULL)
         die("local_gemm_create: A is NULL for a non-empty %dx%d block", m_loc, n_loc);
 
     local_gemm_context = (local_gemm_t *)xmalloc(sizeof *local_gemm_context);
@@ -216,8 +214,10 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k,
      * nessuna cudaMalloc puo' cadere nella prima repetition, neppure con
      * --warmup 0. */
     if (bytes_A > 0)
-        CUDA_CHECK(cudaMemcpy(local_gemm_context->dA_loc, A, bytes_A, cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(local_gemm_context->dA_loc, A_loc, bytes_A, cudaMemcpyHostToDevice));
+
     CUDA_CHECK(cudaMemset(local_gemm_context->dY_loc_part, 0, nonzero(bytes_Y)));
+
     CUDA_CHECK(cudaEventCreate(&local_gemm_context->ev_start));
     CUDA_CHECK(cudaEventCreate(&local_gemm_context->ev_stop));
 
@@ -235,26 +235,25 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k,
     return local_gemm_context;
 }
 
-void local_gemm(local_gemm_t *local_gemm_context,
-                const scalar_t *RESTRICT X, int ldx,
-                scalar_t *RESTRICT Y, int ldy)
+void local_gemm(local_gemm_t *local_gemm_context, const scalar_t *RESTRICT X_loc, int ldx, scalar_t *RESTRICT Y_loc_part, int ldy)
 {
-    const int m_loc = local_gemm_context->m_loc, n_loc = local_gemm_context->n_loc, k = local_gemm_context->k;
+    const int m_loc = local_gemm_context->m_loc,
+              n_loc = local_gemm_context->n_loc,
+              k = local_gemm_context->k;
+
     const scalar_t alpha = (scalar_t)1;
     const scalar_t beta  = (scalar_t)0;
+
     float ms = 0.0f;
 
     if (ldx != local_gemm_context->ldx || ldy != local_gemm_context->ldy)
-        die("cublas: leading dimensions changed between calls "
-            "(ldx %d -> %d, ldy %d -> %d)",
-            local_gemm_context->ldx, ldx, local_gemm_context->ldy, ldy);
+        die("cublas: leading dimensions changed between calls " "(ldx %d -> %d, ldy %d -> %d)", local_gemm_context->ldx, ldx, local_gemm_context->ldy, ldy);
 
     if (n_loc > 0 && k > 0)
-        CUDA_CHECK(cudaMemcpy(local_gemm_context->dX_loc, X,
-                              (size_t)n_loc * (size_t)ldx * sizeof(scalar_t),
-                              cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(local_gemm_context->dX_loc, X_loc, (size_t)n_loc * (size_t)ldx * sizeof(scalar_t), cudaMemcpyHostToDevice));
 
     CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_start, 0));
+
     if (m_loc > 0 && k > 0) {
         if (n_loc > 0) {
             /* Y_cm(k x m) = X_cm(k x n) * A_cm(n x m): vedi il trucco
@@ -263,28 +262,27 @@ void local_gemm(local_gemm_t *local_gemm_context,
                                      CUBLAS_OP_N, CUBLAS_OP_N,
                                      k, m_loc, n_loc,
                                      &alpha,
-                                     local_gemm_context->dX_loc, ldx,
-                                     local_gemm_context->dA_loc, local_gemm_context->lda,
+                                     local_gemm_context->dX_loc, ldx, /* primo operando */
+                                     local_gemm_context->dA_loc, local_gemm_context->lda, /* secondo operando */
                                      &beta,
-                                     local_gemm_context->dY_loc_part, ldy));
+                                     local_gemm_context->dY_loc_part, ldy)); /* output */
         } else {
             /* Blocco senza colonne: Y = 0. Un gemm con K=0 sarebbe legale ma
              * qui il caso e' esplicito, e resta dentro gli eventi cosi' che
              * t_kernel misuri la stessa regione in tutti i casi. */
-            CUDA_CHECK(cudaMemsetAsync(local_gemm_context->dY_loc_part, 0,
-                                       (size_t)m_loc * (size_t)ldy * sizeof(scalar_t),
-                                       0));
+            CUDA_CHECK(cudaMemsetAsync(local_gemm_context->dY_loc_part, 0, (size_t)m_loc * (size_t)ldy * sizeof(scalar_t), 0));
         }
     }
+
     CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_stop, 0));
 
     if (m_loc > 0 && k > 0)
-        CUDA_CHECK(cudaMemcpy(Y, local_gemm_context->dY_loc_part,
-                              (size_t)m_loc * (size_t)ldy * sizeof(scalar_t),
-                              cudaMemcpyDeviceToHost));
+        CUDA_CHECK(cudaMemcpy(Y_loc_part, local_gemm_context->dY_loc_part, (size_t)m_loc * (size_t)ldy * sizeof(scalar_t), cudaMemcpyDeviceToHost));
 
     CUDA_CHECK(cudaEventSynchronize(local_gemm_context->ev_stop));
+
     CUDA_CHECK(cudaEventElapsedTime(&ms, local_gemm_context->ev_start, local_gemm_context->ev_stop));
+    
     local_gemm_context->t_last = (double)ms * 1.0e-3;
 }
 

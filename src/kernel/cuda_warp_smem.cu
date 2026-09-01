@@ -172,7 +172,7 @@ static __global__ void smem_kernel_fixed(int m_loc, int n_loc, int x_rows_per_ti
      * maschera delle shuffle. */
     const bool active = (row < m_loc);
 
-    const scalar_t *const arow = A_loc + (size_t)(active ? row : 0) * (size_t)lda;
+    const scalar_t *const arow = A_loc + (size_t)(active ? row : 0) * (size_t)lda; // ripiegamento a riga 0 se il warp è inattivo, per non scatenare undefined behavior
 
     scalar_t acc[K];
 
@@ -187,7 +187,12 @@ static __global__ void smem_kernel_fixed(int m_loc, int n_loc, int x_rows_per_ti
         const int rows_in_tile = (n_loc - tile_first_row < x_rows_per_tile) ? (n_loc - tile_first_row) : x_rows_per_tile;
 
         /* Prima barriera: nessuno sovrascrive il tile finche' tutti i warp
-         * del blocco hanno finito di consumare quello precedente. */
+         * del blocco hanno finito di consumare quello precedente.
+         *
+         * Il costo è che tutti aspettano il più lento.
+         * Il beneficio è che dopo la barriera il tile è completo e visibile a tutto il blocco.
+         *
+        */
         __syncthreads();
 
         /* Staging cooperativo: i 256 thread del blocco si spartiscono le
@@ -198,7 +203,8 @@ static __global__ void smem_kernel_fixed(int m_loc, int n_loc, int x_rows_per_ti
             const int tile_row = load_index / K;
             const int tile_col = load_index - tile_row * K;
 
-            X_tile[tile_row * tile_row_stride + tile_col] = X_loc[(size_t)(tile_first_row + tile_row) * (size_t)ldx + tile_col];
+            X_tile[tile_row * tile_row_stride + tile_col] =
+                X_loc[(size_t)(tile_first_row + tile_row) * (size_t)ldx + tile_col];
         }
 
         /* Seconda barriera: il tile e' completo e visibile a tutto il blocco. */
@@ -483,7 +489,7 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
     return local_gemm_context;
 }
 
-void local_gemm(local_gemm_t *local_gemm_context, const scalar_t *RESTRICT X, int ldx, scalar_t *RESTRICT Y, int ldy) {
+void local_gemm(local_gemm_t *local_gemm_context, const scalar_t *RESTRICT X_loc, int ldx, scalar_t *RESTRICT Y, int ldy) {
 
     const int m_loc = local_gemm_context->m_loc, n_loc = local_gemm_context->n_loc, k = local_gemm_context->k;
     float ms = 0.0f;
@@ -492,7 +498,7 @@ void local_gemm(local_gemm_t *local_gemm_context, const scalar_t *RESTRICT X, in
         die("cuda_warp_smem: leading dimensions changed between calls " "(ldx %d -> %d, ldy %d -> %d)", local_gemm_context->ldx, ldx, local_gemm_context->ldy, ldy);
 
     if (n_loc > 0 && k > 0)
-        CUDA_CHECK(cudaMemcpy(local_gemm_context->dX_loc, X, (size_t)n_loc * (size_t)ldx * sizeof(scalar_t), cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(local_gemm_context->dX_loc, X_loc, (size_t)n_loc * (size_t)ldx * sizeof(scalar_t), cudaMemcpyHostToDevice));
 
     CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_start, 0));
     if (m_loc > 0 && k > 0) {
