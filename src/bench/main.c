@@ -10,6 +10,7 @@
 
 #include <errno.h>
 #include <limits.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -226,6 +227,11 @@ static double vec_mean(const double *v, int n)
     for (i = 0; i < n; i++)
         s += v[i];
     return s / n;
+}
+
+static int validation_passed(double rel_err)
+{
+    return isfinite(rel_err) && rel_err >= 0.0 && rel_err <= SCALAR_CHECK_TOL;
 }
 
 int main(int argc, char **argv)
@@ -484,7 +490,7 @@ int main(int argc, char **argv)
                    2.0 * (double)options.M * (double)options.N * (double)options.k / 1e9);
             if (options.check)
                 printf("  validation              relative L2 error %.3e   [%s]\n",
-                       rel_err, (rel_err <= SCALAR_CHECK_TOL) ? "PASS" : "FAIL");
+                       rel_err, validation_passed(rel_err) ? "PASS" : "FAIL");
         }
         fflush(stdout);
     }
@@ -509,5 +515,5 @@ int main(int argc, char **argv)
     MPI_Finalize();
 
     /* esito non nullo se la validazione fallisce: utile negli script */
-    return (options.check && rel_err > SCALAR_CHECK_TOL) ? EXIT_FAILURE : EXIT_SUCCESS;
+    return (options.check && !validation_passed(rel_err)) ? EXIT_FAILURE : EXIT_SUCCESS;
 }
