@@ -41,6 +41,10 @@ ORIGINAL_ARGS=("$@")
 # -------------------------
 
 EXPERIMENT=""
+EXPERIMENT_NAME=""
+CONFIG_FILE=""
+SUITE_FILE=""
+OUTDIR_EXPLICIT=0
 
 M=10000
 N=10000
@@ -101,6 +105,21 @@ usage() {
 cat <<'EOF'
 Uso:
   ./run_cuda_experiments.sh --experiment <tipo> [flag...]
+  ./run_cuda_experiments.sh --config <file.conf> [flag di override...]
+  ./run_cuda_experiments.sh --suite <suite.txt>
+
+CONFIGURAZIONE DA FILE
+  --config FILE
+      Legge un esperimento da un file key=value.
+      I flag passati sulla command line hanno precedenza sul file.
+
+  --suite FILE
+      Il file contiene, una per riga, le configurazioni .conf da eseguire.
+      Le righe vuote e quelle che iniziano con # vengono ignorate.
+
+  --name NAME
+      Nome logico dell'esperimento. I risultati vengono salvati in:
+          results/NAME/<timestamp>/
 
 TIPI DI ESPERIMENTO
   --experiment k-sweep
@@ -187,12 +206,21 @@ FLAG CUDA / BUILD
 
 FLAG PROFILING / OUTPUT
   --ncu-set SET               Set Nsight Compute         [default full]
-  --outdir DIR                Directory risultati
+  --outdir DIR                Directory risultati (override del path automatico)
+  --name NAME                    Nome esperimento / cartella risultati
+  --config FILE                  Carica parametri da file
+  --suite FILE                   Esegue una lista di file .conf
   --verbose                   Mostra le righe CSV anche a terminale
   --continue-on-error         Continua una campagna se una run fallisce
   --help
 
 ESEMPI
+
+  # Da file di configurazione
+  ./run_cuda_experiments.sh --config experiments/naive_block_sweep.conf
+
+  # Esegue piu' file di configurazione in sequenza
+  ./run_cuda_experiments.sh --suite experiments/cuda_naive_suite.txt
 
   # Naive, tutti i k standard
   ./run_cuda_experiments.sh \
@@ -232,12 +260,215 @@ ESEMPI
 EOF
 }
 
+
+trim() {
+    local x="$1"
+    x="${x#"${x%%[![:space:]]*}"}"
+    x="${x%"${x##*[![:space:]]}"}"
+    printf '%s' "$x"
+}
+
+apply_config_kv() {
+    local key="$1"
+    local value="$2"
+
+    case "$key" in
+        name) EXPERIMENT_NAME="$value" ;;
+        experiment) EXPERIMENT="$value" ;;
+
+        M) M="$value" ;;
+        N) N="$value" ;;
+        k)
+            SINGLE_K="$value"
+            KS_EXPLICIT=1
+            ;;
+        ks)
+            read -r -a K_SWEEP_KS <<< "$value"
+            read -r -a BLOCK_SWEEP_KS <<< "$value"
+            read -r -a COMPARE_KS <<< "$value"
+            KS_EXPLICIT=1
+            ;;
+        reps) REPS="$value" ;;
+        warmup) WARMUP="$value" ;;
+        seed) SEED="$value" ;;
+        check)
+            [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" ]] && CHECK=1 || CHECK=0
+            ;;
+        a_mode|a-mode) A_MODE="$value" ;;
+        x_mode|x-mode) X_MODE="$value" ;;
+
+        np)
+            NP="$value"
+            NP_EXPLICIT=1
+            ;;
+        pr)
+            PR="$value"
+            PR_EXPLICIT=1
+            ;;
+        pc)
+            PC="$value"
+            PC_EXPLICIT=1
+            ;;
+        all_grids|all-grids) ALL_GRIDS_P="$value" ;;
+
+        btl) BTL="$value" ;;
+        bind_to|bind-to) BIND_TO="$value" ;;
+        map_by|map-by) MAP_BY="$value" ;;
+        report_bindings|report-bindings)
+            [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" ]] && REPORT_BINDINGS=1 || REPORT_BINDINGS=0
+            ;;
+
+        kernel)
+            KERNEL="$value"
+            KERNEL_EXPLICIT=1
+            ;;
+        kernels)
+            read -r -a KERNELS <<< "$value"
+            ;;
+        block)
+            BLOCK="$value"
+            BLOCK_EXPLICIT=1
+            ;;
+        blocks)
+            read -r -a BLOCKS <<< "$value"
+            ;;
+
+        prec) PREC="$value" ;;
+        smem_pad|smem-pad) SMEM_PAD="$value" ;;
+        smem_pads|smem-pads)
+            read -r -a SMEM_PADS <<< "$value"
+            ;;
+        force_generic_k|force-generic-k) FORCE_GENERIC_K="$value" ;;
+        test_a_padding|test-a-padding) TEST_A_PADDING="$value" ;;
+        nvcc_arch|nvcc-arch) NVCC_ARCH="$value" ;;
+
+        ncu_set|ncu-set) NCU_SET="$value" ;;
+        verbose)
+            [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" ]] && VERBOSE=1 || VERBOSE=0
+            ;;
+        continue_on_error|continue-on-error)
+            [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" ]] && CONTINUE_ON_ERROR=1 || CONTINUE_ON_ERROR=0
+            ;;
+        outdir)
+            OUTDIR="$value"
+            OUTDIR_EXPLICIT=1
+            ;;
+        "")
+            ;;
+        *)
+            echo "Errore in config: chiave sconosciuta '$key'." >&2
+            exit 1
+            ;;
+    esac
+}
+
+load_config() {
+    local file="$1"
+
+    if [[ ! -f "$file" ]]; then
+        echo "Errore: config '$file' non trovato." >&2
+        exit 1
+    fi
+
+    CONFIG_FILE="$file"
+
+    while IFS= read -r raw || [[ -n "$raw" ]]; do
+        local line key value
+
+        line="$(trim "$raw")"
+        [[ -z "$line" ]] && continue
+        [[ "$line" == \#* ]] && continue
+
+        if [[ "$line" != *=* ]]; then
+            echo "Errore in $file: riga non valida: $raw" >&2
+            echo "Formato atteso: chiave=valore" >&2
+            exit 1
+        fi
+
+        key="$(trim "${line%%=*}")"
+        value="$(trim "${line#*=}")"
+
+        # Supporta opzionalmente virgolette semplici/doppie attorno all'intero valore.
+        if [[ ${#value} -ge 2 ]]; then
+            if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+                value="${value:1:${#value}-2}"
+            elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+                value="${value:1:${#value}-2}"
+            fi
+        fi
+
+        apply_config_kv "$key" "$value"
+    done < "$file"
+}
+
+run_suite() {
+    local suite="$1"
+
+    if [[ ! -f "$suite" ]]; then
+        echo "Errore: suite '$suite' non trovata." >&2
+        exit 1
+    fi
+
+    local suite_dir
+    suite_dir="$(cd "$(dirname "$suite")" && pwd)"
+
+    while IFS= read -r raw || [[ -n "$raw" ]]; do
+        local line config_path
+        line="$(trim "$raw")"
+        [[ -z "$line" ]] && continue
+        [[ "$line" == \#* ]] && continue
+
+        if [[ "$line" = /* ]]; then
+            config_path="$line"
+        else
+            config_path="$suite_dir/$line"
+        fi
+
+        echo
+        echo "################################################################"
+        echo "SUITE -> $config_path"
+        echo "################################################################"
+
+        "$0" --config "$config_path"
+    done < "$suite"
+}
+
 need_value() {
     if [[ $# -lt 2 || -z "${2:-}" ]]; then
         echo "Errore: il flag '$1' richiede un valore." >&2
         exit 1
     fi
 }
+
+# -------------------------
+# Pre-scan: config / suite
+# -------------------------
+
+# I file vengono caricati prima del parsing normale, cosi' i flag CLI
+# successivi possono sovrascrivere i valori del file.
+for ((i=0; i<${#ORIGINAL_ARGS[@]}; i++)); do
+    case "${ORIGINAL_ARGS[$i]}" in
+        --config)
+            if (( i + 1 >= ${#ORIGINAL_ARGS[@]} )); then
+                echo "Errore: --config richiede un file." >&2
+                exit 1
+            fi
+            load_config "${ORIGINAL_ARGS[$((i+1))]}"
+            ;;
+        --suite)
+            if (( i + 1 >= ${#ORIGINAL_ARGS[@]} )); then
+                echo "Errore: --suite richiede un file." >&2
+                exit 1
+            fi
+            SUITE_FILE="${ORIGINAL_ARGS[$((i+1))]}"
+            ;;
+    esac
+done
+
+if [[ -n "$SUITE_FILE" ]]; then
+    run_suite "$SUITE_FILE"
+    exit 0
+fi
 
 # -------------------------
 # Parse: SOLO flag
@@ -248,6 +479,21 @@ while [[ $# -gt 0 ]]; do
         --experiment)
             need_value "$@"
             EXPERIMENT="$2"
+            shift 2
+            ;;
+        --name)
+            need_value "$@"
+            EXPERIMENT_NAME="$2"
+            shift 2
+            ;;
+        --config)
+            need_value "$@"
+            # gia' caricato nel pre-scan
+            shift 2
+            ;;
+        --suite)
+            need_value "$@"
+            # gia' gestito nel pre-scan
             shift 2
             ;;
         --M)
@@ -374,7 +620,11 @@ while [[ $# -gt 0 ]]; do
         --ncu-set)
             need_value "$@"; NCU_SET="$2"; shift 2 ;;
         --outdir)
-            need_value "$@"; OUTDIR="$2"; shift 2 ;;
+            need_value "$@"
+            OUTDIR="$2"
+            OUTDIR_EXPLICIT=1
+            shift 2
+            ;;
         --verbose)
             VERBOSE=1
             shift
@@ -571,7 +821,27 @@ warn_multi_rank_gpu_contention() {
     fi
 }
 
-mkdir -p "$OUTDIR"
+finalize_output_dir() {
+    if [[ -z "$EXPERIMENT_NAME" ]]; then
+        EXPERIMENT_NAME="$EXPERIMENT"
+    fi
+
+    # Sanitizza solo i caratteri pericolosi nei path.
+    EXPERIMENT_NAME="${EXPERIMENT_NAME// /_}"
+    EXPERIMENT_NAME="${EXPERIMENT_NAME//\//_}"
+
+    if [[ "$OUTDIR_EXPLICIT" -eq 0 ]]; then
+        OUTDIR="results/${EXPERIMENT_NAME}/${TIMESTAMP}"
+    fi
+
+    mkdir -p "$OUTDIR"
+}
+
+result_path() {
+    local stem="$1"
+    local ext="$2"
+    echo "$OUTDIR/${EXPERIMENT_NAME}_${stem}.${ext}"
+}
 
 log() {
     echo
@@ -646,7 +916,7 @@ csv_header() {
 }
 
 failure_file() {
-    echo "$OUTDIR/failures.csv"
+    echo "$OUTDIR/${EXPERIMENT_NAME}_failures.csv"
 }
 
 init_failure_file() {
@@ -736,7 +1006,9 @@ write_metadata() {
         echo
 
         echo "timestamp=$TIMESTAMP"
+        echo "name=$EXPERIMENT_NAME"
         echo "experiment=$EXPERIMENT"
+        echo "config_file=${CONFIG_FILE:-none}"
         echo "M=$M"
         echo "N=$N"
         echo "reps=$REPS"
@@ -802,7 +1074,7 @@ experiment_k_sweep() {
     local bin
     bin="$(bin_for "$kernel" "$block" "$smem_pad")"
 
-    local csv="$OUTDIR/k_sweep_${kernel}_block${block}.csv"
+    local csv="$(result_path "k_sweep_${kernel}_block${block}" "csv")"
     csv_header "$bin" "$csv"
 
     log "K-SWEEP -> $csv"
@@ -820,7 +1092,7 @@ experiment_k_sweep() {
 experiment_block_sweep() {
     local kernel="$KERNEL"
     local smem_pad="$SMEM_PAD"
-    local csv="$OUTDIR/block_sweep_${kernel}.csv"
+    local csv="$(result_path "block_sweep_${kernel}" "csv")"
     local header_written=0
 
     log "BLOCK-SWEEP -> $csv"
@@ -862,7 +1134,7 @@ experiment_grid_sweep() {
     local bin
     bin="$(bin_for "$kernel" "$block" "$smem_pad")"
 
-    local csv="$OUTDIR/grid_sweep_${kernel}_k${K_SWEEP_KS[0]}_block${block}_P${ALL_GRIDS_P}.csv"
+    local csv="$(result_path "grid_sweep_${kernel}_block${block}_P${ALL_GRIDS_P}" "csv")"
     csv_header "$bin" "$csv"
 
     log "GRID-SWEEP P=$ALL_GRIDS_P -> $csv"
@@ -880,7 +1152,7 @@ experiment_grid_sweep() {
 experiment_compare() {
     local block="$BLOCK"
     local smem_pad="$SMEM_PAD"
-    local csv="$OUTDIR/kernel_compare_block${block}.csv"
+    local csv="$(result_path "kernel_compare_block${block}" "csv")"
     local header_written=0
 
     log "KERNEL-COMPARE -> $csv"
@@ -914,14 +1186,14 @@ experiment_registers() {
         kernels=("$KERNEL")
     fi
 
-    local summary="$OUTDIR/registers_summary.txt"
+    local summary="$(result_path "registers_summary" "txt")"
     : > "$summary"
 
     log "PTXAS REGISTERS -> $OUTDIR"
 
     for kernel in "${kernels[@]}"; do
-        local txt="$OUTDIR/ptxas_${kernel}.txt"
-        local regs="$OUTDIR/ptxas_${kernel}_registers.txt"
+        local txt="$(result_path "ptxas_${kernel}" "txt")"
+        local regs="$(result_path "ptxas_${kernel}_registers" "txt")"
 
         echo "kernel=$kernel"
 
@@ -966,7 +1238,7 @@ experiment_smem_pad_sweep() {
     fi
 
     local block="$BLOCK"
-    local csv="$OUTDIR/smem_pad_sweep_${kernel}_block${block}.csv"
+    local csv="$(result_path "smem_pad_sweep_${kernel}_block${block}" "csv")"
     local header_written=0
 
     log "SMEM-PAD-SWEEP -> $csv"
@@ -1024,7 +1296,7 @@ experiment_ncu() {
     for g in "${GRIDS[@]}"; do
         IFS=: read -r np pr pc <<< "$g"
 
-        local base="$OUTDIR/ncu_${kernel}_k${k}_block${block}_P${np}_${pr}x${pc}"
+        local base="$OUTDIR/${EXPERIMENT_NAME}_ncu_${kernel}_k${k}_block${block}_P${np}_${pr}x${pc}"
         local txt="${base}.txt"
 
         local args=(
@@ -1127,6 +1399,7 @@ experiment_full() {
 validate_common
 generate_grids
 build_mpi_flags
+finalize_output_dir
 warn_multi_rank_gpu_contention
 write_metadata
 
