@@ -43,16 +43,26 @@ typedef struct {
     uint64_t seed;
     int check;
     int csv;
+    const char *csv_raw_file;
     a_mode_t a_mode;
     x_mode_t x_mode;
 } opts_t;
 
 static const char *CSV_HEADER =
     "kernel,scalar,a_mode,x_mode,M,N,k,P,pr,pc,reps,"
-    "t_bcast_mean_s,t_local_mean_s,t_reduce_mean_s,t_total_mean_s,"
-    "t_official_mean_s,t_total_median_s,t_total_min_s,t_kernel_mean_s,"
-    "t_transfer_runtime_overhead_mean_s,t_setup_s,"
-    "gflops,gflops_compute,gflops_kernel,rel_err";
+    "t_bcast_mean_s,t_bcast_std_s,"
+    "t_local_mean_s,t_local_std_s,"
+    "t_reduce_mean_s,t_reduce_std_s,"
+    "t_total_mean_s,t_total_median_s,t_total_min_s,t_total_std_s,t_total_cv_pct,"
+    "t_official_mean_s,t_official_median_s,t_official_min_s,t_official_std_s,t_official_cv_pct,"
+    "t_kernel_mean_s,t_kernel_median_s,t_kernel_min_s,t_kernel_std_s,t_kernel_cv_pct,"
+    "t_transfer_runtime_overhead_mean_s,t_transfer_runtime_overhead_std_s,"
+    "t_setup_s,gflops,gflops_compute,gflops_kernel,rel_err";
+
+static const char *CSV_RAW_HEADER =
+    "kernel,scalar,a_mode,x_mode,M,N,k,P,pr,pc,rep,"
+    "t_bcast_s,t_local_s,t_reduce_s,t_total_s,t_official_s,t_kernel_s,"
+    "t_transfer_runtime_overhead_s,gflops,gflops_compute,gflops_kernel";
 
 static const char *a_mode_name(a_mode_t mode)
 {
@@ -83,6 +93,8 @@ static void usage(const char *prog)
     printf("  --check         validate against the serial reference\n");
     printf("  --csv           print one CSV row instead of the report\n");
     printf("  --csv-header    print the CSV header and exit\n");
+    printf("  --csv-raw-file <path>\n");
+    printf("                  append one row per timed repetition to a raw CSV\n");
     printf("  -h, --help      this message\n");
 }
 
@@ -139,6 +151,7 @@ static void parse_args(int argc, char **argv, opts_t *options, int rank)
     options->seed = GEN_DEFAULT_SEED;
     options->check = 0;
     options->csv = 0;
+    options->csv_raw_file = NULL;
     options->a_mode = A_MODE_LOCAL;
     options->x_mode = X_MODE_LOCAL;
 
@@ -188,7 +201,11 @@ static void parse_args(int argc, char **argv, opts_t *options, int rank)
             options->check = 1;
         else if (!strcmp(argv[i], "--csv"))
             options->csv = 1;
-        else if (!strcmp(argv[i], "--csv-header")) {
+        else if (!strcmp(argv[i], "--csv-raw-file")) {
+            if (i + 1 >= argc)
+                die("option --csv-raw-file requires a path");
+            options->csv_raw_file = argv[++i];
+        } else if (!strcmp(argv[i], "--csv-header")) {
             if (rank == 0)
                 printf("%s\n", CSV_HEADER);
             MPI_Finalize();
@@ -229,9 +246,126 @@ static double vec_mean(const double *v, int n)
     return s / n;
 }
 
+static double vec_stddev(const double *v, int n)
+{
+    double mean = vec_mean(v, n);
+    double sum = 0.0;
+    int i;
+
+    if (n < 2)
+        return 0.0;
+
+    for (i = 0; i < n; i++) {
+        double d = v[i] - mean;
+        sum += d * d;
+    }
+
+    return sqrt(sum / (double)(n - 1));
+}
+
+static double vec_median(double *scratch, const double *v, int n)
+{
+    memcpy(scratch, v, (size_t)n * sizeof *scratch);
+    qsort(scratch, (size_t)n, sizeof *scratch, cmp_double);
+
+    if (n % 2)
+        return scratch[n / 2];
+
+    return 0.5 * (scratch[n / 2 - 1] + scratch[n / 2]);
+}
+
+static double vec_min(const double *v, int n)
+{
+    double min_value = v[0];
+    int i;
+
+    for (i = 1; i < n; i++)
+        if (v[i] < min_value)
+            min_value = v[i];
+
+    return min_value;
+}
+
+static double coeff_var_pct(double mean, double stddev)
+{
+    return mean > 0.0 ? 100.0 * stddev / mean : -1.0;
+}
+
 static int validation_passed(double rel_err)
 {
     return isfinite(rel_err) && rel_err >= 0.0 && rel_err <= SCALAR_CHECK_TOL;
+}
+
+static void append_raw_csv(const char *path,
+                           const opts_t *options,
+                           const grid_t *grid,
+                           const double *bcast_times,
+                           const double *local_phase_times,
+                           const double *reduce_times,
+                           const double *total_times,
+                           const double *official_times,
+                           const double *kernel_times,
+                           const double *non_kernel_local_times)
+{
+    FILE *fp;
+    long file_size;
+    double flop;
+    int rep;
+
+    if (path == NULL)
+        return;
+
+    fp = fopen(path, "a+");
+    if (fp == NULL)
+        die("cannot open raw CSV '%s'", path);
+
+    if (fseek(fp, 0, SEEK_END) != 0) {
+        fclose(fp);
+        die("cannot seek raw CSV '%s'", path);
+    }
+
+    file_size = ftell(fp);
+    if (file_size < 0) {
+        fclose(fp);
+        die("cannot determine size of raw CSV '%s'", path);
+    }
+
+    if (file_size == 0)
+        fprintf(fp, "%s\n", CSV_RAW_HEADER);
+
+    flop = 2.0 * (double)options->M *
+           (double)options->N * (double)options->k;
+
+    for (rep = 0; rep < options->reps; rep++) {
+        double compute_time = kernel_times[rep] >= 0.0
+                                ? kernel_times[rep]
+                                : local_phase_times[rep];
+        double rep_gflops = official_times[rep] > 0.0
+                              ? flop / official_times[rep] / 1.0e9
+                              : -1.0;
+        double rep_gflops_compute = compute_time > 0.0
+                                      ? flop / compute_time / 1.0e9
+                                      : -1.0;
+        double rep_gflops_kernel = kernel_times[rep] > 0.0
+                                     ? flop / kernel_times[rep] / 1.0e9
+                                     : -1.0;
+
+        fprintf(fp,
+                "%s,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,"
+                "%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,"
+                "%.6f,%.6f,%.6f\n",
+                kernel_name(), SCALAR_NAME,
+                a_mode_name(options->a_mode), x_mode_name(options->x_mode),
+                options->M, options->N, options->k,
+                grid->nprocs, grid->pr, grid->pc, rep + 1,
+                bcast_times[rep], local_phase_times[rep], reduce_times[rep],
+                total_times[rep], official_times[rep], kernel_times[rep],
+                non_kernel_local_times[rep],
+                rep_gflops, rep_gflops_compute, rep_gflops_kernel);
+    }
+
+    if (fclose(fp) != 0)
+        die("cannot close raw CSV '%s'", path);
 }
 
 int main(int argc, char **argv)
@@ -246,10 +380,23 @@ int main(int argc, char **argv)
 
     local_gemm_t *local_gemm_context;
 
-    double *bcast_times, *local_phase_times, *reduce_times, *total_times, *official_times, *kernel_times, *non_kernel_local_times, *sorted_total_times;
-    double mean_bcast_time, mean_local_phase_time, mean_reduce_time, mean_total_time, mean_official_time;
-    double mean_kernel_time, mean_compute_time, mean_non_kernel_local_time  = -1.0;
-    double median_total_time, min_total_time, gflops, gflops_compute, rel_err = -1.0;
+    double *bcast_times, *local_phase_times, *reduce_times, *total_times;
+    double *official_times, *kernel_times, *non_kernel_local_times;
+    double *sorted_total_times, *sorted_official_times, *sorted_kernel_times;
+
+    double mean_bcast_time, mean_local_phase_time, mean_reduce_time;
+    double mean_total_time, mean_official_time, mean_kernel_time;
+    double mean_compute_time, mean_non_kernel_local_time = -1.0;
+
+    double std_bcast_time, std_local_phase_time, std_reduce_time;
+    double std_total_time, std_official_time, std_kernel_time;
+    double std_non_kernel_local_time;
+
+    double median_total_time, median_official_time, median_kernel_time;
+    double min_total_time, min_official_time, min_kernel_time;
+    double cv_total_time, cv_official_time, cv_kernel_time;
+
+    double gflops, gflops_compute, rel_err = -1.0;
     double gflops_kernel = -1.0, setup_time;
     int world_rank, world_size, rep;
 
@@ -259,7 +406,7 @@ int main(int argc, char **argv)
 
     parse_args(argc, argv, &options, world_rank);
 
-    /* 
+    /*
      * Se l'utente non ha specificato la forma della griglia, la calcolo in modo
      * da renderla il più quadrata possibile. Se invece ha specificato solo una
      * dimensione, calcolo l'altra in modo da usare tutti i processi.
@@ -366,6 +513,8 @@ int main(int argc, char **argv)
     kernel_times = xmalloc((size_t)options.reps * sizeof *kernel_times);
     non_kernel_local_times = xmalloc((size_t)options.reps * sizeof *non_kernel_local_times);
     sorted_total_times = xmalloc((size_t)options.reps * sizeof *sorted_total_times);
+    sorted_official_times = xmalloc((size_t)options.reps * sizeof *sorted_official_times);
+    sorted_kernel_times = xmalloc((size_t)options.reps * sizeof *sorted_kernel_times);
 
     for (rep = 0; rep < options.warmup_reps; rep++)
         mpi_matmul(&grid, &layout, local_gemm_context, X_loc, Y_loc_part, Y_row_col0, NULL);
@@ -413,19 +562,36 @@ int main(int argc, char **argv)
         rel_err = check_against_serial(&grid, &layout, Y_row_col0, options.seed);
 
     if (grid.rank == 0) {
-        memcpy(sorted_total_times, total_times, (size_t)options.reps * sizeof *sorted_total_times);
-        qsort(sorted_total_times, (size_t)options.reps, sizeof *sorted_total_times, cmp_double);
         mean_bcast_time = vec_mean(bcast_times, options.reps);
         mean_local_phase_time = vec_mean(local_phase_times, options.reps);
         mean_reduce_time = vec_mean(reduce_times, options.reps);
         mean_total_time = vec_mean(total_times, options.reps);
         mean_official_time = vec_mean(official_times, options.reps);
         mean_kernel_time = vec_mean(kernel_times, options.reps);
-        mean_non_kernel_local_time  = vec_mean(non_kernel_local_times, options.reps);
-        mean_compute_time = (mean_kernel_time >= 0.0) ? mean_kernel_time : mean_local_phase_time;
-        median_total_time = (options.reps % 2) ? sorted_total_times[options.reps / 2]
-                                    : 0.5 * (sorted_total_times[options.reps / 2 - 1] + sorted_total_times[options.reps / 2]);
-        min_total_time = sorted_total_times[0];
+        mean_non_kernel_local_time = vec_mean(non_kernel_local_times, options.reps);
+        mean_compute_time = (mean_kernel_time >= 0.0)
+                              ? mean_kernel_time
+                              : mean_local_phase_time;
+
+        std_bcast_time = vec_stddev(bcast_times, options.reps);
+        std_local_phase_time = vec_stddev(local_phase_times, options.reps);
+        std_reduce_time = vec_stddev(reduce_times, options.reps);
+        std_total_time = vec_stddev(total_times, options.reps);
+        std_official_time = vec_stddev(official_times, options.reps);
+        std_kernel_time = vec_stddev(kernel_times, options.reps);
+        std_non_kernel_local_time = vec_stddev(non_kernel_local_times, options.reps);
+
+        median_total_time = vec_median(sorted_total_times, total_times, options.reps);
+        median_official_time = vec_median(sorted_official_times, official_times, options.reps);
+        median_kernel_time = vec_median(sorted_kernel_times, kernel_times, options.reps);
+
+        min_total_time = vec_min(total_times, options.reps);
+        min_official_time = vec_min(official_times, options.reps);
+        min_kernel_time = vec_min(kernel_times, options.reps);
+
+        cv_total_time = coeff_var_pct(mean_total_time, std_total_time);
+        cv_official_time = coeff_var_pct(mean_official_time, std_official_time);
+        cv_kernel_time = coeff_var_pct(mean_kernel_time, std_kernel_time);
 
         /* Metrica ufficiale: prodotto MPI completo, ma senza i trasferimenti
          * CUDA come richiesto dalla traccia. Su CPU mean_official coincide con
@@ -443,16 +609,37 @@ int main(int argc, char **argv)
             gflops_kernel = gflops_compute;
         }
 
+        append_raw_csv(options.csv_raw_file, &options, &grid,
+                       bcast_times, local_phase_times, reduce_times,
+                       total_times, official_times, kernel_times,
+                       non_kernel_local_times);
+
         if (options.csv) {
             printf("%s,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,"
-                   "%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,"
+                   "%.9e,%.9e,"
+                   "%.9e,%.9e,"
+                   "%.9e,%.9e,"
+                   "%.9e,%.9e,%.9e,%.9e,%.9e,"
+                   "%.9e,%.9e,%.9e,%.9e,%.9e,"
+                   "%.9e,%.9e,%.9e,%.9e,%.9e,"
+                   "%.9e,%.9e,"
+                   "%.9e,"
                    "%.6f,%.6f,%.6f,%.3e\n",
                    kernel_name(), SCALAR_NAME, a_mode_name(options.a_mode),
                    x_mode_name(options.x_mode),
-                   options.M, options.N, options.k, grid.nprocs, grid.pr, grid.pc, options.reps,
-                   mean_bcast_time, mean_local_phase_time, mean_reduce_time, mean_total_time,
-                   mean_official_time, median_total_time, min_total_time, mean_kernel_time,
-                   mean_non_kernel_local_time , setup_time,
+                   options.M, options.N, options.k,
+                   grid.nprocs, grid.pr, grid.pc, options.reps,
+                   mean_bcast_time, std_bcast_time,
+                   mean_local_phase_time, std_local_phase_time,
+                   mean_reduce_time, std_reduce_time,
+                   mean_total_time, median_total_time, min_total_time,
+                   std_total_time, cv_total_time,
+                   mean_official_time, median_official_time, min_official_time,
+                   std_official_time, cv_official_time,
+                   mean_kernel_time, median_kernel_time, min_kernel_time,
+                   std_kernel_time, cv_kernel_time,
+                   mean_non_kernel_local_time, std_non_kernel_local_time,
+                   setup_time,
                    gflops, gflops_compute, gflops_kernel, rel_err);
         } else {
             double bytes_A = (double)options.M * options.N * sizeof(scalar_t);
@@ -465,20 +652,38 @@ int main(int argc, char **argv)
                    bytes_A / 1048576.0);
             printf("  reps=%d warmup=%d seed=%llu\n",
                    options.reps, options.warmup_reps, (unsigned long long)options.seed);
-            printf("  Bcast mean              %.3f ms\n", mean_bcast_time * 1e3);
-            printf("  Local mean              %.3f ms\n", mean_local_phase_time * 1e3);
-            printf("  Reduce mean             %.3f ms\n", mean_reduce_time * 1e3);
-            printf("  Total mean (end-to-end) %.3f ms   median %.3f ms   min %.3f ms\n",
-                   mean_total_time * 1e3, median_total_time * 1e3, min_total_time * 1e3);
+            printf("  Bcast mean              %.3f ms   std %.3f ms\n",
+                   mean_bcast_time * 1e3, std_bcast_time * 1e3);
+            printf("  Local mean              %.3f ms   std %.3f ms\n",
+                   mean_local_phase_time * 1e3, std_local_phase_time * 1e3);
+            printf("  Reduce mean             %.3f ms   std %.3f ms\n",
+                   mean_reduce_time * 1e3, std_reduce_time * 1e3);
+            printf("  Total mean (end-to-end) %.3f ms   std %.3f ms   CV %.2f%%\n",
+                   mean_total_time * 1e3, std_total_time * 1e3, cv_total_time);
+            printf("  Total distribution      median %.3f ms   min %.3f ms\n",
+                   median_total_time * 1e3, min_total_time * 1e3);
             if (mean_kernel_time >= 0.0) {
-                printf("  Official mean           %.3f ms   (GPU transfers excluded)\n",
-                       mean_official_time * 1e3);
-                printf("  Kernel mean             %.3f ms\n", mean_kernel_time * 1e3);
-                printf("  Transfer/runtime ovh.   %.3f ms\n",
-                       mean_non_kernel_local_time  * 1e3);
+                printf("  Official mean           %.3f ms   std %.3f ms   CV %.2f%%"
+                       "   (GPU transfers excluded)\n",
+                       mean_official_time * 1e3, std_official_time * 1e3,
+                       cv_official_time);
+                printf("  Official distribution   median %.3f ms   min %.3f ms\n",
+                       median_official_time * 1e3, min_official_time * 1e3);
+                printf("  Kernel mean             %.3f ms   std %.3f ms   CV %.2f%%\n",
+                       mean_kernel_time * 1e3, std_kernel_time * 1e3,
+                       cv_kernel_time);
+                printf("  Kernel distribution     median %.3f ms   min %.3f ms\n",
+                       median_kernel_time * 1e3, min_kernel_time * 1e3);
+                printf("  Transfer/runtime ovh.   %.3f ms   std %.3f ms\n",
+                       mean_non_kernel_local_time * 1e3,
+                       std_non_kernel_local_time * 1e3);
             } else {
-                printf("  Official mean           %.3f ms   (same as end-to-end)\n",
-                       mean_official_time * 1e3);
+                printf("  Official mean           %.3f ms   std %.3f ms   CV %.2f%%"
+                       "   (same as end-to-end)\n",
+                       mean_official_time * 1e3, std_official_time * 1e3,
+                       cv_official_time);
+                printf("  Official distribution   median %.3f ms   min %.3f ms\n",
+                       median_official_time * 1e3, min_official_time * 1e3);
             }
             printf("  Backend setup           %.3f ms   (preprocessing, fuori dalla misura)\n",
                    setup_time * 1e3);
@@ -511,6 +716,8 @@ int main(int argc, char **argv)
     xfree(kernel_times);
     xfree(non_kernel_local_times);
     xfree(sorted_total_times);
+    xfree(sorted_official_times);
+    xfree(sorted_kernel_times);
     grid_free(&grid);
     MPI_Finalize();
 

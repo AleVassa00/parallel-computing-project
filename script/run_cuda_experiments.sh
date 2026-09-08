@@ -204,6 +204,19 @@ FLAG CUDA / BUILD
   --test-a-padding N          TEST_A_PADDING             [default 0]
   --nvcc-arch ARCH            Architettura NVCC          [default sm_75]
 
+OUTPUT DEI BENCHMARK
+  Per un normale esperimento con:
+      name=naive_block_sweep
+
+  vengono prodotti:
+      naive_block_sweep.csv
+      naive_block_sweep_raw.csv
+      metadata.txt
+
+  Il CSV principale contiene una riga aggregata per configurazione.
+  Il CSV _raw contiene una riga per ogni repetition misurata.
+  Le warmup non vengono salvate nel raw.
+
 FLAG PROFILING / OUTPUT
   --ncu-set SET               Set Nsight Compute         [default full]
   --outdir DIR                Directory risultati (override del path automatico)
@@ -843,6 +856,29 @@ result_path() {
     echo "$OUTDIR/${EXPERIMENT_NAME}_${stem}.${ext}"
 }
 
+benchmark_csv_path() {
+    local stem="$1"
+
+    # Per gli esperimenti singoli il CSV prende esattamente il nome indicato
+    # da name= nel .conf. "full" genera piu' dataset nella stessa directory,
+    # quindi in quel solo caso viene mantenuto un suffisso descrittivo.
+    if [[ "$EXPERIMENT" == "full" ]]; then
+        echo "$OUTDIR/${EXPERIMENT_NAME}_${stem}.csv"
+    else
+        echo "$OUTDIR/${EXPERIMENT_NAME}.csv"
+    fi
+}
+
+benchmark_raw_csv_path() {
+    local stem="$1"
+
+    if [[ "$EXPERIMENT" == "full" ]]; then
+        echo "$OUTDIR/${EXPERIMENT_NAME}_${stem}_raw.csv"
+    else
+        echo "$OUTDIR/${EXPERIMENT_NAME}_raw.csv"
+    fi
+}
+
 log() {
     echo
     echo "================================================================"
@@ -961,6 +997,7 @@ run_csv_row() {
     local pr="$8"
     local pc="$9"
     local file="${10}"
+    local raw_file="${11}"
 
     local args=(
         -M "$M" -N "$N" -k "$k"
@@ -970,6 +1007,7 @@ run_csv_row() {
         --warmup "$WARMUP"
         --reps "$REPS"
         --csv
+        --csv-raw-file "$raw_file"
     )
 
     if [[ -n "$SEED" ]]; then
@@ -1074,17 +1112,22 @@ experiment_k_sweep() {
     local bin
     bin="$(bin_for "$kernel" "$block" "$smem_pad")"
 
-    local csv="$(result_path "k_sweep_${kernel}_block${block}" "csv")"
+    local stem="k_sweep_${kernel}_block${block}"
+    local csv="$(benchmark_csv_path "$stem")"
+    local raw_csv="$(benchmark_raw_csv_path "$stem")"
+
     csv_header "$bin" "$csv"
+    : > "$raw_csv"
 
     log "K-SWEEP -> $csv"
+    echo "RAW repetitions -> $raw_csv"
 
     for g in "${GRIDS[@]}"; do
         IFS=: read -r np pr pc <<< "$g"
         for k in "${K_SWEEP_KS[@]}"; do
             echo "kernel=$kernel k=$k BLOCK=$block grid=${pr}x${pc} P=$np"
             run_csv_row "k-sweep" "$bin" "$kernel" "$k" "$block" "$smem_pad" \
-                "$np" "$pr" "$pc" "$csv"
+                "$np" "$pr" "$pc" "$csv" "$raw_csv"
         done
     done
 }
@@ -1092,10 +1135,15 @@ experiment_k_sweep() {
 experiment_block_sweep() {
     local kernel="$KERNEL"
     local smem_pad="$SMEM_PAD"
-    local csv="$(result_path "block_sweep_${kernel}" "csv")"
+    local stem="block_sweep_${kernel}"
+    local csv="$(benchmark_csv_path "$stem")"
+    local raw_csv="$(benchmark_raw_csv_path "$stem")"
     local header_written=0
 
+    : > "$raw_csv"
+
     log "BLOCK-SWEEP -> $csv"
+    echo "RAW repetitions -> $raw_csv"
 
     for block in "${BLOCKS[@]}"; do
         build_kernel "$kernel" "$block" "$smem_pad"
@@ -1113,7 +1161,7 @@ experiment_block_sweep() {
             for k in "${BLOCK_SWEEP_KS[@]}"; do
                 echo "kernel=$kernel k=$k BLOCK=$block grid=${pr}x${pc} P=$np"
                 run_csv_row "block-sweep" "$bin" "$kernel" "$k" "$block" "$smem_pad" \
-                    "$np" "$pr" "$pc" "$csv"
+                    "$np" "$pr" "$pc" "$csv" "$raw_csv"
             done
         done
     done
@@ -1134,17 +1182,22 @@ experiment_grid_sweep() {
     local bin
     bin="$(bin_for "$kernel" "$block" "$smem_pad")"
 
-    local csv="$(result_path "grid_sweep_${kernel}_block${block}_P${ALL_GRIDS_P}" "csv")"
+    local stem="grid_sweep_${kernel}_block${block}_P${ALL_GRIDS_P}"
+    local csv="$(benchmark_csv_path "$stem")"
+    local raw_csv="$(benchmark_raw_csv_path "$stem")"
+
     csv_header "$bin" "$csv"
+    : > "$raw_csv"
 
     log "GRID-SWEEP P=$ALL_GRIDS_P -> $csv"
+    echo "RAW repetitions -> $raw_csv"
 
     for g in "${GRIDS[@]}"; do
         IFS=: read -r np pr pc <<< "$g"
         for k in "${K_SWEEP_KS[@]}"; do
             echo "kernel=$kernel k=$k BLOCK=$block grid=${pr}x${pc} P=$np"
             run_csv_row "grid-sweep" "$bin" "$kernel" "$k" "$block" "$smem_pad" \
-                "$np" "$pr" "$pc" "$csv"
+                "$np" "$pr" "$pc" "$csv" "$raw_csv"
         done
     done
 }
@@ -1152,10 +1205,15 @@ experiment_grid_sweep() {
 experiment_compare() {
     local block="$BLOCK"
     local smem_pad="$SMEM_PAD"
-    local csv="$(result_path "kernel_compare_block${block}" "csv")"
+    local stem="kernel_compare_block${block}"
+    local csv="$(benchmark_csv_path "$stem")"
+    local raw_csv="$(benchmark_raw_csv_path "$stem")"
     local header_written=0
 
+    : > "$raw_csv"
+
     log "KERNEL-COMPARE -> $csv"
+    echo "RAW repetitions -> $raw_csv"
 
     for kernel in "${KERNELS[@]}"; do
         build_kernel "$kernel" "$block" "$smem_pad"
@@ -1173,7 +1231,7 @@ experiment_compare() {
             for k in "${COMPARE_KS[@]}"; do
                 echo "kernel=$kernel k=$k BLOCK=$block grid=${pr}x${pc} P=$np"
                 run_csv_row "compare" "$bin" "$kernel" "$k" "$block" "$smem_pad" \
-                    "$np" "$pr" "$pc" "$csv"
+                    "$np" "$pr" "$pc" "$csv" "$raw_csv"
             done
         done
     done
@@ -1238,10 +1296,15 @@ experiment_smem_pad_sweep() {
     fi
 
     local block="$BLOCK"
-    local csv="$(result_path "smem_pad_sweep_${kernel}_block${block}" "csv")"
+    local stem="smem_pad_sweep_${kernel}_block${block}"
+    local csv="$(benchmark_csv_path "$stem")"
+    local raw_csv="$(benchmark_raw_csv_path "$stem")"
     local header_written=0
 
+    : > "$raw_csv"
+
     log "SMEM-PAD-SWEEP -> $csv"
+    echo "RAW repetitions -> $raw_csv"
 
     for pad in "${SMEM_PADS[@]}"; do
         if ! is_nonneg_int "$pad"; then
@@ -1264,7 +1327,7 @@ experiment_smem_pad_sweep() {
             for k in "${K_SWEEP_KS[@]}"; do
                 echo "kernel=$kernel k=$k BLOCK=$block SMEM_PAD=$pad grid=${pr}x${pc} P=$np"
                 run_csv_row "smem-pad-sweep" "$bin" "$kernel" "$k" "$block" "$pad" \
-                    "$np" "$pr" "$pc" "$csv"
+                    "$np" "$pr" "$pc" "$csv" "$raw_csv"
             done
         done
     done
@@ -1438,3 +1501,4 @@ esac
 echo
 echo "Esperimento completato."
 echo "Risultati: $OUTDIR"
+

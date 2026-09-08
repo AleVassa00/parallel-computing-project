@@ -1,0 +1,51 @@
+command=./script/run_cuda_experiments.sh --config experiments/cuda_naive_block_sweep.conf 
+timestamp=20260908_232318
+name=naive_block_sweep
+experiment=block-sweep
+config_file=experiments/cuda_naive_block_sweep.conf
+M=10000
+N=10000
+reps=20
+warmup=5
+seed=default
+check=0
+a_mode=local
+x_mode=local
+kernel=cuda_naive
+kernels=cuda_naive cuda_warp cuda_warp_smem
+k_sweep=3 6 8 20 32
+block_sweep_k=3 6 8 20 32
+compare_k=3 6 8 20 32
+block=256
+blocks=64 128 192 256 384 512 1024
+prec=double
+smem_pad=1
+smem_pads=0 1
+force_generic_k=0
+test_a_padding=0
+nvcc_arch=sm_75
+all_grids=no
+btl=self,sm
+bind_to=core
+map_by=core
+report_bindings=0
+grids:
+  np=1 pr=1 pc=1
+
+git_commit=89908e482eb09e81fe0029250ab9b93b225e029a
+git_status:
+ M script/run_cuda_experiments.sh
+?? results/
+
+nvcc:
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2025 NVIDIA Corporation
+Built on Wed_Jan_15_19:20:09_PST_2025
+Cuda compilation tools, release 12.8, V12.8.61
+Build cuda_12.8.r12.8/compiler.35404655_0
+
+mpirun:
+mpirun (Open MPI) 5.0.9
+
+
+gpu:
