@@ -839,12 +839,11 @@ finalize_output_dir() {
         EXPERIMENT_NAME="$EXPERIMENT"
     fi
 
-    # Sanitizza solo i caratteri pericolosi nei path.
     EXPERIMENT_NAME="${EXPERIMENT_NAME// /_}"
     EXPERIMENT_NAME="${EXPERIMENT_NAME//\//_}"
 
     if [[ "$OUTDIR_EXPLICIT" -eq 0 ]]; then
-        OUTDIR="results/${EXPERIMENT_NAME}/${TIMESTAMP}"
+        OUTDIR="results/${EXPERIMENT_NAME}"
     fi
 
     mkdir -p "$OUTDIR"
@@ -1034,10 +1033,8 @@ run_csv_row() {
             "$np" "$pr" "$pc" "$rc"
     fi
 }
-
 write_metadata() {
-    local file="$OUTDIR/metadata.txt"
-
+    local file="$OUTDIR/${EXPERIMENT_NAME}_metadata.txt"
     {
         printf "command="
         printf "%q " "$0" "${ORIGINAL_ARGS[@]}"
