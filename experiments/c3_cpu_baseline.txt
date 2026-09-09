@@ -1,0 +1,8 @@
+# C3 - baseline di CPU e microbenchmark specializzazione vs fallback generico.
+#
+#   ./script/run_cuda_experiments.sh --suite experiments/c3_cpu_baseline.txt
+#
+# Le due run differiscono per UNA sola variabile di build (FORCE_GENERIC_K) e
+# producono due binari distinti che coesistono: e' un A/B, non un aneddoto.
+c3_cpu_baseline/specialized.conf
+c3_cpu_baseline/generic.conf

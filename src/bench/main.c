@@ -291,9 +291,11 @@ static double coeff_var_pct(double mean, double stddev)
     return mean > 0.0 ? 100.0 * stddev / mean : -1.0;
 }
 
-static int validation_passed(double rel_err)
+/* n e' la lunghezza della riduzione, cioe' il numero GLOBALE di colonne di A:
+ * la soglia dipende da quanti termini sono stati sommati (vedi scalar.h). */
+static int validation_passed(double rel_err, int n)
 {
-    return isfinite(rel_err) && rel_err >= 0.0 && rel_err <= SCALAR_CHECK_TOL;
+    return isfinite(rel_err) && rel_err >= 0.0 && rel_err <= scalar_check_tol(n);
 }
 
 static void append_raw_csv(const char *path,
@@ -694,8 +696,9 @@ int main(int argc, char **argv)
             printf("                          (2*M*N*k = %.3f GFLOP; official T = official mean)\n",
                    2.0 * (double)options.M * (double)options.N * (double)options.k / 1e9);
             if (options.check)
-                printf("  validation              relative L2 error %.3e   [%s]\n",
-                       rel_err, validation_passed(rel_err) ? "PASS" : "FAIL");
+                printf("  validation              relative L2 error %.3e   tol %.3e   [%s]\n",
+                       rel_err, scalar_check_tol(options.N),
+                       validation_passed(rel_err, options.N) ? "PASS" : "FAIL");
         }
         fflush(stdout);
     }
@@ -722,5 +725,6 @@ int main(int argc, char **argv)
     MPI_Finalize();
 
     /* esito non nullo se la validazione fallisce: utile negli script */
-    return (options.check && !validation_passed(rel_err)) ? EXIT_FAILURE : EXIT_SUCCESS;
+    return (options.check && !validation_passed(rel_err, options.N))
+             ? EXIT_FAILURE : EXIT_SUCCESS;
 }

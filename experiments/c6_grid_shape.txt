@@ -1,0 +1,10 @@
+# C6 - forma della griglia a P fisso: TUTTE le fattorizzazioni di P.
+#
+#   ./script/run_cuda_experiments.sh --suite experiments/c6_grid_shape.txt
+#
+# E' la campagna che giustifica la scelta di una griglia 2D invece di una 1D,
+# cioe' il requisito centrale della traccia. Senza questi numeri, "abbiamo
+# distribuito A su una griglia bidimensionale" resta un'affermazione.
+c6_grid_shape/P8.conf
+c6_grid_shape/P16.conf
+c6_grid_shape/P20.conf

@@ -69,9 +69,15 @@ local_gemm_t *local_gemm_create(int m, int n, int k, const scalar_t *A_loc, int 
  * restano nella firma dell'invocazione per rendere esplicito il layout dei
  * buffer, ma il backend verifica che non siano cambiati.
  * X e Y non devono sovrapporsi fra loro ne' con A (sono dichiarati restrict).
- * Le leading dimension di X e Y restano parametri e non coincidono
- * necessariamente con k: e' il gancio per il padding anti-conflict-miss
- * senza toccare ne' il kernel ne' il codice chiamante. */
+ *
+ * Ogni backend deve onorare ldx e ldy anche quando sono maggiori di k, e i
+ * test li esercitano padded: e' l'interfaccia del KERNEL, e come tale resta
+ * generale. Il DRIVER distribuito, pero', li tiene entrambi uguali a k, e li
+ * impone: MPI_Bcast di X e MPI_Reduce di Y usano conteggi contigui, e
+ * descrivere uno stride richiederebbe di costruire un datatype derivato a
+ * ogni invocazione, dentro la regione cronometrata. L'unico padding che il
+ * percorso distribuito puo' avere - e che il progetto misura - e' quindi
+ * quello di A, cioe' lda, perche' A non attraversa nessuna collettiva. */
 void local_gemm(local_gemm_t *local_gemm_context, const scalar_t *RESTRICT X, int ldx, scalar_t *RESTRICT Y, int ldy);
 
 /* Rilascia le risorse del backend (per CUDA: la copia di A in VRAM).

@@ -1,0 +1,18 @@
+# C1 - dimensioni crescenti su 3 rapporti M:N   (gpu, kernel=cuda_warp)
+#
+#   ./script/run_cuda_experiments.sh --suite experiments/c1_size_ratio_gpu.txt
+#
+# Le taglie sono in ordine crescente: se il punto piu' grande non entra in
+# memoria, i punti gia' raccolti restano validi.
+c1_size_ratio/gpu_1x1_s1.conf
+c1_size_ratio/gpu_3x1_s1.conf
+c1_size_ratio/gpu_1x2_s1.conf
+c1_size_ratio/gpu_1x1_s2.conf
+c1_size_ratio/gpu_3x1_s2.conf
+c1_size_ratio/gpu_1x2_s2.conf
+c1_size_ratio/gpu_1x1_s3.conf
+c1_size_ratio/gpu_3x1_s3.conf
+c1_size_ratio/gpu_1x2_s3.conf
+c1_size_ratio/gpu_1x1_s4.conf
+c1_size_ratio/gpu_3x1_s4.conf
+c1_size_ratio/gpu_1x2_s4.conf

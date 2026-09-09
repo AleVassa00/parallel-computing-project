@@ -1,0 +1,13 @@
+# C2 - sweep completo su k, un backend per riga.
+#
+#   ./script/run_cuda_experiments.sh --suite experiments/c2_k_sweep.txt
+#
+# scheme_a per primo: e' il termine di paragone di tutti gli altri e non
+# richiede nvcc, quindi la campagna produce un risultato utile anche se la
+# build CUDA fallisce.
+c2_k_sweep/scheme_a.conf
+c2_k_sweep/cuda_naive.conf
+c2_k_sweep/cuda_warp.conf
+c2_k_sweep/cuda_warp_smem.conf
+c2_k_sweep/cuda_warp_tiled.conf
+c2_k_sweep/cublas.conf

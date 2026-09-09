@@ -70,9 +70,13 @@ static void check_case(int m, int n, int k, int padding,
         const double warp_error = (double)std::sqrt(warp_norm > 0 ? warp_diff / warp_norm : warp_diff);
         *max_serial_error = std::max(*max_serial_error, serial_error);
         *max_warp_error = std::max(*max_warp_error, warp_error);
-        if (serial_error > SCALAR_CHECK_TOL || warp_error > SCALAR_CHECK_TOL) {
-            std::fprintf(stderr, "m=%d n=%d k=%d padding=%d serial=%.3e cuda_warp=%.3e\n",
-                         m, n, k, padding, serial_error, warp_error);
+        /* n e' la lunghezza della riduzione: la soglia dipende da quanti
+         * termini sono stati sommati (vedi scalar.h). */
+        const double tol = scalar_check_tol(n);
+        if (serial_error > tol || warp_error > tol) {
+            std::fprintf(stderr,
+                         "m=%d n=%d k=%d padding=%d serial=%.3e cuda_warp=%.3e tol=%.3e\n",
+                         m, n, k, padding, serial_error, warp_error, tol);
             require(false, "relative L2 tolerance");
         }
     }
@@ -85,11 +89,18 @@ int main()
     const int ks[] = {3, 6, 8, 20, 32, 1, 7, 17, 40, 65, 257};
     const int shapes[][2] = {{1, 1}, {13, 19}, {17, 65}, {9, 173}, {0, 29}, {5, 0}};
     double max_serial_error = 0, max_warp_error = 0;
+    int max_n = 0;
     for (int k : ks)
         for (const auto &shape : shapes)
-            for (int padding : {0, 3})
+            for (int padding : {0, 3}) {
+                max_n = std::max(max_n, shape[1]);
                 check_case(shape[0], shape[1], k, padding, &max_serial_error, &max_warp_error);
+            }
     local_gemm_destroy(NULL);
-    std::printf("PASS %s %s: 264 invocations; max relative L2 serial=%.3e cuda_warp=%.3e (tol %.1e)\n",
-                kernel_name(), SCALAR_NAME, max_serial_error, max_warp_error, (double)SCALAR_CHECK_TOL);
+    /* La soglia riportata e' quella del caso piu' severo, cioe' la riduzione
+     * piu' lunga: e' l'unica che valga la pena stampare in una riga sola. */
+    std::printf("PASS %s %s: 264 invocations; max relative L2 serial=%.3e cuda_warp=%.3e"
+                " (tol %.1e at n=%d)\n",
+                kernel_name(), SCALAR_NAME, max_serial_error, max_warp_error,
+                scalar_check_tol(max_n), max_n);
 }

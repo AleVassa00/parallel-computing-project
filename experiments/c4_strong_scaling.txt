@@ -1,0 +1,12 @@
+# C4 - strong scaling: problema FISSO, P crescente.
+#
+#   ./script/run_cuda_experiments.sh --suite experiments/c4_strong_scaling.txt
+#
+# P cresce 1 -> 20 sulla forma piu' quadrata, che e' quella che il programma
+# sceglierebbe da solo. Quale forma sia davvero la migliore lo stabilisce C6.
+c4_strong_scaling/P1.conf
+c4_strong_scaling/P2.conf
+c4_strong_scaling/P4.conf
+c4_strong_scaling/P8.conf
+c4_strong_scaling/P16.conf
+c4_strong_scaling/P20.conf

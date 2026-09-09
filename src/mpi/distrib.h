@@ -27,9 +27,14 @@ typedef struct {
     int row0;    /* prima riga globale di A posseduta */
     int col0;    /* prima colonna globale di A posseduta */
 
-    int lda;     /* leading dimension di A_loc (row-major) */
-    int ldx;     /* leading dimension di X_loc: k contiguo */
-    int ldy;     /* leading dimension di Y_loc: k contiguo */
+    int lda;     /* leading dimension di A_loc (row-major). E' l'UNICA che puo'
+                  * essere padded: A non attraversa nessuna collettiva, quindi
+                  * il padding resta un fatto locale al kernel. */
+    int ldx;     /* leading dimension di X_loc. Vale SEMPRE k: MPI_Bcast la
+                  * tratta come un buffer contiguo di n_loc*k elementi. */
+    int ldy;     /* leading dimension di Y_loc. Vale SEMPRE k: MPI_Reduce e la
+                  * Gatherv della validazione la trattano come un buffer
+                  * contiguo di m_loc*k elementi. */
 } layout_t;
 
 void layout_init(layout_t *l, const grid_t *g, int M, int N, int k);
@@ -47,8 +52,8 @@ void distribute_global_A(const grid_t *g, const layout_t *l,
 /* Distribuisce X_global, presente soltanto sul grid rank 0 e compatta
  * row-major con leading dimension k, fra i processi della sola grid row 0.
  * Ogni process-grid column riceve le righe globali [col0, col0+n_loc) tramite
- * MPI_Scatterv su row_comm. Se X_loc ha ldx > k, il ricevente descrive lo
- * stride locale con un datatype derivato; il buffer sorgente resta contiguo.
+ * MPI_Scatterv su row_comm. Entrambi i lati sono contigui, perche' X_loc ha
+ * ldx == k come tutto il resto del percorso distribuito (vedi layout_t).
  * I processi fuori dalla grid row 0 non partecipano ad alcuna collettiva. */
 void distribute_global_X(const grid_t *g, const layout_t *l,
                          const scalar_t *X_global, scalar_t *X_loc);

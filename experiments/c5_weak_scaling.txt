@@ -1,0 +1,15 @@
+# C5 - weak scaling: lavoro per rank COSTANTE, P crescente.
+#
+#   ./script/run_cuda_experiments.sh --suite experiments/c5_weak_scaling.txt
+#
+# Ogni processo possiede sempre un blocco 5000 x 5000 (200 MB in double):
+# M = 5000*pr e N = 5000*pc. Il tempo ideale sarebbe COSTANTE al crescere di
+# P, quindi tutto cio' che si vede salire e' comunicazione pura - il che lo
+# rende un separatore fra calcolo e comunicazione piu' netto dello strong
+# scaling, dove i due effetti si sovrappongono.
+c5_weak_scaling/P1.conf
+c5_weak_scaling/P2.conf
+c5_weak_scaling/P4.conf
+c5_weak_scaling/P8.conf
+c5_weak_scaling/P16.conf
+c5_weak_scaling/P20.conf

@@ -14,6 +14,14 @@ double check_against_serial(const grid_t *g, const layout_t *l,
     scalar_t *Y_all = NULL;
     int *counts = NULL, *displs = NULL;
 
+    /* Stesso invariante di mpi_matmul: la Gatherv qui sotto, e i counts di
+     * layout_y_counts, descrivono Y come m_loc*k elementi contigui. Con
+     * ldy > k il gather leggerebbe dentro il padding e l'oracolo direbbe
+     * "sbagliato" su un risultato corretto - o, peggio, il contrario. */
+    if (l->ldy != l->k)
+        die("check_against_serial: Y deve essere contigua (ldy=%d, k=%d)",
+            l->ldy, l->k);
+
     /* Y vive sulla colonna 0 della griglia: solo quei processi partecipano
      * alla raccolta. Le collettive sui sotto-comunicatori vanno chiamate
      * condizionatamente, gli altri processi hanno un col diverso e non devono

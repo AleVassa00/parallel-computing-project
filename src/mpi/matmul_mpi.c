@@ -2,11 +2,31 @@
 
 #include <stddef.h>
 
+#include "common/util.h"
+
 void mpi_matmul(const grid_t *grid, const layout_t *layout, local_gemm_t *local_gemm_context,  scalar_t *X_loc, scalar_t *Y_loc_part, scalar_t *Y_row_col0, matmul_time_t *times_struct_rep)
 {
     const int x_count = layout->n_loc * layout->k; //numero elementi di x locali
     const int y_count = layout->m_loc * layout->k; //numero elemento di y locali
     double t0, t1, t2, t3;
+
+    /* Le due collettive qui sotto trattano X_loc e Y come buffer CONTIGUI di
+     * n_loc*k e m_loc*k elementi. E' vero soltanto se ldx == k e ldy == k.
+     *
+     * L'invariante viene IMPOSTO invece che sperato perche' violarlo non fa
+     * fallire niente: produce risultati sbagliati in silenzio, che e' il modo
+     * peggiore di sbagliare. E non si puo' rimediare costruendo qui un
+     * datatype derivato che descriva lo stride: sarebbe una MPI_Type_vector +
+     * commit + free per ogni invocazione, cioe' tre chiamate al runtime MPI
+     * DENTRO la regione cronometrata, che e' proprio cio' che la misura non
+     * deve contenere. Il padding che il progetto misura e' quello di A (lda,
+     * vedi TEST_A_PADDING), e A non passa da nessuna collettiva.
+     *
+     * Il controllo e' fuori dal cronometro e costa due confronti fra int. */
+    if (layout->ldx != layout->k || layout->ldy != layout->k)
+        die("mpi_matmul: X e Y devono essere contigue (ldx=%d, ldy=%d, k=%d): "
+            "MPI_Bcast e MPI_Reduce usano conteggi contigui",
+            layout->ldx, layout->ldy, layout->k);
 
     t0 = MPI_Wtime();
 

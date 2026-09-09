@@ -58,6 +58,12 @@ void layout_init(layout_t *layout, const grid_t *grid, int M, int N, int k)
      * TEST_A_PADDING=8 per collaudare il datatype ricevente con stride locale
      * senza esporre il padding come opzione pubblica. */
     layout->lda = layout->n_loc + TEST_A_PADDING;
+
+    /* ldx e ldy valgono k e NON sono un punto di estensione: mpi_matmul,
+     * distribute_global_X e check_against_serial trattano X e Y come buffer
+     * contigui, e lo impongono. Il padding dei buffer che attraversano una
+     * collettiva richiederebbe un datatype derivato per invocazione, dentro
+     * la misura. Vedi il commento in src/mpi/matmul_mpi.c. */
     layout->ldx = k;
     layout->ldy = k;
 }
@@ -177,19 +183,25 @@ void distribute_global_X(const grid_t *grid, const layout_t *layout,
                          const scalar_t *X_global, scalar_t *X_loc)
 {
     const int root = 0;
-    MPI_Datatype recv_type = SCALAR_MPI_TYPE;
     int *sendcounts = NULL, *displs = NULL;
     int recv_count, error_code;
-    int recv_type_is_derived = 0;
 
     /* Solo la riga 0 possiede inizialmente X: gli altri processi riceveranno
      * la stessa fetta dal normale broadcast lungo col_comm in mpi_matmul. */
     if (grid->my_row != 0)
         return;
 
-    if (layout->ldx < layout->k)
+    /* X_loc e' contigua per costruzione (layout_init fissa ldx == k) e DEVE
+     * restarlo: e' lo stesso invariante che mpi_matmul impone al broadcast.
+     * Descrivere qui uno stride locale con un datatype derivato sarebbe
+     * possibile - questa e' preprocessing, non e' cronometrata - ma sarebbe
+     * una generalita' solo apparente: il buffer cosi' distribuito verrebbe
+     * poi trasmesso da un MPI_Bcast che lo assume contiguo, e il risultato
+     * sarebbe sbagliato in silenzio. Meglio un invariante unico, imposto in
+     * tutti i punti che lo usano. */
+    if (layout->ldx != layout->k)
         mpi_abort_error(grid->grid_comm, MPI_ERR_ARG,
-                        "X_loc leading dimension is smaller than k");
+                        "X_loc leading dimension must be exactly k");
 
     /* MPI_Scatterv usa count e displacement di tipo int. Il controllo sul
      * prodotto globale implica che anche tutti i conteggi e displacement dei
@@ -229,44 +241,15 @@ void distribute_global_X(const grid_t *grid, const layout_t *layout,
         }
     }
 
-    /* X_global e' compatta (ld = k), quindi il lato sorgente usa scalar_t
-     * contigui. Solo un eventuale X_loc padded richiede un tipo vettoriale
-     * ricevente per saltare da una riga locale alla successiva. */
-    if (recv_count > 0 && layout->ldx != layout->k) {
-        error_code = MPI_Type_vector(layout->n_loc, layout->k, layout->ldx,
-                                     SCALAR_MPI_TYPE, &recv_type);
-        if (error_code != MPI_SUCCESS)
-            mpi_abort_error(grid->grid_comm, error_code,
-                            "MPI_Type_vector(local X block)");
-        error_code = MPI_Type_commit(&recv_type);
-        if (error_code != MPI_SUCCESS) {
-            MPI_Type_free(&recv_type);
-            mpi_abort_error(grid->grid_comm, error_code,
-                            "MPI_Type_commit(local X block)");
-        }
-        recv_count = 1;
-        recv_type_is_derived = 1;
-    }
-
+    /* Sia X_global sia X_loc sono compatte (ld = k): entrambi i lati della
+     * Scatterv sono scalar_t contigui e non serve nessun datatype derivato. */
     error_code = MPI_Scatterv(X_global, sendcounts, displs, SCALAR_MPI_TYPE,
-                              X_loc, recv_count, recv_type,
+                              X_loc, recv_count, SCALAR_MPI_TYPE,
                               root, grid->row_comm);
     if (error_code != MPI_SUCCESS) {
-        if (recv_type_is_derived)
-            MPI_Type_free(&recv_type);
         free(sendcounts);
         free(displs);
         mpi_abort_error(grid->grid_comm, error_code, "MPI_Scatterv(X blocks)");
-    }
-
-    if (recv_type_is_derived) {
-        error_code = MPI_Type_free(&recv_type);
-        if (error_code != MPI_SUCCESS) {
-            free(sendcounts);
-            free(displs);
-            mpi_abort_error(grid->grid_comm, error_code,
-                            "MPI_Type_free(local X block)");
-        }
     }
 
     free(sendcounts);
