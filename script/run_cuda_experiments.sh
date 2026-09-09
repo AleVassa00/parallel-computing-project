@@ -436,7 +436,17 @@ run_suite() {
     local suite_dir
     suite_dir="$(cd "$(dirname "$suite")" && pwd)"
 
-    while IFS= read -r raw || [[ -n "$raw" ]]; do
+    # La lista viene letta dal descrittore 3, non da stdin, e il figlio riceve
+    # stdin da /dev/null.
+    #
+    # Serve entrambe le cose. Il figlio arriva a mpirun, che per progetto
+    # INOLTRA stdin al rank 0 e quindi lo legge fino a EOF: con il ciclo
+    # attaccato a stdin, mpirun si mangiava il resto del file della suite. Al
+    # giro dopo `read` non trovava piu' niente e il ciclo terminava senza
+    # errore, quindi una suite da N configurazioni ne eseguiva UNA e
+    # annunciava "Esperimento completato". E' lo stesso inciampo di ssh dentro
+    # un while read, e non fa rumore: si vede solo contando i banner SUITE.
+    while IFS= read -r raw <&3 || [[ -n "$raw" ]]; do
         local line config_path
         line="$(trim "$raw")"
         [[ -z "$line" ]] && continue
@@ -453,8 +463,8 @@ run_suite() {
         echo "SUITE -> $config_path"
         echo "################################################################"
 
-        "$0" --config "$config_path"
-    done < "$suite"
+        "$0" --config "$config_path" < /dev/null
+    done 3< "$suite"
 }
 
 need_value() {
