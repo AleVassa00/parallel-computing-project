@@ -980,7 +980,11 @@ build_kernel() {
 
     validate_block "$block"
 
-    log "BUILD kernel=$kernel BLOCK=$block SMEM_PAD=$smem_pad PREC=$PREC"
+    if [[ "$kernel" == "cuda_warp_smem" ]]; then
+        log "BUILD kernel=$kernel BLOCK=$block SMEM_PAD=$smem_pad PREC=$PREC"
+    else
+        log "BUILD kernel=$kernel BLOCK=$block PREC=$PREC"
+    fi
 
     make \
         KERNEL="$kernel" \
