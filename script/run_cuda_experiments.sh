@@ -82,6 +82,8 @@ BLOCKS=(64 128 192 256 384 512 1024)
 PREC="double"
 SMEM_PAD=1
 SMEM_PADS=(0 1)
+WARP_COL_TILE=8
+WARP_COL_TILES=(4 8 16 32)
 FORCE_GENERIC_K=0
 TEST_A_PADDING=0
 NVCC_ARCH="sm_75"
@@ -142,6 +144,9 @@ TIPI DI ESPERIMENTO
       Confronta i valori di padding della shared memory.
       Default kernel: cuda_warp_smem.
 
+  --experiment warp-tile-sweep
+      Varia WARP_COL_TILE per cuda_warp_tiled sui k richiesti.
+
   --experiment ncu
       Esegue Nsight Compute.
 
@@ -180,7 +185,7 @@ FLAG MPI / GRIGLIA
           1x8, 2x4, 4x2, 8x1
 
       Questo flag puo' essere combinato con k-sweep, block-sweep,
-      compare, smem-pad-sweep e full.
+      compare, smem-pad-sweep, warp-tile-sweep e full.
 
   --btl VALUE                  OpenMPI BTL               [default self,sm]
   --bind-to VALUE              OpenMPI --bind-to         [default core]
@@ -200,6 +205,8 @@ FLAG CUDA / BUILD
   --prec double|float         Precisione                 [default double]
   --smem-pad N                Padding shared             [default 1]
   --smem-pads "0 1"           Lista padding per smem-pad-sweep
+  --warp-col-tile N           Colonne per warp (cuda_warp_tiled) [default 8]
+  --warp-col-tiles "4 8 16 32" Lista tile per warp-tile-sweep
   --force-generic-k 0|1       FORCE_GENERIC_K            [default 0]
   --test-a-padding N          TEST_A_PADDING             [default 0]
   --nvcc-arch ARCH            Architettura NVCC          [default sm_75]
@@ -350,6 +357,10 @@ apply_config_kv() {
         smem_pad|smem-pad) SMEM_PAD="$value" ;;
         smem_pads|smem-pads)
             read -r -a SMEM_PADS <<< "$value"
+            ;;
+        warp_col_tile|warp-col-tile) WARP_COL_TILE="$value" ;;
+        warp_col_tiles|warp-col-tiles)
+            read -r -a WARP_COL_TILES <<< "$value"
             ;;
         force_generic_k|force-generic-k) FORCE_GENERIC_K="$value" ;;
         test_a_padding|test-a-padding) TEST_A_PADDING="$value" ;;
@@ -625,6 +636,13 @@ while [[ $# -gt 0 ]]; do
             ;;
         --force-generic-k)
             need_value "$@"; FORCE_GENERIC_K="$2"; shift 2 ;;
+        --warp-col-tile)
+            need_value "$@"; WARP_COL_TILE="$2"; shift 2 ;;
+        --warp-col-tiles)
+            need_value "$@"
+            read -r -a WARP_COL_TILES <<< "$2"
+            shift 2
+            ;;
         --test-a-padding)
             need_value "$@"; TEST_A_PADDING="$2"; shift 2 ;;
         --nvcc-arch)
@@ -670,6 +688,10 @@ if [[ -n "$SINGLE_K" ]]; then
     COMPARE_KS=("$SINGLE_K")
 fi
 
+if [[ "$EXPERIMENT" == "warp-tile-sweep" && "$KERNEL_EXPLICIT" -eq 0 ]]; then
+    KERNEL="cuda_warp_tiled"
+fi
+
 # -------------------------
 # Validazione
 # -------------------------
@@ -691,6 +713,27 @@ validate_block() {
 }
 
 validate_common() {
+    if ! is_pos_int "$WARP_COL_TILE"; then
+        echo "Errore: WARP_COL_TILE deve essere un intero positivo." >&2
+        exit 1
+    fi
+    if [[ "$EXPERIMENT" == "warp-tile-sweep" ]]; then
+        if [[ "$KERNEL" != "cuda_warp_tiled" ]]; then
+            echo "Errore: warp-tile-sweep richiede kernel=cuda_warp_tiled." >&2
+            exit 1
+        fi
+        if [[ "${#WARP_COL_TILES[@]}" -eq 0 || "${#K_SWEEP_KS[@]}" -eq 0 ]]; then
+            echo "Errore: warp_col_tiles e ks non possono essere vuoti." >&2
+            exit 1
+        fi
+        local tile
+        for tile in "${WARP_COL_TILES[@]}"; do
+            if ! is_pos_int "$tile"; then
+                echo "Errore: WARP_COL_TILE non valido '$tile'." >&2
+                exit 1
+            fi
+        done
+    fi
     if ! is_pos_int "$M" || ! is_pos_int "$N"; then
         echo "Errore: M e N devono essere positivi." >&2
         exit 1
@@ -909,6 +952,9 @@ config_suffix() {
     if [[ "$block" != "256" ]]; then
         suffix="${suffix}-blk${block}"
     fi
+    if [[ "$kernel" == "cuda_warp_tiled" && "$WARP_COL_TILE" != "8" ]]; then
+        suffix="${suffix}-tile${WARP_COL_TILE}"
+    fi
 
     echo "$suffix"
 }
@@ -927,6 +973,10 @@ build_kernel() {
     local block="$2"
     local smem_pad="$3"
     local extra_nvcc="${4:-}"
+    local tile_args=()
+    if [[ "$kernel" == "cuda_warp_tiled" ]]; then
+        tile_args+=(WARP_COL_TILE="$WARP_COL_TILE")
+    fi
 
     validate_block "$block"
 
@@ -940,6 +990,7 @@ build_kernel() {
         FORCE_GENERIC_K="$FORCE_GENERIC_K" \
         TEST_A_PADDING="$TEST_A_PADDING" \
         NVCC_ARCH="$NVCC_ARCH" \
+        "${tile_args[@]}" \
         EXTRA_NVCCFLAGS="$extra_nvcc"
 }
 
@@ -972,6 +1023,10 @@ handle_failure() {
     local pr="$7"
     local pc="$8"
     local rc="$9"
+
+    if [[ "$kernel" == "cuda_warp_tiled" ]]; then
+        kernel="${kernel}(tile${WARP_COL_TILE})"
+    fi
 
     init_failure_file
     echo "$experiment,$kernel,$M,$N,$k,$block,$smem_pad,$np,$pr,$pc,$rc" \
@@ -1062,6 +1117,8 @@ write_metadata() {
         echo "prec=$PREC"
         echo "smem_pad=$SMEM_PAD"
         echo "smem_pads=${SMEM_PADS[*]}"
+        echo "warp_col_tile=$WARP_COL_TILE"
+        echo "warp_col_tiles=${WARP_COL_TILES[*]}"
         echo "force_generic_k=$FORCE_GENERIC_K"
         echo "test_a_padding=$TEST_A_PADDING"
         echo "nvcc_arch=$NVCC_ARCH"
@@ -1247,8 +1304,14 @@ experiment_registers() {
     log "PTXAS REGISTERS -> $OUTDIR"
 
     for kernel in "${kernels[@]}"; do
-        local txt="$(result_path "ptxas_${kernel}" "txt")"
-        local regs="$(result_path "ptxas_${kernel}_registers" "txt")"
+        local tile_args=()
+        local label="$kernel"
+        if [[ "$kernel" == "cuda_warp_tiled" ]]; then
+            tile_args+=(WARP_COL_TILE="$WARP_COL_TILE")
+            label="${kernel}_tile${WARP_COL_TILE}"
+        fi
+        local txt="$(result_path "ptxas_${label}" "txt")"
+        local regs="$(result_path "ptxas_${label}_registers" "txt")"
 
         echo "kernel=$kernel"
 
@@ -1262,6 +1325,7 @@ experiment_registers() {
             FORCE_GENERIC_K="$FORCE_GENERIC_K" \
             TEST_A_PADDING="$TEST_A_PADDING" \
             NVCC_ARCH="$NVCC_ARCH" \
+            "${tile_args[@]}" \
             EXTRA_NVCCFLAGS="-Xptxas -v" \
             2>&1 | tee "$txt"
         local rc=${PIPESTATUS[0]}
@@ -1279,7 +1343,7 @@ experiment_registers() {
             "$txt" > "$regs" || true
 
         {
-            echo "===== $kernel ====="
+            echo "===== $label ====="
             cat "$regs"
             echo
         } >> "$summary"
@@ -1330,6 +1394,41 @@ experiment_smem_pad_sweep() {
     done
 }
 
+experiment_warp_tile_sweep() {
+    local kernel="$KERNEL"
+    local block="$BLOCK"
+    local smem_pad="$SMEM_PAD"
+    local stem="warp_tile_sweep_${kernel}_block${block}"
+    local csv="$(benchmark_csv_path "$stem")"
+    local raw_csv="$(benchmark_raw_csv_path "$stem")"
+    local header_written=0
+    local bin g np pr pc k
+    # La variabile locale e' visibile anche agli helper Bash chiamati qui:
+    # build, nome binario e registrazione errori usano sempre lo stesso tile.
+    local WARP_COL_TILE
+
+    : > "$raw_csv"
+    log "WARP-TILE-SWEEP -> $csv"
+    echo "RAW repetitions -> $raw_csv"
+
+    for WARP_COL_TILE in "${WARP_COL_TILES[@]}"; do
+        build_kernel "$kernel" "$block" "$smem_pad"
+        bin="$(bin_for "$kernel" "$block" "$smem_pad")"
+        if [[ "$header_written" -eq 0 ]]; then
+            csv_header "$bin" "$csv"
+            header_written=1
+        fi
+        for g in "${GRIDS[@]}"; do
+            IFS=: read -r np pr pc <<< "$g"
+            for k in "${K_SWEEP_KS[@]}"; do
+                echo "kernel=$kernel k=$k BLOCK=$block WARP_COL_TILE=$WARP_COL_TILE grid=${pr}x${pc} P=$np"
+                run_csv_row "warp-tile-sweep" "$bin" "$kernel" "$k" "$block" "$smem_pad" \
+                    "$np" "$pr" "$pc" "$csv" "$raw_csv"
+            done
+        done
+    done
+}
+
 experiment_ncu() {
     if ! command -v ncu >/dev/null 2>&1; then
         echo "ncu non trovato: profiling saltato." >&2
@@ -1357,6 +1456,9 @@ experiment_ncu() {
         IFS=: read -r np pr pc <<< "$g"
 
         local base="$OUTDIR/${EXPERIMENT_NAME}_ncu_${kernel}_k${k}_block${block}_P${np}_${pr}x${pc}"
+        if [[ "$kernel" == "cuda_warp_tiled" ]]; then
+            base="${base}_tile${WARP_COL_TILE}"
+        fi
         local txt="${base}.txt"
 
         local args=(
@@ -1482,6 +1584,9 @@ case "$EXPERIMENT" in
     smem-pad-sweep)
         experiment_smem_pad_sweep
         ;;
+    warp-tile-sweep)
+        experiment_warp_tile_sweep
+        ;;
     ncu)
         experiment_ncu
         ;;
@@ -1498,4 +1603,3 @@ esac
 echo
 echo "Esperimento completato."
 echo "Risultati: $OUTDIR"
-
