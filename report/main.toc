@@ -99,7 +99,7 @@
 \contentsline {section}{\numberline {11.2}Che cosa dicono i dati finora}{40}{section.11.2}%
 \contentsline {section}{\numberline {11.3}Lavori futuri}{41}{section.11.3}%
 \contentsline {paragraph}{Blocking del ciclo su $j$ sul nucleo di CPU.}{41}{section*.47}%
-\contentsline {paragraph}{Parallelizzazione OpenMP interna al processo.}{41}{section*.48}%
+\contentsline {paragraph}{Campagna di misura dei backend OpenMP.}{41}{section*.48}%
 \contentsline {paragraph}{MPI CUDA-aware.}{41}{section*.49}%
 \contentsline {paragraph}{MPS per la condivisione della GPU.}{41}{section*.50}%
 \contentsline {paragraph}{Profilazione con \texttt {ncu}.}{41}{section*.51}%

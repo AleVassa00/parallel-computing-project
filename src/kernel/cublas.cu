@@ -323,6 +323,15 @@ int local_gemm_x_rows_per_tile(const local_gemm_t *local_gemm_context)
     return -1;
 }
 
+/* I thread di CPU non sono un concetto di questo backend: il parallelismo qui
+ * e' quello della GPU, gia' descritto dalle due funzioni sopra. Sentinella
+ * negativa, come per tutto cio' che il backend non ha. */
+int local_gemm_threads(const local_gemm_t *local_gemm_context)
+{
+    (void)local_gemm_context;
+    return -1;
+}
+
 const char *kernel_name(void)
 {
     return "cublas";

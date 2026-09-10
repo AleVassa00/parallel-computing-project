@@ -27,6 +27,9 @@ make KERNEL=cuda_warp check    # warp-per-row, template sui cinque k richiesti
 make KERNEL=cuda_warp_smem check          # tile di X in shared memory
 make KERNEL=cuda_warp_smem SMEM_PAD=0 check   # la stessa cosa senza padding
 make KERNEL=cublas check       # riferimento esterno (aggiunge -lcublas da solo)
+make KERNEL=omp_scheme_a check       # backend OpenMP (non richiede nvcc)
+make KERNEL=omp_scheme_a_tiled check # OpenMP con il tile di X in cache
+make check-omp      # i due backend OpenMP validati a 1, 2 e 4 thread
 ```
 
 Ogni configurazione ha un binario con nome proprio, cosi' una build non puo'
@@ -45,6 +48,9 @@ aggiunge un suffisso:
 | `make KERNEL=cuda_warp_smem` | `bin/matmul_mpi-cuda_warp_smem` |
 | `make KERNEL=cuda_warp_smem SMEM_PAD=0` | `bin/matmul_mpi-cuda_warp_smem-smempad0` |
 | `make KERNEL=cublas` | `bin/matmul_mpi-cublas` |
+| `make KERNEL=omp_scheme_a` | `bin/matmul_mpi-omp_scheme_a` |
+| `make KERNEL=omp_scheme_a_tiled` | `bin/matmul_mpi-omp_scheme_a_tiled` |
+| `make KERNEL=omp_scheme_a_tiled OMP_X_TILE_BYTES=65536` | `bin/matmul_mpi-omp_scheme_a_tiled-xtile65536` |
 
 La riga finale di `make` ricorda sempre quale binario e' stato prodotto e con
 quali variabili.
@@ -107,6 +113,161 @@ il backend CUDA `create` e' la `cudaMemcpy` H2D di A in VRAM, che avviene una
 volta sola: la consegna esclude dalla misura il tempo di trasferimento da e
 verso la scheda, e con A dell'ordine dei GB una copia per invocazione
 misurerebbe il PCIe, non la GPU.
+
+## Backend OpenMP
+
+La traccia chiede una parallelizzazione interna al singolo processo «in OpenMP
+o CUDA». Il progetto le implementa entrambe, dietro la stessa interfaccia
+`local_gemm`: il codice MPI non sa quale delle due sta girando, e nella
+campagna di misura un backend OpenMP e' un binario come gli altri.
+
+Il Makefile riconosce un backend OpenMP dal sorgente, esattamente come
+riconosce un `.cu`: se il file include `<omp.h>` viene compilato e linkato con
+`-fopenmp`. Non c'e' nessun flag `OPENMP=1` da ricordarsi, e questo non e'
+solo comodita': senza `-fopenmp` le direttive verrebbero ignorate in silenzio e
+si otterrebbe un binario che gira, che valida, e che misura **un** thread
+credendo di misurarne venti.
+
+```bash
+make KERNEL=omp_scheme_a check
+OMP_NUM_THREADS=20 mpirun -np 1 --bind-to none \
+  ./bin/matmul_mpi-omp_scheme_a -M 20000 -N 20000 -k 32 --reps 10
+```
+
+### `omp_scheme_a` - parallelizzare lo schema A
+
+Dei tre cicli del nucleo se ne parallelizza uno solo, e non e' una scelta fra
+alternative equivalenti:
+
+| ciclo | ampiezza | perche' no / si |
+|---|---|---|
+| `c` | 3..32 | sono gli accumulatori in registro: parallelizzarli smonta l'unica ottimizzazione del nucleo |
+| `j` | `n_loc` | le iterazioni aggiornano gli **stessi** k accumulatori: servirebbe una reduction vettoriale a ogni riga |
+| `i` | `m_loc` | iterazioni indipendenti: ogni thread legge A e X e scrive **solo** le proprie righe di Y |
+
+Si parallelizza `i`: e' l'unico ciclo che non richiede sincronizzazione. Non
+c'e' nessun `critical`, nessun `atomic`, nessuna `reduction`, e l'unica
+barriera e' quella implicita di fine regione.
+
+La regione parallela si apre **una volta per invocazione** e contiene tutto il
+lavoro. Al suo interno ogni thread calcola la propria fetta contigua di righe e
+chiama lo stesso nucleo del backend scalare: il dispatch sui cinque k
+specializzati avviene una volta per thread invece che una per riga, e il codice
+caldo resta identico a quello di `scheme_a`. La partizione e' statica e a
+blocchi contigui - il lavoro per riga e' esattamente lo stesso, quindi non c'e'
+niente da bilanciare a runtime - e cosi' ogni thread percorre uno stream lineare
+di A e le righe di Y che scrive sono disgiunte e contigue.
+
+Il nucleo vive in `src/kernel/scheme_a_core.h`, condiviso dai tre backend di
+CPU. E' quello che rende il confronto un esperimento controllato: fra
+`scheme_a`, `omp_scheme_a` e `omp_scheme_a_tiled` l'unica variabile che cambia
+e' la mappatura sui thread, non il ciclo caldo.
+
+### `omp_scheme_a_tiled` - il tile di X in cache
+
+Nello schema A ogni riga di A si legge una volta sola, ma per **ogni** riga di A
+il ciclo interno percorre tutta X: il traffico in lettura vale `m*n*k` elementi
+su X contro gli `m*n` di A. X non arriva in DRAM, ma la banda di L3 e'
+condivisa da tutti i core del socket ed e' lei a saturare, tanto piu' quanto
+piu' k e' grande. E' lo stesso fenomeno che sulla GPU separa `cuda_warp` da
+`cuda_warp_smem`, e la cura e' la stessa: percorrere X a tile e riusare ogni
+tile su molte righe di A. Cambia dove sta il tile - li' la shared memory, qui la
+L1 - non l'idea.
+
+Servono due livelli. `JB` righe di X per tile, perche' il tile stia in L1;
+`IB` righe di A e Y per blocco, perche' gli accumulatori che il ciclo su `j`
+spezzato costringe a riportare in Y restino caldi in L2. Il traffico verso i
+livelli lenti passa da
+
+```text
+A: m*n          X: m*n*k              Y: m*k          (omp_scheme_a)
+A: m*n          X: n*k*ceil(m/IB)     Y: m*k          (omp_scheme_a_tiled)
+```
+
+Ne' `IB` ne' `JB` sono costanti: il tile pesa `righe*k*sizeof(scalar_t)` e k si
+conosce solo a runtime, come `TJ` in `cuda_warp_smem`. Si fissa quindi il
+budget in byte e si ricavano le righe; il numero scelto finisce nel CSV come
+`x_rows_per_tile`, la stessa colonna che usa `cuda_warp_smem`.
+
+```bash
+make KERNEL=omp_scheme_a_tiled                          # 16 KiB / 256 KiB
+make KERNEL=omp_scheme_a_tiled OMP_X_TILE_BYTES=65536   # binario distinto
+```
+
+**Il tiling non conviene sempre, e i due backend restano due proprio per
+questo.** Spezzare il ciclo su `j` accorcia il ciclo interno e aggiunge il
+viavai degli accumulatori: quel costo si paga sempre, il guadagno arriva solo
+se X non stava gia' in cache. La discriminante e' una sola quantita',
+`n_loc*k*sizeof(scalar_t)`, confrontata con la cache disponibile. Su una
+macchina di sviluppo a 8 core, in doppia precisione:
+
+| blocco locale | X | `omp_scheme_a` | `omp_scheme_a_tiled` |
+|---|---|---|---|
+| m=2000, n=60000, k=32 | 15 MB | 26.2 GFLOPS | **75.3 GFLOPS** |
+| m=60000, n=2000, k=32 | 512 KB | **65.9 GFLOPS** | 55.1 GFLOPS |
+
+Sono numeri indicativi presi fuori dal server, e servono a mostrare che il
+segno del confronto cambia con la **forma** del blocco locale, non con la
+taglia del problema globale; i numeri della relazione sono quelli del server.
+Un'euristica automatica avrebbe bisogno della dimensione della cache, che il
+codice non conosce, e nasconderebbe nel binario proprio la variabile che la
+campagna deve misurare. Il caso degenere si gestisce comunque da solo: se il
+budget contiene tutta X (`n_loc <= JB`), il percorso in accumulo non viene mai
+eseguito e il backend torna a essere esattamente `omp_scheme_a`.
+
+### Thread, affinita' e regime ibrido
+
+Il numero di thread e' una variabile d'ambiente, non di compilazione: tutti i
+punti di una curva di scaling girano sullo **stesso** binario, quindi lo
+speedup non contiene la differenza fra due build. Il backend lo legge una volta
+in `local_gemm_create` e poi lo impone con `num_threads` a ogni invocazione,
+cosi' il valore riportato e' davvero quello che ha eseguito la misura. Finisce
+nel CSV nella colonna `threads`, che vale 1 sui backend di CPU seriali - dove
+non e' un sentinella ma il denominatore dello speedup - e -1 sui backend CUDA.
+
+L'errore da non commettere e' il binding. `--bind-to core` e' la scelta giusta
+per la campagna CUDA, dove ogni rank e' monothread, ed e' esattamente cio' che
+rovina una misura OpenMP: il rank resta confinato su **un** core e i suoi thread
+se lo contendono.
+
+```bash
+# 1 rank x 20 thread: nessun binding di processo
+OMP_NUM_THREADS=20 OMP_PROC_BIND=spread OMP_PLACES=cores \
+  mpirun -np 1 --bind-to none ./bin/matmul_mpi-omp_scheme_a \
+    -M 20000 -N 20000 -k 32 --reps 10 --csv
+
+# 4 rank x 5 thread: cinque core dedicati a ciascun rank
+OMP_NUM_THREADS=5 OMP_PROC_BIND=spread OMP_PLACES=cores \
+  mpirun -np 4 --map-by socket:PE=5 ./bin/matmul_mpi-omp_scheme_a \
+    -M 20000 -N 20000 -k 32 --pr 2 --pc 2 --reps 10 --csv
+```
+
+Il runner degli esperimenti inoltra da solo `OMP_NUM_THREADS`, `OMP_PROC_BIND`
+e `OMP_PLACES` ai rank (mpirun non propaga l'ambiente da solo) e avvisa se il
+binding e' incompatibile con un backend OpenMP:
+
+```bash
+./script/run_cuda_experiments.sh --suite experiments/c7_openmp.txt
+./script/run_cuda_experiments.sh --experiment omp-thread-sweep \
+    --kernel omp_scheme_a --omp-threads-list "1 2 4 8 16 20" --bind-to none
+```
+
+### Validazione
+
+`make check-omp` esegue l'intera suite di validazione con **numeri di thread
+diversi** (1, 2 e 4) su entrambi i backend, e in coda con tile da 64 byte. Il
+punto non e' rieseguire la stessa suite con un altro kernel: il risultato del
+prodotto non dipende da quanti thread lo calcolano, quindi una corsa fra thread
+si manifesta come FAIL solo con piu' di un thread, e i tile minimi sono il caso
+limite del percorso in accumulo, che con i budget di default sui k della traccia
+non verrebbe quasi mai attraversato.
+
+Nota NUMA: A viene generata dal thread master in preprocessing, quindi su un
+nodo a piu' socket le pagine sono tutte sul nodo di memoria del master (*first
+touch*). Con un rank MPI per socket il problema non si pone - la decomposizione
+MPI ha gia' dato a ogni processo la propria memoria - mentre con un solo rank e
+thread su piu' socket una parte degli accessi diventa remota. Va tenuto presente
+leggendo lo scaling oltre il numero di core di un socket.
 
 ## Backend CUDA
 

@@ -58,7 +58,7 @@ static const char *CSV_HEADER =
     "t_kernel_mean_s,t_kernel_median_s,t_kernel_min_s,t_kernel_std_s,t_kernel_cv_pct,"
     "t_transfer_runtime_overhead_mean_s,t_transfer_runtime_overhead_std_s,"
     "t_setup_s,gflops,gflops_compute,gflops_kernel,"
-    "blocks_per_sm,x_rows_per_tile,rel_err";
+    "blocks_per_sm,x_rows_per_tile,threads,rel_err";
 
 static const char *CSV_RAW_HEADER =
     "kernel,scalar,a_mode,x_mode,M,N,k,P,pr,pc,rep,"
@@ -401,7 +401,7 @@ int main(int argc, char **argv)
 
     double gflops, gflops_compute, rel_err = -1.0;
     double gflops_kernel = -1.0, setup_time;
-    int blocks_per_sm, x_rows_per_tile;
+    int blocks_per_sm, x_rows_per_tile, threads;
     int world_rank, world_size, rep;
 
     MPI_Init(&argc, &argv);
@@ -571,9 +571,11 @@ int main(int argc, char **argv)
      * sopravvive al massimo perche' li' e' -1 su tutti. */
     blocks_per_sm = local_gemm_blocks_per_sm(local_gemm_context);
     x_rows_per_tile = local_gemm_x_rows_per_tile(local_gemm_context);
+    threads = local_gemm_threads(local_gemm_context);
 
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &blocks_per_sm, &blocks_per_sm, 1, MPI_INT, MPI_MAX, 0, grid.grid_comm);
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &x_rows_per_tile, &x_rows_per_tile, 1, MPI_INT, MPI_MAX, 0, grid.grid_comm);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &threads, &threads, 1, MPI_INT, MPI_MAX, 0, grid.grid_comm);
 
     if (options.check)
         rel_err = check_against_serial(&grid, &layout, Y_row_col0, options.seed);
@@ -642,7 +644,7 @@ int main(int argc, char **argv)
                    "%.9e,%.9e,"
                    "%.9e,"
                    "%.6f,%.6f,%.6f,"
-                   "%d,%d,%.3e\n",
+                   "%d,%d,%d,%.3e\n",
                    kernel_name(), SCALAR_NAME, a_mode_name(options.a_mode),
                    x_mode_name(options.x_mode),
                    options.M, options.N, options.k,
@@ -659,7 +661,7 @@ int main(int argc, char **argv)
                    mean_non_kernel_local_time, std_non_kernel_local_time,
                    setup_time,
                    gflops, gflops_compute, gflops_kernel,
-                   blocks_per_sm, x_rows_per_tile, rel_err);
+                   blocks_per_sm, x_rows_per_tile, threads, rel_err);
         } else {
             double bytes_A = (double)options.M * options.N * sizeof(scalar_t);
             printf("matmul_mpi  M=%d N=%d k=%d  grid=%dx%d (P=%d)  %s  kernel=%s  A=%s X=%s\n",
@@ -709,6 +711,8 @@ int main(int argc, char **argv)
             if (x_rows_per_tile > 0 || blocks_per_sm > 0)
                 printf("  Piano del backend       %d righe di X per tile   %d blocchi per SM\n",
                        x_rows_per_tile, blocks_per_sm);
+            if (threads > 0)
+                printf("  Thread OpenMP per rank  %d\n", threads);
             printf("  GFLOPS MPI              %.3f\n", gflops);
             printf("  GFLOPS compute-only     %.3f\n", gflops_compute);
             if (gflops_kernel > 0.0)

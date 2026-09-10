@@ -1,0 +1,20 @@
+# C7 - campagna OpenMP: alternativa a CUDA per la parallelizzazione interna
+#      al processo.
+#
+#   ./script/run_cuda_experiments.sh --suite experiments/c7_openmp.txt
+#
+# L'ordine non e' casuale. Prima le due curve di scaling sui thread, che sono
+# il risultato principale e non dipendono da nessuna scelta di tiling; poi lo
+# sweep sul budget del tile, che ha senso leggere solo dopo aver visto se e
+# quanto il tiling serva; infine il regime ibrido, che e' il confronto a parita'
+# di core fra le tre ripartizioni possibili fra MPI e OpenMP.
+#
+# Il denominatore di tutti gli speedup e' la baseline seriale gia' misurata da
+# experiments/c3_cpu_baseline.txt: va eseguita prima, oppure riusata.
+c7_openmp/thread_scaling.conf
+c7_openmp/thread_scaling_tiled.conf
+c7_openmp/xtile_4096.conf
+c7_openmp/xtile_16384.conf
+c7_openmp/xtile_65536.conf
+c7_openmp/xtile_262144.conf
+c7_openmp/hybrid_2x2.conf

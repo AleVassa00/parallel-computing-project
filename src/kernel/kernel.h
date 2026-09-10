@@ -145,6 +145,19 @@ int local_gemm_blocks_per_sm(const local_gemm_t *local_gemm_context);
 /* Righe di X messe in un tile di shared memory. */
 int local_gemm_x_rows_per_tile(const local_gemm_t *local_gemm_context);
 
+/* Thread di CPU usati dal backend nell'ultima invocazione.
+ *
+ * E' l'analogo su CPU delle due colonne qui sopra: dice COME il lavoro e' stato
+ * mappato sull'hardware, e senza di esso una curva di scaling su OpenMP non e'
+ * spiegabile - non si saprebbe se il tempo e' cambiato perche' e' cambiato il
+ * team o perche' e' cambiato il problema.
+ *
+ * Vale 1 sui backend di CPU seriali, dove non e' un sentinella ma la misura
+ * esatta e il denominatore dello speedup, e -1 sui backend che non hanno il
+ * concetto di thread di CPU (CUDA), con la stessa convenzione di sentinella
+ * negativa delle altre funzioni di questa sezione. */
+int local_gemm_threads(const local_gemm_t *local_gemm_context);
+
 /* Nome del backend attivo, per l'intestazione delle misure. */
 const char *kernel_name(void);
 

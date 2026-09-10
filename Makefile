@@ -15,6 +15,15 @@
 #                                                     derivato dall'occupancy
 #   make BLOCK=<n>  thread per blocco dei backend CUDA (default 256)
 #   make KERNEL=cublas     riferimento esterno (aggiunge -lcublas da solo)
+#   make KERNEL=omp_scheme_a        schema A parallelizzato con OpenMP
+#   make KERNEL=omp_scheme_a_tiled  come sopra, con il tiling di X in cache
+#   make KERNEL=omp_scheme_a_tiled OMP_X_TILE_BYTES=<n>  budget del tile di X
+#   make KERNEL=omp_scheme_a_tiled OMP_Y_TILE_BYTES=<n>  budget del blocco di Y
+#   make check-omp  validazione dei due backend OpenMP a 1 e 4 thread
+#
+# Un backend che include <omp.h> viene riconosciuto da solo e compilato con
+# -fopenmp, esattamente come un .cu viene riconosciuto e compilato con nvcc:
+# non c'e' nessun flag OPENMP=1 da ricordarsi di passare.
 #
 # Il backend si sceglie con KERNEL e il Makefile capisce da solo se e' un file C
 # o un file CUDA:  src/kernel/$$(KERNEL).cu ha la precedenza su .c, viene
@@ -77,6 +86,26 @@ endif
 endif
 endif
 
+# Budget in byte dei due tile di cache di omp_scheme_a_tiled: quello di X, che
+# deve stare in L1 dati, e quello di Y, che deve restare caldo in L2 per tutta
+# la scansione di X. I default (16 KiB e 256 KiB) sono un'ipotesi sulla
+# gerarchia del server, non una verita': sono knob perche' vanno misurati, e
+# come SMEM_PAD entrano nel nome della configurazione, cosi' le build
+# coesistono come binari distinti con un kernel_name() diverso ciascuna.
+# Il NUMERO DI RIGHE per tile lo deriva il backend a runtime, perche' dipende
+# da k: righe = budget / (k * sizeof(scalar_t)).
+OMP_X_TILE_BYTES ?= 16384
+OMP_Y_TILE_BYTES ?= 262144
+
+ifeq ($(KERNEL),omp_scheme_a_tiled)
+ifeq ($(shell printf '%s\n' '$(OMP_X_TILE_BYTES)' | grep -E '^[1-9][0-9]*$$'),)
+$(error OMP_X_TILE_BYTES deve essere un intero positivo)
+endif
+ifeq ($(shell printf '%s\n' '$(OMP_Y_TILE_BYTES)' | grep -E '^[1-9][0-9]*$$'),)
+$(error OMP_Y_TILE_BYTES deve essere un intero positivo)
+endif
+endif
+
 ifeq ($(KERNEL),cuda_warp_tiled)
 WARP_COL_TILE   ?= 8
 ifeq ($(shell printf '%s\n' '$(WARP_COL_TILE)' | grep -E '^[1-9][0-9]*$$'),)
@@ -134,6 +163,17 @@ endif
 # Solo cuda_warp_smem legge questi due: entrano nel nome della configurazione
 # soltanto li', altrimenti si otterrebbero binari con nomi diversi e contenuto
 # identico, indistinguibili nel CSV perche' kernel_name() non cambierebbe.
+# Come sopra: solo omp_scheme_a_tiled legge questi due budget, quindi solo li'
+# entrano nel nome, altrimenti si otterrebbero binari con nomi diversi e
+# contenuto identico.
+ifeq ($(KERNEL),omp_scheme_a_tiled)
+ifneq ($(OMP_X_TILE_BYTES),16384)
+CONFIG := $(CONFIG)-xtile$(OMP_X_TILE_BYTES)
+endif
+ifneq ($(OMP_Y_TILE_BYTES),262144)
+CONFIG := $(CONFIG)-ytile$(OMP_Y_TILE_BYTES)
+endif
+endif
 ifeq ($(KERNEL),cuda_warp_smem)
 ifneq ($(TILE_GRANULARITY),32)
 CONFIG := $(CONFIG)-g$(TILE_GRANULARITY)
@@ -189,6 +229,42 @@ ifeq ($(suffix $(KERNEL_SRC)),.cu)
 KERNEL_IS_CUDA := 1
 else
 KERNEL_IS_CUDA := 0
+endif
+
+# Stessa idea del riconoscimento .cu/.c e di quello di cuBLAS: un backend che
+# include <omp.h> ha bisogno di -fopenmp per compilare le direttive e per
+# linkare il runtime, e il Makefile lo deduce dal sorgente invece di chiedere
+# un flag OPENMP=1 da ricordarsi. Senza -fopenmp le direttive sarebbero
+# silenziosamente ignorate: si otterrebbe un binario che gira, che valida, e
+# che misura un thread solo credendo di misurarne venti. E' esattamente il
+# genere di errore che non lascia tracce, quindi il flag non puo' essere
+# opzionale ne' dimenticabile.
+KERNEL_IS_OPENMP := $(if $(shell grep -l '<omp\.h>' $(KERNEL_SRC) 2>/dev/null),1,0)
+
+ifeq ($(KERNEL_IS_OPENMP),1)
+ifeq ($(shell $(MPICC) -fopenmp -E -x c /dev/null >/dev/null 2>&1 && echo yes),)
+$(error KERNEL='$(KERNEL)' e' un backend OpenMP, ma '$(MPICC)' non c'e' nel PATH oppure non accetta -fopenmp)
+endif
+# -fopenmp resta in CFLAGS e non in LDFLAGS: la regola di link passa CFLAGS al
+# compilatore, che e' il modo corretto di tirarsi dietro il runtime OpenMP.
+CFLAGS += -fopenmp
+CFLAGS += -DSCPA_OMP_X_TILE_BYTES=$(OMP_X_TILE_BYTES) \
+          -DSCPA_OMP_Y_TILE_BYTES=$(OMP_Y_TILE_BYTES)
+
+# Il numero di thread e l'affinita' sono variabili d'ambiente, e mpirun non
+# propaga automaticamente quelle che gli interessano: se sono definite qui,
+# vanno inoltrate esplicitamente ai rank, altrimenti la validazione girerebbe
+# sempre con il default del runtime e `make check-omp` non collauderebbe
+# niente di diverso a ogni giro.
+ifdef OMP_NUM_THREADS
+MPIFLAGS += -x OMP_NUM_THREADS
+endif
+ifdef OMP_PROC_BIND
+MPIFLAGS += -x OMP_PROC_BIND
+endif
+ifdef OMP_PLACES
+MPIFLAGS += -x OMP_PLACES
+endif
 endif
 
 ifeq ($(KERNEL_IS_CUDA),1)
@@ -248,7 +324,7 @@ DEPS   := $(patsubst src/%.c,$(OBJDIR)/%.d,$(C_SRCS))
 BIN ?= bin/matmul_mpi$(CONFIG)
 TESTBIN := bin/test_index
 
-.PHONY: all test check check-mpi check-cxx check-padding padding-run clean
+.PHONY: all test check check-mpi check-cxx check-omp check-padding padding-run clean
 
 all: $(BIN) $(TESTBIN)
 	@echo "built $(BIN)  [PREC=$(PREC) KERNEL=$(KERNEL) ($(KERNEL_SRC)) FORCE_GENERIC_K=$(FORCE_GENERIC_K) TEST_A_PADDING=$(TEST_A_PADDING) SMEM_PAD=$(SMEM_PAD) BLOCK=$(BLOCK) TILE_GRANULARITY=$(TILE_GRANULARITY) SMEM_BUDGET_BYTES=$(if $(SMEM_BUDGET_BYTES),$(SMEM_BUDGET_BYTES),derivato)]"
@@ -339,6 +415,7 @@ check-cxx:
 		for sym in local_gemm_create local_gemm local_gemm_destroy \
 		           local_gemm_last_compute_seconds local_gemm_setup_seconds \
 		           local_gemm_blocks_per_sm local_gemm_x_rows_per_tile \
+		           local_gemm_threads \
 		           kernel_name xmalloc die; do \
 			nm -u $(OBJDIR)/cxx_iface.o | grep -qw $$sym || { \
 				echo "check-cxx: FAIL: '$$sym' e' decorato (manca extern \"C\" in un header)"; \
@@ -346,6 +423,32 @@ check-cxx:
 		done; \
 	fi
 	@echo "check-cxx: kernel.h e util.h sono compilabili da C++ con linkage C (pronti per nvcc)"
+
+# Validazione dei backend OpenMP.
+#
+# Il punto non e' rieseguire la stessa suite con un altro kernel: e' eseguirla
+# con NUMERI DI THREAD DIVERSI. Il risultato del prodotto non dipende da quanti
+# thread lo calcolano, quindi una corsa fra thread - una riga di Y scritta da
+# due team, un intervallo che si sovrappone al vicino - si manifesta come un
+# FAIL solo quando i thread sono piu' di uno, e non si manifesta affatto se si
+# collauda alla cieca con il default del runtime.
+#
+# L'ultimo giro forza tile di 64 byte, cioe' pochissime righe per tile: e' il
+# caso limite del percorso in accumulo, dove il ciclo su j viene spezzato
+# centinaia di volte per riga e ogni confine di tile puo' sbagliare. Con i
+# budget di default, sui k della traccia, quel percorso non verrebbe quasi mai
+# attraversato.
+check-omp:
+	@for t in 1 2 4; do \
+		for kern in omp_scheme_a omp_scheme_a_tiled; do \
+			echo "== check-omp: KERNEL=$$kern OMP_NUM_THREADS=$$t"; \
+			OMP_NUM_THREADS=$$t $(MAKE) --no-print-directory KERNEL=$$kern check-mpi || exit 1; \
+		done; \
+	done
+	@echo "== check-omp: tile minimi (percorso in accumulo sotto stress)"
+	OMP_NUM_THREADS=4 $(MAKE) --no-print-directory KERNEL=omp_scheme_a_tiled \
+		OMP_X_TILE_BYTES=64 OMP_Y_TILE_BYTES=64 check-mpi
+	@echo "check-omp: i due backend OpenMP validano a 1, 2 e 4 thread"
 
 # Build isolata che forza lda=n_loc+8; non modifica la build normale.
 check-padding:

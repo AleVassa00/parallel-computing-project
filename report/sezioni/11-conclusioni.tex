@@ -62,14 +62,25 @@ diretta dell'analisi di \cref{sec:c3}: percorrere $X$ a fette che stiano nella
 cache privata, riusando ogni fetta su tutte le righe di $A$ prima di passare alla
 successiva. Non cambia lo schema, cambia solo l'ordine di visita, ed \`e lo stesso
 principio che \kernelname{cuda\_warp\_smem} applica sulla GPU con la shared
-memory. Se l'ipotesi sulla soglia di cache regge, \`e l'intervento con il
-rapporto guadagno/costo migliore dell'intero progetto per $k \ge 20$.
+memory. \`E implementato in \kernelname{omp\_scheme\_a\_tiled}, con il budget del
+tile esposto come parametro di build perch\'e la soglia di cache \`e un'ipotesi da
+misurare e non un dato del codice; misure preliminari fuori dal server
+confermano che il segno del guadagno dipende da $n_{loc}\,k\,\mathrm{sizeof}$
+confrontato con la cache disponibile, cio\`e che il tiling paga quando la fetta
+locale di $X$ non ci sta e costa quando ci sta gi\`a.
 
-\paragraph{Parallelizzazione OpenMP interna al processo.} La traccia ammette
-OpenMP \emph{oppure} CUDA e il progetto ha scelto CUDA. Un backend OpenMP dietro
-la stessa interfaccia \code{local\_gemm} permetterebbe di usare i circa venti
-core del nodo anche quando la GPU \`e occupata, e di misurare il regime ibrido
-MPI+OpenMP con lo stesso cronometro degli altri.
+\paragraph{Campagna di misura dei backend OpenMP.} La traccia ammette OpenMP
+\emph{oppure} CUDA e il progetto implementa entrambe le alternative dietro la
+stessa interfaccia \code{local\_gemm}: \kernelname{omp\_scheme\_a} parallelizza
+il ciclo sulle righe di $Y$, che \`e l'unico dei tre cicli del nucleo a non
+richiedere sincronizzazione, e \kernelname{omp\_scheme\_a\_tiled} vi aggiunge il
+tiling di $X$ in cache descritto nel paragrafo precedente. Il codice \`e
+validato (\code{make check-omp} ripete l'intera suite a 1, 2 e 4 thread, perch\'e
+una corsa fra thread non si manifesta con un thread solo) e la campagna \`e
+predisposta in \code{experiments/c7\_openmp.txt}; quel che resta \`e eseguirla sul
+server e riportarne i numeri. Le tre righe da confrontare a parit\`a di core
+occupati sono $20\times1$, $4\times5$ e $1\times20$ fra rank e thread: differiscono
+solo per dove passa il confine fra i due livelli di parallelismo.
 
 \paragraph{MPI CUDA-aware.} L'interfaccia \code{local\_gemm} \`e stata progettata
 agnostica rispetto alla posizione della memoria proprio per consentirlo:

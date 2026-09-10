@@ -82,6 +82,19 @@ BLOCKS=(64 128 192 256 384 512 1024)
 PREC="double"
 SMEM_PAD=1
 SMEM_PADS=(0 1)
+
+# OpenMP. OMP_THREADS vuoto = si lascia decidere al runtime (di norma un thread
+# per core del nodo). Ha effetto solo sui backend OpenMP, ma viene comunque
+# registrato nei metadata: una campagna CPU senza il numero di thread accanto
+# ai tempi non e' rileggibile.
+OMP_THREADS=""
+OMP_THREADS_LIST=(1 2 4 8 16 20)
+# spread/cores e' l'affinita' giusta per il regime ibrido: i thread di un rank
+# si distribuiscono sui core invece di accalcarsi sui primi, e non migrano.
+OMP_PROC_BIND="spread"
+OMP_PLACES="cores"
+OMP_X_TILE_BYTES=16384
+OMP_Y_TILE_BYTES=262144
 WARP_COL_TILE=8
 WARP_COL_TILES=(4 8 16 32)
 FORCE_GENERIC_K=0
@@ -147,6 +160,12 @@ TIPI DI ESPERIMENTO
   --experiment warp-tile-sweep
       Varia WARP_COL_TILE per cuda_warp_tiled sui k richiesti.
 
+  --experiment omp-thread-sweep
+      Varia OMP_NUM_THREADS sui k richiesti, a parita' di binario.
+      Richiede un kernel OpenMP (omp_scheme_a, omp_scheme_a_tiled).
+      E' la curva di scaling interna al processo: da leggere insieme a
+      --omp-threads-list e alla colonna threads del CSV.
+
   --experiment ncu
       Esegue Nsight Compute.
 
@@ -208,6 +227,17 @@ FLAG CUDA / BUILD
   --warp-col-tile N           Colonne per warp (cuda_warp_tiled) [default 8]
   --warp-col-tiles "4 8 16 32" Lista tile per warp-tile-sweep
   --force-generic-k 0|1       FORCE_GENERIC_K            [default 0]
+
+FLAG OPENMP
+  --omp-threads N             OMP_NUM_THREADS            [default: runtime]
+  --omp-threads-list "..."    Lista per omp-thread-sweep [default 1 2 4 8 16 20]
+  --omp-proc-bind VALUE       OMP_PROC_BIND              [default spread]
+  --omp-places VALUE          OMP_PLACES                 [default cores]
+  --omp-x-tile-bytes N        Budget tile di X in L1     [default 16384]
+  --omp-y-tile-bytes N        Budget blocco di Y in L2   [default 262144]
+  Nota: con un backend OpenMP, --bind-to core confina il rank su un core solo
+  e i suoi thread se lo contendono. Usare --bind-to none oppure
+  --map-by socket:PE=<thread>.
   --test-a-padding N          TEST_A_PADDING             [default 0]
   --nvcc-arch ARCH            Architettura NVCC          [default sm_75]
 
@@ -362,6 +392,14 @@ apply_config_kv() {
         warp_col_tiles|warp-col-tiles)
             read -r -a WARP_COL_TILES <<< "$value"
             ;;
+        omp_threads|omp-threads) OMP_THREADS="$value" ;;
+        omp_threads_list|omp-threads-list)
+            read -r -a OMP_THREADS_LIST <<< "$value"
+            ;;
+        omp_proc_bind|omp-proc-bind) OMP_PROC_BIND="$value" ;;
+        omp_places|omp-places) OMP_PLACES="$value" ;;
+        omp_x_tile_bytes|omp-x-tile-bytes) OMP_X_TILE_BYTES="$value" ;;
+        omp_y_tile_bytes|omp-y-tile-bytes) OMP_Y_TILE_BYTES="$value" ;;
         force_generic_k|force-generic-k) FORCE_GENERIC_K="$value" ;;
         test_a_padding|test-a-padding) TEST_A_PADDING="$value" ;;
         nvcc_arch|nvcc-arch) NVCC_ARCH="$value" ;;
@@ -644,6 +682,21 @@ while [[ $# -gt 0 ]]; do
             read -r -a SMEM_PADS <<< "$2"
             shift 2
             ;;
+        --omp-threads)
+            need_value "$@"; OMP_THREADS="$2"; shift 2 ;;
+        --omp-threads-list)
+            need_value "$@"
+            read -r -a OMP_THREADS_LIST <<< "$2"
+            shift 2
+            ;;
+        --omp-proc-bind)
+            need_value "$@"; OMP_PROC_BIND="$2"; shift 2 ;;
+        --omp-places)
+            need_value "$@"; OMP_PLACES="$2"; shift 2 ;;
+        --omp-x-tile-bytes)
+            need_value "$@"; OMP_X_TILE_BYTES="$2"; shift 2 ;;
+        --omp-y-tile-bytes)
+            need_value "$@"; OMP_Y_TILE_BYTES="$2"; shift 2 ;;
         --force-generic-k)
             need_value "$@"; FORCE_GENERIC_K="$2"; shift 2 ;;
         --warp-col-tile)
@@ -743,6 +796,21 @@ validate_common() {
                 exit 1
             fi
         done
+    fi
+    if [[ "$EXPERIMENT" == "omp-thread-sweep" ]]; then
+        if ! kernel_is_openmp "$KERNEL"; then
+            echo "Errore: omp-thread-sweep richiede un kernel OpenMP" \
+                 "(omp_scheme_a, omp_scheme_a_tiled); ricevuto '$KERNEL'." >&2
+            exit 1
+        fi
+        if [[ "${#OMP_THREADS_LIST[@]}" -eq 0 || "${#K_SWEEP_KS[@]}" -eq 0 ]]; then
+            echo "Errore: omp_threads_list e ks non possono essere vuoti." >&2
+            exit 1
+        fi
+    fi
+    if ! is_pos_int "$OMP_X_TILE_BYTES" || ! is_pos_int "$OMP_Y_TILE_BYTES"; then
+        echo "Errore: OMP_X_TILE_BYTES e OMP_Y_TILE_BYTES devono essere positivi." >&2
+        exit 1
     fi
     if ! is_pos_int "$M" || ! is_pos_int "$N"; then
         echo "Errore: M e N devono essere positivi." >&2
@@ -861,6 +929,48 @@ build_mpi_flags() {
     if [[ "$REPORT_BINDINGS" -eq 1 ]]; then
         MPI_FLAGS+=(--report-bindings)
     fi
+
+    # mpirun non propaga da solo le variabili che servono a OpenMP: senza
+    # questo inoltro i rank userebbero il default del runtime e ogni punto di
+    # uno sweep sui thread misurerebbe la stessa cosa.
+    if [[ -n "$OMP_THREADS" ]]; then
+        export OMP_NUM_THREADS="$OMP_THREADS"
+        MPI_FLAGS+=(-x OMP_NUM_THREADS)
+    fi
+    if [[ -n "$OMP_PROC_BIND" ]]; then
+        export OMP_PROC_BIND
+        MPI_FLAGS+=(-x OMP_PROC_BIND)
+    fi
+    if [[ -n "$OMP_PLACES" ]]; then
+        export OMP_PLACES
+        MPI_FLAGS+=(-x OMP_PLACES)
+    fi
+}
+
+warn_openmp_binding() {
+    kernel_is_openmp "$KERNEL" || return 0
+
+    # --bind-to core lega il RANK a un core solo: i thread OpenMP di quel rank
+    # finiscono tutti li' e si contendono un core, quindi lo sweep sui thread
+    # misurerebbe l'oversubscription invece dello scaling. E' il default della
+    # campagna CUDA - dove ogni rank e' monothread ed e' la scelta giusta - e
+    # quindi e' anche l'errore che si commette per inerzia passando alla CPU.
+    if [[ "$BIND_TO" == "core" ]]; then
+        echo
+        echo "ATTENZIONE OpenMP/MPI:"
+        echo "  kernel='$KERNEL' e' un backend OpenMP, ma --bind-to e' 'core':"
+        echo "  ogni rank resterebbe confinato su UN core e i suoi thread se lo"
+        echo "  contenderebbero. Per il regime ibrido usa una delle due:"
+        echo "    --bind-to none                    (affinita' lasciata a OMP_PROC_BIND)"
+        echo "    --map-by socket:PE=<thread>       (un rank per socket, core dedicati)"
+        echo
+    fi
+
+    if [[ -n "$OMP_THREADS" ]]; then
+        echo "OpenMP: OMP_NUM_THREADS=$OMP_THREADS OMP_PROC_BIND=$OMP_PROC_BIND OMP_PLACES=$OMP_PLACES"
+    else
+        echo "OpenMP: OMP_NUM_THREADS non impostato, decide il runtime (--omp-threads per fissarlo)."
+    fi
 }
 
 warn_multi_rank_gpu_contention() {
@@ -938,6 +1048,14 @@ log() {
     echo "================================================================"
 }
 
+# Un backend e' OpenMP se il suo sorgente include <omp.h>: e' lo stesso
+# criterio che usa il Makefile, e non una lista di nomi da tenere aggiornata.
+kernel_is_openmp() {
+    local kernel="$1"
+    [[ -f "src/kernel/${kernel}.c" ]] || return 1
+    grep -q '<omp\.h>' "src/kernel/${kernel}.c"
+}
+
 config_suffix() {
     local kernel="$1"
     local block="$2"
@@ -964,6 +1082,14 @@ config_suffix() {
     fi
     if [[ "$kernel" == "cuda_warp_tiled" && "$WARP_COL_TILE" != "8" ]]; then
         suffix="${suffix}-tile${WARP_COL_TILE}"
+    fi
+    if [[ "$kernel" == "omp_scheme_a_tiled" ]]; then
+        if [[ "$OMP_X_TILE_BYTES" != "16384" ]]; then
+            suffix="${suffix}-xtile${OMP_X_TILE_BYTES}"
+        fi
+        if [[ "$OMP_Y_TILE_BYTES" != "262144" ]]; then
+            suffix="${suffix}-ytile${OMP_Y_TILE_BYTES}"
+        fi
     fi
 
     echo "$suffix"
@@ -1004,6 +1130,8 @@ build_kernel() {
         FORCE_GENERIC_K="$FORCE_GENERIC_K" \
         TEST_A_PADDING="$TEST_A_PADDING" \
         NVCC_ARCH="$NVCC_ARCH" \
+        OMP_X_TILE_BYTES="$OMP_X_TILE_BYTES" \
+        OMP_Y_TILE_BYTES="$OMP_Y_TILE_BYTES" \
         "${tile_args[@]}" \
         EXTRA_NVCCFLAGS="$extra_nvcc"
 }
@@ -1135,6 +1263,12 @@ write_metadata() {
         echo "warp_col_tiles=${WARP_COL_TILES[*]}"
         echo "force_generic_k=$FORCE_GENERIC_K"
         echo "test_a_padding=$TEST_A_PADDING"
+        echo "omp_threads=${OMP_THREADS:-runtime}"
+        echo "omp_threads_list=${OMP_THREADS_LIST[*]}"
+        echo "omp_proc_bind=$OMP_PROC_BIND"
+        echo "omp_places=$OMP_PLACES"
+        echo "omp_x_tile_bytes=$OMP_X_TILE_BYTES"
+        echo "omp_y_tile_bytes=$OMP_Y_TILE_BYTES"
         echo "nvcc_arch=$NVCC_ARCH"
         echo "all_grids=${ALL_GRIDS_P:-no}"
         echo "btl=$BTL"
@@ -1443,6 +1577,52 @@ experiment_warp_tile_sweep() {
     done
 }
 
+experiment_omp_thread_sweep() {
+    local kernel="$KERNEL"
+    local block="$BLOCK"
+    local smem_pad="$SMEM_PAD"
+    local stem="omp_thread_sweep_${kernel}"
+    local csv="$(benchmark_csv_path "$stem")"
+    local raw_csv="$(benchmark_raw_csv_path "$stem")"
+    local header_written=0
+    local bin g np pr pc k t
+
+    : > "$raw_csv"
+    log "OMP-THREAD-SWEEP -> $csv"
+    echo "RAW repetitions -> $raw_csv"
+
+    # Il numero di thread e' una variabile d'AMBIENTE, non di compilazione: il
+    # binario si costruisce una volta sola e tutti i punti dello sweep girano
+    # sullo stesso identico eseguibile. E' cio' che rende la curva di scaling
+    # una misura del parallelismo e non della build.
+    build_kernel "$kernel" "$block" "$smem_pad"
+    bin="$(bin_for "$kernel" "$block" "$smem_pad")"
+
+    for t in "${OMP_THREADS_LIST[@]}"; do
+        if ! is_pos_int "$t"; then
+            echo "Errore: numero di thread non valido '$t'." >&2
+            exit 1
+        fi
+
+        OMP_THREADS="$t"
+        build_mpi_flags
+
+        if [[ "$header_written" -eq 0 ]]; then
+            csv_header "$bin" "$csv"
+            header_written=1
+        fi
+
+        for g in "${GRIDS[@]}"; do
+            IFS=: read -r np pr pc <<< "$g"
+            for k in "${K_SWEEP_KS[@]}"; do
+                echo "kernel=$kernel k=$k OMP_NUM_THREADS=$t grid=${pr}x${pc} P=$np"
+                run_csv_row "omp-thread-sweep" "$bin" "$kernel" "$k" "$block" "$smem_pad" \
+                    "$np" "$pr" "$pc" "$csv" "$raw_csv"
+            done
+        done
+    done
+}
+
 experiment_ncu() {
     if ! command -v ncu >/dev/null 2>&1; then
         echo "ncu non trovato: profiling saltato." >&2
@@ -1577,6 +1757,7 @@ generate_grids
 build_mpi_flags
 finalize_output_dir
 warn_multi_rank_gpu_contention
+warn_openmp_binding
 write_metadata
 
 case "$EXPERIMENT" in
@@ -1600,6 +1781,9 @@ case "$EXPERIMENT" in
         ;;
     warp-tile-sweep)
         experiment_warp_tile_sweep
+        ;;
+    omp-thread-sweep)
+        experiment_omp_thread_sweep
         ;;
     ncu)
         experiment_ncu

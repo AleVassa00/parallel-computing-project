@@ -36,8 +36,11 @@ extern "C" const char *scpa_cxx_iface_probe(void)
         die("timing accessors must never disagree like this");
 
     /* Anche il piano fa parte del contratto: se un giorno qualcuno togliesse
-     * questi due da extern "C", il backend CUDA compilerebbe e non linkerebbe. */
-    if (local_gemm_blocks_per_sm(ctx) == 0 || local_gemm_x_rows_per_tile(ctx) == 0)
+     * questi da extern "C", il backend CUDA compilerebbe e non linkerebbe.
+     * local_gemm_threads e' l'analogo su CPU e vale -1 su CUDA, ma il simbolo
+     * deve restare non decorato esattamente come gli altri. */
+    if (local_gemm_blocks_per_sm(ctx) == 0 || local_gemm_x_rows_per_tile(ctx) == 0 ||
+        local_gemm_threads(ctx) == 0)
         die("plan accessors must never return zero");
 
     local_gemm_destroy(ctx);
