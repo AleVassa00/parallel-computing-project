@@ -347,6 +347,20 @@ double local_gemm_setup_seconds(const local_gemm_t *local_gemm_context)
     return (local_gemm_context != NULL) ? local_gemm_context->t_setup : 0.0;
 }
 
+/* Questo backend non pianifica nessun tiling in shared memory: non ha il
+ * concetto, e il sentinella negativo lo dice invece di inventare un numero. */
+int local_gemm_blocks_per_sm(const local_gemm_t *local_gemm_context)
+{
+    (void)local_gemm_context;
+    return -1;
+}
+
+int local_gemm_x_rows_per_tile(const local_gemm_t *local_gemm_context)
+{
+    (void)local_gemm_context;
+    return -1;
+}
+
 /* Il nome porta la dimensione del blocco quando non e' quella di default: nel
  * CSV le righe di uno sweep su BLOCK devono restare distinguibili fra loro. */
 #define SCPA_STR_(x) #x

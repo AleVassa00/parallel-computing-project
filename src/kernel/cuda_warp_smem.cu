@@ -57,16 +57,26 @@
  * modo di misurare per sbaglio la build sbagliata.
  *
  * ---------------------------------------------------------------------------
- * Perche' x_rows_per_tile si sceglie a runtime
+ * Perche' x_rows_per_tile si sceglie a runtime, e su cosa agisce davvero
  * ---------------------------------------------------------------------------
- * Il tile in shared memory pesa x_rows_per_tile * (k + SMEM_PAD) * sizeof(scalar_t), e k e'
- * noto solo a runtime. x_rows_per_tile viene scelto dal budget di shared memory per
- * blocco (SMEM_BUDGET_BYTES) e la memoria e' allocata dinamicamente al lancio.
- * Il budget e' 16 KiB e non i 48 KiB massimi per un motivo di occupancy: la
- * Turing ha 64 KiB di shared per SM, quindi 16 KiB per blocco lasciano
- * risiedere 4 blocchi (1024 thread, 32 warp) per SM. Con 48 KiB ne resterebbe
- * uno solo, cioe' 8 warp: si guadagnerebbe traffico L2 e si perderebbe molto
- * piu' parallelismo di quanto si guadagna.
+ * Il tile in shared memory pesa x_rows_per_tile * (k + SMEM_PAD) * sizeof(scalar_t),
+ * e k e' noto solo a runtime: la memoria e' quindi allocata dinamicamente al
+ * lancio e le righe si scelgono in local_gemm_create.
+ *
+ * ATTENZIONE a cosa cambia e cosa no. Il traffico verso L2 NON dipende dalla
+ * dimensione del tile: dipende da quanti warp ci sono per blocco. Ogni blocco
+ * legge comunque tutta X una volta, che lo faccia in due tile grandi o in venti
+ * piccoli. Il fattore di riuso resta WARPS_PER_BLOCK e basta.
+ *
+ * Quello su cui il tile agisce davvero e' il NUMERO DI BARRIERE e l'ILP: ogni
+ * tile costa due __syncthreads(), e un tile che contiene un solo passo di warp
+ * (x_rows_per_tile == 32) fa sbattere ogni warp nella barriera successiva dopo
+ * una sola iterazione del ciclo j, senza nessuna iterazione con cui coprire la
+ * latenza delle letture da shared. Dimezzare il numero di tile dimezza le
+ * barriere; non tocca il traffico.
+ *
+ * Il budget di shared memory per blocco non va quindi scelto in assoluto, ma in
+ * modo che NON SIA LUI il vincolo attivo sull'occupancy: vedi plan_tile.
  *
  * ---------------------------------------------------------------------------
  * Perche' non ci sono return anticipati
@@ -147,11 +157,34 @@
 #error "SCPA_SMEM_PAD deve essere >= 0"
 #endif
 
-/* Budget di shared memory per blocco (vedi la nota sull'occupancy sopra) e
- * limite architetturale oltre il quale il lancio fallirebbe. */
-#define SMEM_BUDGET_BYTES 16384
+/* Limite architetturale della shared memory dinamica per blocco senza opt-in
+ * via cudaFuncSetAttribute: oltre questo il LANCIO fallisce. E' un tetto vero,
+ * espresso in byte, e resta la rete di sicurezza del piano di tiling.
+ *
+ * Non esiste piu' un massimo espresso in RIGHE: non era un vincolo fisico e,
+ * appena il budget cresce, sarebbe diventato silenziosamente il vincolo attivo
+ * ai k piccoli, rendendo inefficace qualunque sweep sul budget. Il minimo di un
+ * passo di warp invece resta, in plan_tile, perche' un significato ce l'ha. */
 #define SMEM_MAX_BYTES    49152
-#define X_ROWS_PER_TILE_MAX 512
+
+/* Granularita' di arrotondamento delle righe per tile.
+ *
+ * NON e' un requisito di correttezza: rows_in_tile gestisce gia' il tile
+ * parziale e il ciclo `for (j = lane; j < rows_in_tile; j += WARP_SIZE)` gestisce
+ * gia' un tile che non sia multiplo di 32. E' solo un'ottimizzazione - "nessuna
+ * lane inattiva nell'ultimo passo di warp" - e come tale ha un costo: a k=32 in
+ * double le righe che entrano nel budget sono 62, e arrotondare a 32 ne butta
+ * via la meta', raddoppiando le barriere per guadagnare zero lane.
+ *
+ * Costo e beneficio vanno quindi MISURATI, non assunti: da qui il parametro.
+ * Il default resta 32, cosi' il comportamento non cambia finche' non si chiede
+ * esplicitamente altro. Si imposta dal Makefile con TILE_GRANULARITY=<n>. */
+#ifndef SCPA_TILE_GRANULARITY
+#define SCPA_TILE_GRANULARITY 32
+#endif
+#if SCPA_TILE_GRANULARITY < 1
+#error "SCPA_TILE_GRANULARITY deve essere >= 1"
+#endif
 
 /* ---------------------------------------------------------------------------
  * Kernel specializzato: K e' una costante di compilazione
@@ -332,56 +365,153 @@ static __global__ void smem_kernel_runtime(int m_loc, int n_loc, int k, int x_ro
     }
 }
 
-/* Numero di righe di X per tile: il piu' grande multiplo di 32 che sta nel
- * budget di shared memory, mai piu' delle righe che X ha davvero. */
-static int choose_x_rows_per_tile(int tile_row_stride, int n_loc) {
+/* ---------------------------------------------------------------------------
+ * Pianificazione del tile
+ * ---------------------------------------------------------------------------
+ * Il piano dipende solo da k e da n_loc, che sono fissi per tutta l'esecuzione:
+ * si calcola UNA VOLTA in local_gemm_create e non ha nulla da fare nel cammino
+ * cronometrato. Vedi il commento in local_gemm_create sul perche' quella
+ * distinzione qui sia critica e non stilistica. */
+typedef struct {
+    int    x_rows_per_tile;
+    size_t smem_bytes;
+    int    blocks_per_sm;   /* esposto nel CSV: senza, le curve non si spiegano */
+} tile_plan_t;
 
-    const long long rows_that_fit = (long long)SMEM_BUDGET_BYTES / ((long long)tile_row_stride * (long long)sizeof(scalar_t));
+/* Serve solo al budget derivato: con SCPA_SMEM_BUDGET_BYTES definito la
+ * funzione non verrebbe chiamata da nessuno e -Wunused-function la segnalerebbe
+ * a ogni build dello sweep. */
+#ifndef SCPA_SMEM_BUDGET_BYTES
+static int shared_per_sm(void) {
+    static int cached = -1;
+    if (cached < 0) {
+        cudaDeviceProp prop;
+        CUDA_CHECK(cudaGetDeviceProperties(&prop, CUDA_DEVICE_ID));
+        cached = (int)prop.sharedMemPerMultiprocessor;
+    }
+    return cached;
+}
+#endif
 
-    int x_rows_per_tile = (int)(rows_that_fit - (rows_that_fit % WARP_SIZE)); // arrotondamento per difetto a 32 perché i warp percorrono un tile a passo 32, essendo 32 lane
+static int round_down_g(int v, int g) { return v - (v % g); }
+static int round_up_g(int v, int g)   { return ((v + g - 1) / g) * g; }
 
-    if (x_rows_per_tile < WARP_SIZE)
-        x_rows_per_tile = WARP_SIZE;          /* k grandissimo: almeno un passo di warp */
-    if (x_rows_per_tile > X_ROWS_PER_TILE_MAX)
-        x_rows_per_tile = X_ROWS_PER_TILE_MAX;
-    if (n_loc > 0 && n_loc < x_rows_per_tile)
-        x_rows_per_tile = ((n_loc + WARP_SIZE - 1) / WARP_SIZE) * WARP_SIZE;
-    return x_rows_per_tile;
+/* Sceglie le righe per tile in modo che la shared memory non sia il vincolo
+ * attivo sull'occupancy.
+ *
+ * Il problema dell'uovo e della gallina - l'API dell'occupancy vuole i byte di
+ * shared che stiamo calcolando - si rompe interrogandola con smem = 0: cosi' si
+ * ottiene quanti blocchi consentono REGISTRI e thread per SM da soli, cioe'
+ * l'obiettivo da non peggiorare. A k=32 acc[32] costa gia' 64 registri a 32 bit
+ * per thread, quindi il vincolo attivo sono quasi certamente quelli: un budget
+ * di shared scelto a mano piu' stretto starebbe rimpicciolendo il tile per
+ * proteggere un'occupancy gia' persa altrove. */
+static tile_plan_t plan_tile(const void *kernel, int tile_row_stride, int n_loc) {
+
+    const int g         = SCPA_TILE_GRANULARITY;
+    const int row_bytes = tile_row_stride * (int)sizeof(scalar_t);
+    int target, budget, rows, achieved = -1;
+    tile_plan_t plan;
+
+    /* 1. Blocchi che entrerebbero con shared memory gratis. */
+    CUDA_CHECK(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        &target, kernel, BLOCK_THREADS, 0));
+    if (target < 1)
+        target = 1;
+
+    /* 2. Fetta di shared memory che spetta a un blocco. */
+#ifdef SCPA_SMEM_BUDGET_BYTES
+    budget = SCPA_SMEM_BUDGET_BYTES;   /* forzato dal Makefile, per lo sweep */
+#else
+    budget = shared_per_sm() / target; /* derivato dall'obiettivo di occupancy */
+#endif
+    if (budget > SMEM_MAX_BYTES)
+        budget = SMEM_MAX_BYTES;       /* limite di lancio, non di occupancy */
+
+    /* 3. Righe che ci stanno. */
+    rows = round_down_g(budget / row_bytes, g);
+    if (rows < WARP_SIZE)
+        rows = WARP_SIZE;                 /* almeno un passo di warp completo */
+    if (n_loc > 0 && n_loc < rows)
+        rows = round_up_g(n_loc, g);      /* inutile allocare piu' righe di
+                                           * quante X ne abbia davvero */
+
+    /* 4. Verifica invece di fidarsi. Il driver riserva shared memory per blocco
+     *    OLTRE a quella richiesta, quindi il punto 2 puo' essere ottimista.
+     *    Quella riserva non va modellata con una costante inventata: la si
+     *    scopre interrogando l'API e scendendo di un passo finche' l'obiettivo
+     *    e' raggiunto. Il ciclo termina sempre, perche' rows non scende sotto
+     *    WARP_SIZE e li' si esce comunque. */
+    for (;;) {
+        plan.smem_bytes = (size_t)rows * (size_t)row_bytes;
+        CUDA_CHECK(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+            &achieved, kernel, BLOCK_THREADS, plan.smem_bytes));
+        if (achieved >= target || rows <= WARP_SIZE)
+            break;
+        rows -= g;
+        if (rows < WARP_SIZE)
+            rows = WARP_SIZE;
+    }
+
+    if (plan.smem_bytes > (size_t)SMEM_MAX_BYTES)
+        die("cuda_warp_smem: il tile richiede %zu byte di shared memory per "
+            "blocco, oltre il limite di %d (righe per tile=%d, stride=%d, pad=%d): "
+            "abbassare SMEM_BUDGET_BYTES",
+            plan.smem_bytes, SMEM_MAX_BYTES, rows, tile_row_stride, SCPA_SMEM_PAD);
+
+    plan.x_rows_per_tile = rows;
+    plan.blocks_per_sm   = achieved;
+    return plan;
 }
 
-static void launch_smem_kernel(int m_loc, int n_loc, int k, const scalar_t *A, int lda, const scalar_t *X, int ldx, scalar_t *Y, int ldy) {
+/* plan_tile vuole il puntatore all'ISTANZA template concreta: i registri di
+ * smem_kernel_fixed<3> e smem_kernel_fixed<32> non sono gli stessi, e chiedere
+ * l'occupancy della funzione sbagliata darebbe un piano sbagliato. */
+template<int K>
+static tile_plan_t plan_fixed(int n_loc) {
+    return plan_tile((const void *)smem_kernel_fixed<K>,
+                     K + SCPA_SMEM_PAD, n_loc);
+}
+
+static tile_plan_t plan_for_k(int k, int n_loc) {
+    switch (k) {
+    case 3:  return plan_fixed<3>(n_loc);
+    case 6:  return plan_fixed<6>(n_loc);
+    case 8:  return plan_fixed<8>(n_loc);
+    case 20: return plan_fixed<20>(n_loc);
+    case 32: return plan_fixed<32>(n_loc);
+    default: return plan_tile((const void *)smem_kernel_runtime,
+                              RUNTIME_TILE + SCPA_SMEM_PAD, n_loc);
+    }
+}
+
+/* Nel cammino cronometrato resta soltanto il lancio: il piano arriva gia'
+ * pronto dal contesto. */
+static void launch_smem_kernel(const tile_plan_t *plan, int m_loc, int n_loc, int k, const scalar_t *A, int lda, const scalar_t *X, int ldx, scalar_t *Y, int ldy) {
 
     const int blocks = (int)(((long long)m_loc + WARPS_PER_BLOCK - 1) / WARPS_PER_BLOCK);
 
-    const int specialized = (k == 3 || k == 6 || k == 8 || k == 20 || k == 32);
-
-    const int tile_row_stride = (specialized ? k : RUNTIME_TILE) + SCPA_SMEM_PAD;
-
-    const int x_rows_per_tile = choose_x_rows_per_tile(tile_row_stride, n_loc);
-
-    const size_t smem_bytes = (size_t)x_rows_per_tile * (size_t)tile_row_stride * sizeof(scalar_t);
-
-    if (smem_bytes > (size_t)SMEM_MAX_BYTES)
-        die("cuda_warp_smem: il tile richiede %zu byte di shared memory per " "blocco, oltre il limite di %d (k=%d, righe per tile=%d, pad=%d): abbassare " "SMEM_BUDGET_BYTES", smem_bytes, SMEM_MAX_BYTES, k, x_rows_per_tile, SCPA_SMEM_PAD);
+    const int rows = plan->x_rows_per_tile;
+    const size_t smem_bytes = plan->smem_bytes;
 
     switch (k) {
     case 3:
-        smem_kernel_fixed<3><<<blocks, BLOCK_THREADS, smem_bytes>>>(m_loc, n_loc, x_rows_per_tile, A, lda, X, ldx, Y, ldy);
+        smem_kernel_fixed<3><<<blocks, BLOCK_THREADS, smem_bytes>>>(m_loc, n_loc, rows, A, lda, X, ldx, Y, ldy);
         break;
     case 6:
-        smem_kernel_fixed<6><<<blocks, BLOCK_THREADS, smem_bytes>>>(m_loc, n_loc, x_rows_per_tile, A, lda, X, ldx, Y, ldy);
+        smem_kernel_fixed<6><<<blocks, BLOCK_THREADS, smem_bytes>>>(m_loc, n_loc, rows, A, lda, X, ldx, Y, ldy);
         break;
     case 8:
-        smem_kernel_fixed<8><<<blocks, BLOCK_THREADS, smem_bytes>>>(m_loc, n_loc, x_rows_per_tile, A, lda, X, ldx, Y, ldy);
+        smem_kernel_fixed<8><<<blocks, BLOCK_THREADS, smem_bytes>>>(m_loc, n_loc, rows, A, lda, X, ldx, Y, ldy);
         break;
     case 20:
-        smem_kernel_fixed<20><<<blocks, BLOCK_THREADS, smem_bytes>>>(m_loc, n_loc, x_rows_per_tile, A, lda, X, ldx, Y, ldy);
+        smem_kernel_fixed<20><<<blocks, BLOCK_THREADS, smem_bytes>>>(m_loc, n_loc, rows, A, lda, X, ldx, Y, ldy);
         break;
     case 32:
-        smem_kernel_fixed<32><<<blocks, BLOCK_THREADS, smem_bytes>>>(m_loc, n_loc, x_rows_per_tile, A, lda, X, ldx, Y, ldy);
+        smem_kernel_fixed<32><<<blocks, BLOCK_THREADS, smem_bytes>>>(m_loc, n_loc, rows, A, lda, X, ldx, Y, ldy);
         break;
     default:
-        smem_kernel_runtime<<<blocks, BLOCK_THREADS, smem_bytes>>>(m_loc, n_loc, k, x_rows_per_tile, A, lda, X, ldx, Y, ldy);
+        smem_kernel_runtime<<<blocks, BLOCK_THREADS, smem_bytes>>>(m_loc, n_loc, k, rows, A, lda, X, ldx, Y, ldy);
         break;
     }
 }
@@ -394,6 +524,7 @@ struct local_gemm_context {
     int lda, ldx, ldy;
     scalar_t *dA_loc, *dX_loc, *dY_loc_part;
     cudaEvent_t ev_start, ev_stop;
+    tile_plan_t plan;   /* calcolato una volta sola: k e n_loc non cambiano piu' */
     double t_setup;
     double t_last;
 };
@@ -483,6 +614,21 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
     CUDA_CHECK(cudaEventCreate(&local_gemm_context->ev_start));
     CUDA_CHECK(cudaEventCreate(&local_gemm_context->ev_stop));
 
+    /* Il piano di tiling si calcola QUI, e non in launch_smem_kernel, per una
+     * ragione di misura e non di stile.
+     *
+     * launch_smem_kernel viene invocata fra le due cudaEventRecord. Se ci si
+     * infilassero cudaGetDeviceProperties e le query all'occupancy API, la GPU
+     * resterebbe ferma con lo stream vuoto mentre l'host calcola, e quel tempo
+     * finirebbe dentro t_kernel: si misurerebbe il pianificatore invece del
+     * kernel. Qui invece k e n_loc sono gia' noti e fissi per tutta
+     * l'esecuzione, il piano vale per tutte le repetition, e il suo costo
+     * compare in t_setup, che e' il posto onesto dove farlo stare.
+     *
+     * Va dopo cudaSetDevice / cudaFree(0): prima di quelli il contesto non e'
+     * inizializzato e le query cadrebbero nel vuoto. */
+    local_gemm_context->plan = plan_for_k(k, n_loc);
+
     CUDA_CHECK(cudaDeviceSynchronize());
 
     local_gemm_context->t_setup = now_seconds() - t0;
@@ -500,9 +646,12 @@ void local_gemm(local_gemm_t *local_gemm_context, const scalar_t *RESTRICT X_loc
     if (n_loc > 0 && k > 0)
         CUDA_CHECK(cudaMemcpy(local_gemm_context->dX_loc, X_loc, (size_t)n_loc * (size_t)ldx * sizeof(scalar_t), cudaMemcpyHostToDevice));
 
+    /* Fra i due cudaEventRecord non deve esserci NIENTE che faccia lavorare
+     * l'host: solo il lancio, che e' asincrono, e la cudaGetLastError che ne
+     * legge l'esito. Il piano di tiling e' gia' pronto nel contesto. */
     CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_start, 0));
     if (m_loc > 0 && k > 0) {
-        launch_smem_kernel(m_loc, n_loc, k, local_gemm_context->dA_loc, local_gemm_context->lda, local_gemm_context->dX_loc, ldx, local_gemm_context->dY_loc_part, ldy);
+        launch_smem_kernel(&local_gemm_context->plan, m_loc, n_loc, k, local_gemm_context->dA_loc, local_gemm_context->lda, local_gemm_context->dX_loc, ldx, local_gemm_context->dY_loc_part, ldy);
         CUDA_CHECK(cudaGetLastError());
     }
     CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_stop, 0));
@@ -536,9 +685,22 @@ double local_gemm_setup_seconds(const local_gemm_t *local_gemm_context) {
     return (local_gemm_context != NULL) ? local_gemm_context->t_setup : 0.0;
 }
 
-/* Il nome porta il padding e la dimensione del blocco quando non sono quelli di
- * default: nella tabella dei risultati le varianti non possono essere confuse
- * fra loro, e uno sweep su BLOCK resta leggibile nel CSV. */
+int local_gemm_blocks_per_sm(const local_gemm_t *local_gemm_context) {
+    return (local_gemm_context != NULL) ? local_gemm_context->plan.blocks_per_sm : -1;
+}
+
+int local_gemm_x_rows_per_tile(const local_gemm_t *local_gemm_context) {
+    return (local_gemm_context != NULL) ? local_gemm_context->plan.x_rows_per_tile : -1;
+}
+
+/* Il nome porta padding, dimensione del blocco, granularita' e budget quando non
+ * sono quelli di default: nella tabella dei risultati le varianti non possono
+ * essere confuse fra loro, e uno sweep resta leggibile nel CSV.
+ *
+ * Il budget DERIVATO non aggiunge suffisso, perche' e' il default: le righe
+ * cosi' etichettate restano pero' distinguibili da quelle raccolte prima di
+ * questa modifica grazie alle colonne x_rows_per_tile e blocks_per_sm, che
+ * prima non esistevano. */
 #define SCPA_STR_(x) #x
 #define SCPA_STR(x)  SCPA_STR_(x)
 
@@ -554,7 +716,20 @@ double local_gemm_setup_seconds(const local_gemm_t *local_gemm_context) {
 #define SCPA_BLK_SUFFIX "(blk" SCPA_STR(SCPA_BLOCK_THREADS) ")"
 #endif
 
+#if SCPA_TILE_GRANULARITY == 32
+#define SCPA_GRAN_SUFFIX ""
+#else
+#define SCPA_GRAN_SUFFIX "(g" SCPA_STR(SCPA_TILE_GRANULARITY) ")"
+#endif
+
+#ifdef SCPA_SMEM_BUDGET_BYTES
+#define SCPA_BUD_SUFFIX "(bud" SCPA_STR(SCPA_SMEM_BUDGET_BYTES) ")"
+#else
+#define SCPA_BUD_SUFFIX ""
+#endif
+
 const char *kernel_name(void)
 {
-    return "cuda_warp_smem" SCPA_PAD_SUFFIX SCPA_BLK_SUFFIX;
+    return "cuda_warp_smem" SCPA_PAD_SUFFIX SCPA_BLK_SUFFIX
+           SCPA_GRAN_SUFFIX SCPA_BUD_SUFFIX;
 }

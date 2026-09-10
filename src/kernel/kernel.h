@@ -121,6 +121,30 @@ double local_gemm_last_compute_seconds(const local_gemm_t *local_gemm_context);
  * nascosto. */
 double local_gemm_setup_seconds(const local_gemm_t *local_gemm_context);
 
+/* ---------------------------------------------------------------------------
+ * Piano di esecuzione del backend
+ * ---------------------------------------------------------------------------
+ * Alcuni backend non si limitano a eseguire: scelgono a runtime come mappare il
+ * lavoro sull'hardware. cuda_warp_smem, per esempio, deve decidere quante righe
+ * di X stanno in un tile di shared memory, e quella scelta determina quante
+ * barriere esegue ogni warp e quanti blocchi restano residenti per SM.
+ *
+ * Senza queste due colonne nel CSV una campagna sul tiling non e' spiegabile:
+ * si vedrebbero curve che salgono e scendono senza sapere se e' cambiato il
+ * tile, l'occupancy, o entrambi. Non sono metriche di prestazione, sono la
+ * CONFIGURAZIONE effettivamente scelta, e vanno registrate accanto ai tempi.
+ *
+ * Entrambe restituiscono -1 quando il backend non ha il concetto (CPU, cuBLAS,
+ * che decide da se' e non lo dice), con la stessa convenzione di sentinella
+ * negativa gia' usata da local_gemm_last_compute_seconds. */
+
+/* Blocchi residenti per SM che il runtime CUDA dichiara raggiungibili con la
+ * shared memory effettivamente richiesta dal lancio. */
+int local_gemm_blocks_per_sm(const local_gemm_t *local_gemm_context);
+
+/* Righe di X messe in un tile di shared memory. */
+int local_gemm_x_rows_per_tile(const local_gemm_t *local_gemm_context);
+
 /* Nome del backend attivo, per l'intestazione delle misure. */
 const char *kernel_name(void);
 

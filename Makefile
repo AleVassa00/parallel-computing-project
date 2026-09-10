@@ -10,6 +10,9 @@
 #   make KERNEL=cuda_warp  backend CUDA warp-per-row con dispatch su k
 #   make KERNEL=cuda_warp_smem  come sopra, ma con il tile di X in shared
 #   make KERNEL=cuda_warp_smem SMEM_PAD=0  la stessa cosa senza il padding k+1
+#   make KERNEL=cuda_warp_smem TILE_GRANULARITY=<n>   arrotondamento righe/tile
+#   make KERNEL=cuda_warp_smem SMEM_BUDGET_BYTES=<n>  budget forzato invece che
+#                                                     derivato dall'occupancy
 #   make BLOCK=<n>  thread per blocco dei backend CUDA (default 256)
 #   make KERNEL=cublas     riferimento esterno (aggiunge -lcublas da solo)
 #
@@ -49,6 +52,30 @@ TEST_A_PADDING  ?= 0
 # Riguarda solo i backend CUDA che lo leggono, ma entra nel nome della
 # configurazione: le due build coesistono come binari distinti.
 SMEM_PAD        ?= 1
+
+# Granularita' di arrotondamento delle righe per tile di cuda_warp_smem.
+# 32 e' il default e NON e' un requisito di correttezza: il kernel gestisce gia'
+# tile parziali. E' un'ottimizzazione ("nessuna lane inattiva nell'ultimo passo
+# di warp") che a k=32 costa meta' del tile, e il cui bilancio va misurato.
+TILE_GRANULARITY ?= 32
+
+# Budget di shared memory per blocco di cuda_warp_smem, in byte.
+# VUOTO = derivato a runtime dall'occupancy, che e' il default: il budget viene
+# scelto in modo da non essere lui il vincolo attivo. Un valore esplicito lo
+# forza, ed e' il termine di paragone dello sweep (p.es. SMEM_BUDGET_BYTES=16384
+# riproduce il valore che prima era scritto a mano nel sorgente).
+SMEM_BUDGET_BYTES ?=
+
+ifeq ($(KERNEL),cuda_warp_smem)
+ifeq ($(shell printf '%s\n' '$(TILE_GRANULARITY)' | grep -E '^[1-9][0-9]*$$'),)
+$(error TILE_GRANULARITY deve essere un intero positivo)
+endif
+ifneq ($(SMEM_BUDGET_BYTES),)
+ifeq ($(shell printf '%s\n' '$(SMEM_BUDGET_BYTES)' | grep -E '^[1-9][0-9]*$$'),)
+$(error SMEM_BUDGET_BYTES deve essere un intero positivo, oppure vuoto per derivarlo)
+endif
+endif
+endif
 
 ifeq ($(KERNEL),cuda_warp_tiled)
 WARP_COL_TILE   ?= 8
@@ -102,6 +129,17 @@ endif
 ifeq ($(KERNEL),cuda_warp_tiled)
 ifneq ($(WARP_COL_TILE),8)
 CONFIG := $(CONFIG)-tile$(WARP_COL_TILE)
+endif
+endif
+# Solo cuda_warp_smem legge questi due: entrano nel nome della configurazione
+# soltanto li', altrimenti si otterrebbero binari con nomi diversi e contenuto
+# identico, indistinguibili nel CSV perche' kernel_name() non cambierebbe.
+ifeq ($(KERNEL),cuda_warp_smem)
+ifneq ($(TILE_GRANULARITY),32)
+CONFIG := $(CONFIG)-g$(TILE_GRANULARITY)
+endif
+ifneq ($(SMEM_BUDGET_BYTES),)
+CONFIG := $(CONFIG)-bud$(SMEM_BUDGET_BYTES)
 endif
 endif
 LDLIBS := -lm
@@ -158,11 +196,24 @@ ifeq ($(KERNEL_IS_CUDA),1)
 # il resto del progetto, che resta C11 compilato da mpicc. -march=native NON va
 # dato a nvcc direttamente, che non lo conosce: passa al compilatore host con
 # -Xcompiler. -lineinfo serve dopo, per correlare i profili di ncu al sorgente.
+# -Xptxas -v stampa, per OGNI istanza template, registri usati e byte di spill.
+# Non e' diagnostica occasionale: con acc[K] in registro il numero di registri
+# per thread e' il vincolo che decide l'occupancy, e uno spill diverso da zero
+# significa accumulatori finiti in local memory (cioe' in DRAM), che e' un
+# problema che viene prima di qualunque discorso sul tiling. Tenerlo sempre
+# acceso costa solo qualche riga a schermo e toglie la scusa di non guardare.
 NVCCFLAGS := -O3 -std=c++14 -arch=$(NVCC_ARCH) -Isrc $(PRECDEF) -lineinfo \
 	-DSCPA_SMEM_PAD=$(SMEM_PAD) -DSCPA_BLOCK_THREADS=$(BLOCK) \
+	-Xptxas -v \
 	-Xcompiler -Wall -Xcompiler -Wextra $(EXTRA_NVCCFLAGS)
 ifeq ($(KERNEL),cuda_warp_tiled)
 NVCCFLAGS += -DSCPA_WARP_COL_TILE=$(WARP_COL_TILE)
+endif
+ifeq ($(KERNEL),cuda_warp_smem)
+NVCCFLAGS += -DSCPA_TILE_GRANULARITY=$(TILE_GRANULARITY)
+ifneq ($(SMEM_BUDGET_BYTES),)
+NVCCFLAGS += -DSCPA_SMEM_BUDGET_BYTES=$(SMEM_BUDGET_BYTES)
+endif
 endif
 ifneq ($(ARCHFLAGS),)
 NVCCFLAGS += -Xcompiler $(ARCHFLAGS)
@@ -200,7 +251,7 @@ TESTBIN := bin/test_index
 .PHONY: all test check check-mpi check-cxx check-padding padding-run clean
 
 all: $(BIN) $(TESTBIN)
-	@echo "built $(BIN)  [PREC=$(PREC) KERNEL=$(KERNEL) ($(KERNEL_SRC)) FORCE_GENERIC_K=$(FORCE_GENERIC_K) TEST_A_PADDING=$(TEST_A_PADDING) SMEM_PAD=$(SMEM_PAD) BLOCK=$(BLOCK)]"
+	@echo "built $(BIN)  [PREC=$(PREC) KERNEL=$(KERNEL) ($(KERNEL_SRC)) FORCE_GENERIC_K=$(FORCE_GENERIC_K) TEST_A_PADDING=$(TEST_A_PADDING) SMEM_PAD=$(SMEM_PAD) BLOCK=$(BLOCK) TILE_GRANULARITY=$(TILE_GRANULARITY) SMEM_BUDGET_BYTES=$(if $(SMEM_BUDGET_BYTES),$(SMEM_BUDGET_BYTES),derivato)]"
 
 $(OBJDIR)/%.o: src/%.c
 	@mkdir -p $(dir $@)
@@ -287,6 +338,7 @@ check-cxx:
 	@if command -v nm >/dev/null 2>&1; then \
 		for sym in local_gemm_create local_gemm local_gemm_destroy \
 		           local_gemm_last_compute_seconds local_gemm_setup_seconds \
+		           local_gemm_blocks_per_sm local_gemm_x_rows_per_tile \
 		           kernel_name xmalloc die; do \
 			nm -u $(OBJDIR)/cxx_iface.o | grep -qw $$sym || { \
 				echo "check-cxx: FAIL: '$$sym' e' decorato (manca extern \"C\" in un header)"; \

@@ -309,6 +309,20 @@ double local_gemm_setup_seconds(const local_gemm_t *local_gemm_context)
     return (local_gemm_context != NULL) ? local_gemm_context->t_setup : 0.0;
 }
 
+/* cuBLAS sceglie da se' tiling e occupancy e non li espone: non c'e' niente di
+ * onesto da riportare, quindi sentinella. */
+int local_gemm_blocks_per_sm(const local_gemm_t *local_gemm_context)
+{
+    (void)local_gemm_context;
+    return -1;
+}
+
+int local_gemm_x_rows_per_tile(const local_gemm_t *local_gemm_context)
+{
+    (void)local_gemm_context;
+    return -1;
+}
+
 const char *kernel_name(void)
 {
     return "cublas";

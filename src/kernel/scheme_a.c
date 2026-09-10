@@ -239,6 +239,21 @@ double local_gemm_setup_seconds(const local_gemm_t *local_gemm_context)
     return (local_gemm_context != NULL) ? local_gemm_context->t_setup : 0.0;
 }
 
+/* Occupancy e tiling in shared memory sono concetti di GPU: su CPU non esistono
+ * e il sentinella negativo lo dichiara, con la stessa convenzione di
+ * local_gemm_last_compute_seconds. */
+int local_gemm_blocks_per_sm(const local_gemm_t *local_gemm_context)
+{
+    (void)local_gemm_context;
+    return -1;
+}
+
+int local_gemm_x_rows_per_tile(const local_gemm_t *local_gemm_context)
+{
+    (void)local_gemm_context;
+    return -1;
+}
+
 const char *kernel_name(void)
 {
 #ifdef FORCE_GENERIC_K
