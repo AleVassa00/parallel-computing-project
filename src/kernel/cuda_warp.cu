@@ -4,6 +4,9 @@
  * della riga di A sono coalescenti e ogni valore di A viene riusato per tutte
  * le colonne del multivettore. I cinque k richiesti sono template distinti;
  * ogni altro k usa un fallback runtime a tile, senza limiti sul valore di k.
+ * X_LAYOUT=column rende contigue anche le letture di X delle lane: per una
+ * colonna c leggono X[c*n_loc+j]. La selezione e' costante di compilazione;
+ * la conversione host e' gia' terminata prima di chiamare questo backend.
  */
 
 #include <cuda_runtime.h>
@@ -86,10 +89,11 @@ static __global__ void warp_kernel_fixed(int m_loc, int n_loc, const scalar_t *_
 
     for (j = lane; j < n_loc; j += WARP_SIZE) {
         const scalar_t a = arow[j];
-        const scalar_t *xrow = X_loc + (size_t)j * (size_t)ldx;
 #pragma unroll
         for (c = 0; c < K; ++c)
-            acc[c] += a * xrow[c];
+            acc[c] += a * X_loc[SCPA_X_COLUMN_MAJOR
+                ? (size_t)c * (size_t)n_loc + j
+                : (size_t)j * (size_t)ldx + c];
     }
 
     /* Maschera piena, non __activemask(). Da Volta in poi le lane di un warp
@@ -148,11 +152,12 @@ static __global__ void warp_kernel_runtime(int m_loc, int n_loc, int k,
 
         for (j = lane; j < n_loc; j += WARP_SIZE) {
             const scalar_t a = arow[j];
-            const scalar_t *xrow = X + (size_t)j * (size_t)ldx + c0;
 #pragma unroll
             for (q = 0; q < RUNTIME_TILE; ++q)
                 if (c0 + q < k)
-                    acc[q] += a * xrow[q];
+                    acc[q] += a * X[SCPA_X_COLUMN_MAJOR
+                        ? (size_t)(c0 + q) * (size_t)n_loc + j
+                        : (size_t)j * (size_t)ldx + c0 + q];
         }
 
 #pragma unroll
@@ -244,6 +249,8 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
     if (ldx < k || ldy < k)
         die("local_gemm_create: ldx %d and ldy %d must both be at least k=%d",
             ldx, ldy, k);
+    if (SCPA_X_COLUMN_MAJOR && ldx != k)
+        die("cuda_warp: column-major X must be compact (ldx=%d, k=%d)", ldx, k);
     if (n_loc > 0 && m_loc > 0 && A_loc == NULL)
         die("local_gemm_create: A is NULL for a non-empty %dx%d block", m_loc, n_loc);
 
@@ -488,6 +495,12 @@ int local_gemm_x_rows_per_tile(const local_gemm_t *local_gemm_context)
 #define SCPA_STR_(x) #x
 #define SCPA_STR(x)  SCPA_STR_(x)
 
+#if SCPA_X_COLUMN_MAJOR
+#define SCPA_X_SUFFIX "(xcol)"
+#else
+#define SCPA_X_SUFFIX ""
+#endif
+
 #if SCPA_BLOCK_THREADS == 256
 #define SCPA_BLK_SUFFIX ""
 #else
@@ -496,5 +509,5 @@ int local_gemm_x_rows_per_tile(const local_gemm_t *local_gemm_context)
 
 const char *kernel_name(void)
 {
-    return "cuda_warp" SCPA_BLK_SUFFIX;
+    return "cuda_warp" SCPA_BLK_SUFFIX SCPA_X_SUFFIX;
 }

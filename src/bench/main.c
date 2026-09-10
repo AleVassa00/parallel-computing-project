@@ -72,13 +72,14 @@ static const char *CSV_HEADER =
     "t_d2h_Y_mean_s,t_d2h_Y_std_s,bw_d2h_Y_gbs,"
     "t_launch_overhead_mean_s,t_launch_overhead_std_s,"
     "t_prep_alloc_buffers_s,t_prep_gen_A_s,t_prep_distrib_A_s,"
-    "t_prep_gen_X_s,t_prep_distrib_X_s,t_prep_total_s,t_io_csv_raw_s";
+    "t_prep_gen_X_s,t_prep_distrib_X_s,t_prep_total_s,t_io_csv_raw_s,"
+    "x_layout,t_prep_convert_X_s";
 
 static const char *CSV_RAW_HEADER =
     "kernel,scalar,a_mode,x_mode,M,N,k,P,pr,pc,rep,"
     "t_bcast_s,t_local_s,t_reduce_s,t_total_s,t_official_s,t_kernel_s,"
     "t_transfer_runtime_overhead_s,gflops,gflops_compute,gflops_kernel,"
-    "t_h2d_X_s,t_d2h_Y_s,t_launch_overhead_s";
+    "t_h2d_X_s,t_d2h_Y_s,t_launch_overhead_s,x_layout";
 
 static const char *a_mode_name(a_mode_t mode)
 {
@@ -88,6 +89,28 @@ static const char *a_mode_name(a_mode_t mode)
 static const char *x_mode_name(x_mode_t mode)
 {
     return mode == X_MODE_GLOBAL ? "global" : "local";
+}
+
+/* Chiamata una volta dopo gen/distrib, prima anche dei warm-up. Sulla riga 0
+ * X e' valida; gli altri rank riceveranno lo stesso buffer compatto via Bcast.
+ * Cambia solo la rappresentazione: dimensioni, valori e ordine delle somme
+ * restano invariati. Il temporaneo viene liberato prima delle ripetizioni. */
+static void prepare_x_layout(const grid_t *grid, const layout_t *layout,
+                             scalar_t **X_loc, double *elapsed)
+{
+    *elapsed = 0.0;
+    if (SCPA_X_COLUMN_MAJOR && grid->my_row == 0 && layout->n_loc > 0) {
+        const double start = now_seconds();
+        scalar_t *column = xmalloc((size_t)layout->n_loc * (size_t)layout->k
+                                   * sizeof *column);
+        for (int c = 0; c < layout->k; ++c)
+            for (int j = 0; j < layout->n_loc; ++j)
+                column[(size_t)c * (size_t)layout->n_loc + j] =
+                    (*X_loc)[(size_t)j * (size_t)layout->ldx + c];
+        xfree(*X_loc);
+        *X_loc = column;
+        *elapsed = now_seconds() - start;
+    }
 }
 
 static void usage(const char *prog)
@@ -106,6 +129,7 @@ static void usage(const char *prog)
     printf("                    local (default), global\n");
     printf("  --x-mode <mode> generate X slices locally or distribute global X\n");
     printf("                    local (default), global\n");
+    printf("  X memory layout: %s (build option X_LAYOUT=row|column)\n", SCPA_X_LAYOUT_NAME);
     printf("  --check         validate against the serial reference\n");
     printf("  --csv           print one CSV row instead of the report\n");
     printf("  --csv-header    print the CSV header and exit\n");
@@ -351,8 +375,20 @@ static void append_raw_csv(const char *path,
         die("cannot determine size of raw CSV '%s'", path);
     }
 
-    if (file_size == 0)
+    if (file_size == 0) {
         fprintf(fp, "%s\n", CSV_RAW_HEADER);
+    } else {
+        /* Non appendere righe con le nuove colonne a un CSV di una build
+         * precedente: il file diventerebbe ambiguo senza alcun errore. */
+        char header[1024];
+        if (fseek(fp, 0, SEEK_SET) != 0 || fgets(header, sizeof header, fp) == NULL)
+            die("cannot read raw CSV header '%s'", path);
+        header[strcspn(header, "\r\n")] = '\0';
+        if (strcmp(header, CSV_RAW_HEADER) != 0)
+            die("incompatible raw CSV header in '%s': use a new output file", path);
+        if (fseek(fp, 0, SEEK_END) != 0)
+            die("cannot seek raw CSV '%s'", path);
+    }
 
     flop = 2.0 * (double)options->M *
            (double)options->N * (double)options->k;
@@ -375,7 +411,7 @@ static void append_raw_csv(const char *path,
                 "%s,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,"
                 "%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,"
                 "%.6f,%.6f,%.6f,"
-                "%.9e,%.9e,%.9e\n",
+                "%.9e,%.9e,%.9e,%s\n",
                 kernel_name(), SCALAR_NAME,
                 a_mode_name(options->a_mode), x_mode_name(options->x_mode),
                 options->M, options->N, options->k,
@@ -385,7 +421,7 @@ static void append_raw_csv(const char *path,
                 non_kernel_local_times[rep],
                 rep_gflops, rep_gflops_compute, rep_gflops_kernel,
                 h2d_X_transfer_times[rep], d2h_Y_transfer_times[rep],
-                launch_overhead_times[rep]);
+                launch_overhead_times[rep], SCPA_X_LAYOUT_NAME);
     }
 
     if (fclose(fp) != 0)
@@ -445,6 +481,7 @@ int main(int argc, char **argv)
     double prep_distrib_A_time = 0.0;   /* resta 0 con --a-mode local */
     double prep_gen_X_time = 0.0;
     double prep_distrib_X_time = 0.0;   /* resta 0 con --x-mode local */
+    double prep_convert_X_time = 0.0;
     double prep_total_time = 0.0;
 
     /* Scomposizione del preprocessing del backend (t_setup): su CUDA sono
@@ -594,6 +631,8 @@ int main(int argc, char **argv)
         X_global_root = NULL;
     }
 
+    prepare_x_layout(&grid, &layout, &X_loc, &prep_convert_X_time);
+
     bcast_times = xmalloc((size_t)options.reps * sizeof *bcast_times);
     total_times = xmalloc((size_t)options.reps * sizeof *total_times);
     local_phase_times = xmalloc((size_t)options.reps * sizeof *local_phase_times);
@@ -670,6 +709,7 @@ int main(int argc, char **argv)
     prep_total_time = prep_alloc_local_buffers_time
                     + prep_gen_A_time + prep_distrib_A_time
                     + prep_gen_X_time + prep_distrib_X_time
+                    + prep_convert_X_time
                     + setup_time;
 
     /* I byte si SOMMANO invece di prendere il massimo: i rank condividono
@@ -688,6 +728,7 @@ int main(int argc, char **argv)
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &prep_distrib_A_time, &prep_distrib_A_time, 1, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &prep_gen_X_time, &prep_gen_X_time, 1, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &prep_distrib_X_time, &prep_distrib_X_time, 1, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &prep_convert_X_time, &prep_convert_X_time, 1, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &prep_total_time, &prep_total_time, 1, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
 
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &bytes_h2d_A_all_ranks, &bytes_h2d_A_all_ranks, 1, MPI_DOUBLE, MPI_SUM, 0, grid.grid_comm);
@@ -811,7 +852,7 @@ int main(int argc, char **argv)
                    "%.9e,%.9e,%.6f,"
                    "%.9e,%.9e,"
                    "%.9e,%.9e,%.9e,"
-                   "%.9e,%.9e,%.9e,%.9e\n",
+                   "%.9e,%.9e,%.9e,%.9e,%s,%.9e\n",
                    kernel_name(), SCALAR_NAME, a_mode_name(options.a_mode),
                    x_mode_name(options.x_mode),
                    options.M, options.N, options.k,
@@ -838,13 +879,14 @@ int main(int argc, char **argv)
                    mean_launch_overhead_time, std_launch_overhead_time,
                    prep_alloc_local_buffers_time, prep_gen_A_time,
                    prep_distrib_A_time, prep_gen_X_time, prep_distrib_X_time,
-                   prep_total_time, io_csv_raw_write_time);
+                   prep_total_time, io_csv_raw_write_time,
+                   SCPA_X_LAYOUT_NAME, prep_convert_X_time);
         } else {
             double bytes_A = (double)options.M * options.N * sizeof(scalar_t);
-            printf("matmul_mpi  M=%d N=%d k=%d  grid=%dx%d (P=%d)  %s  kernel=%s  A=%s X=%s\n",
+            printf("matmul_mpi  M=%d N=%d k=%d  grid=%dx%d (P=%d)  %s  kernel=%s  A=%s X=%s X_layout=%s\n",
                    options.M, options.N, options.k, grid.pr, grid.pc, grid.nprocs, SCALAR_NAME,
                    kernel_name(), a_mode_name(options.a_mode),
-                   x_mode_name(options.x_mode));
+                   x_mode_name(options.x_mode), SCPA_X_LAYOUT_NAME);
             printf("  local block  A %dx%d   X %dx%d   Y %dx%d      A total %.1f MiB\n",
                    layout.m_loc, layout.n_loc, layout.n_loc, layout.k, layout.m_loc, layout.k,
                    bytes_A / 1048576.0);
@@ -912,6 +954,9 @@ int main(int argc, char **argv)
             if (options.x_mode == X_MODE_GLOBAL)
                 printf("    distribuzione di X    %.3f ms   (MPI_Scatterv)\n",
                        prep_distrib_X_time * 1e3);
+            if (SCPA_X_COLUMN_MAJOR)
+                printf("    conversione di X      %.3f ms   (row -> column, una volta)\n",
+                       prep_convert_X_time * 1e3);
             printf("    setup del backend     %.3f ms\n", setup_time * 1e3);
             if (setup_h2d_A_time > 0.0 || setup_device_init_time > 0.0) {
                 printf("      contesto CUDA       %.3f ms\n", setup_device_init_time * 1e3);

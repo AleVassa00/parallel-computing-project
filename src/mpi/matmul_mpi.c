@@ -11,7 +11,9 @@ void mpi_matmul(const grid_t *grid, const layout_t *layout, local_gemm_t *local_
     double t0, t1, t2, t3;
 
     /* Le due collettive qui sotto trattano X_loc e Y come buffer CONTIGUI di
-     * n_loc*k e m_loc*k elementi. E' vero soltanto se ldx == k e ldy == k.
+     * n_loc*k e m_loc*k elementi. Richiediamo ldx == k e ldy == k.
+     * X puo' essere row-major o column-major compatta: il broadcast copia
+     * esattamente l'ordine preparato dal driver, senza interpretarlo.
      *
      * L'invariante viene IMPOSTO invece che sperato perche' violarlo non fa
      * fallire niente: produce risultati sbagliati in silenzio, che e' il modo

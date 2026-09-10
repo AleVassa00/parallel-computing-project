@@ -8,6 +8,7 @@
 #   make KERNEL=..  seleziona l'implementazione di local_gemm (.c oppure .cu)
 #   make FORCE_GENERIC_K=1  forza il fallback generico di scheme_a
 #   make KERNEL=cuda_warp  backend CUDA warp-per-row con dispatch su k
+#   make KERNEL=cuda_warp X_LAYOUT=column  X compatta per colonne (default row)
 #   make KERNEL=cuda_warp_smem  come sopra, ma con il tile di X in shared
 #   make KERNEL=cuda_warp_smem SMEM_PAD=0  la stessa cosa senza il padding k+1
 #   make KERNEL=cuda_warp_smem TILE_GRANULARITY=<n>   arrotondamento righe/tile
@@ -45,6 +46,21 @@ KERNEL ?= scheme_a
 PREC   ?= double
 FORCE_GENERIC_K ?= 0
 TEST_A_PADDING  ?= 0
+
+# Layout del solo blocco locale di X, convertito dal driver in preprocessing.
+# Le due build coesistono; i backend non abilitati rifiutano column.
+X_LAYOUT ?= row
+ifneq ($(X_LAYOUT),row)
+ifneq ($(X_LAYOUT),column)
+$(error X_LAYOUT deve essere row oppure column)
+endif
+endif
+ifeq ($(X_LAYOUT),column)
+ifneq ($(KERNEL),cuda_warp)
+$(error X_LAYOUT=column e' supportato soltanto da cuda_warp)
+endif
+X_LAYOUT_DEF := -DSCPA_X_COLUMN_MAJOR=1
+endif
 
 # Scalari di padding aggiunti a ogni riga del tile di X in shared memory dal
 # backend cuda_warp_smem. 1 rompe il conflitto a 32 vie sui banchi che si
@@ -142,6 +158,9 @@ ifneq ($(SMEM_BUDGET_BYTES),)
 CONFIG := $(CONFIG)-bud$(SMEM_BUDGET_BYTES)
 endif
 endif
+ifeq ($(X_LAYOUT),column)
+CONFIG := $(CONFIG)-xcol
+endif
 LDLIBS := -lm
 
 # Su nodo singolo la comunicazione deve passare da memoria condivisa. Su
@@ -155,7 +174,7 @@ PRECDEF := -DUSE_FLOAT
 else
 PRECDEF :=
 endif
-CFLAGS += $(PRECDEF)
+CFLAGS += $(PRECDEF) $(X_LAYOUT_DEF)
 
 ifneq ($(FORCE_GENERIC_K),0)
 CFLAGS += -DFORCE_GENERIC_K
@@ -203,6 +222,7 @@ ifeq ($(KERNEL_IS_CUDA),1)
 # problema che viene prima di qualunque discorso sul tiling. Tenerlo sempre
 # acceso costa solo qualche riga a schermo e toglie la scusa di non guardare.
 NVCCFLAGS := -O3 -std=c++14 -arch=$(NVCC_ARCH) -Isrc $(PRECDEF) -lineinfo \
+	$(X_LAYOUT_DEF) \
 	-DSCPA_SMEM_PAD=$(SMEM_PAD) -DSCPA_BLOCK_THREADS=$(BLOCK) \
 	-Xptxas -v \
 	-Xcompiler -Wall -Xcompiler -Wextra $(EXTRA_NVCCFLAGS)

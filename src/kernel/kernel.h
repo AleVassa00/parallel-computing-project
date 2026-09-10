@@ -5,6 +5,17 @@
 
 #include "common/scalar.h"
 
+/* Scelta di build condivisa da driver e backend. Il Makefile permette column
+ * soltanto per cuda_warp. X resta n x k: cambia solo l'ordine in memoria. */
+#ifndef SCPA_X_COLUMN_MAJOR
+#define SCPA_X_COLUMN_MAJOR 0
+#endif
+#if SCPA_X_COLUMN_MAJOR
+#define SCPA_X_LAYOUT_NAME "column"
+#else
+#define SCPA_X_LAYOUT_NAME "row"
+#endif
+
 /* Interfaccia unica del kernel locale, indipendente dal backend.
  *
  * Il codice MPI non deve sapere quale implementazione gira sotto: schema A
@@ -65,6 +76,9 @@ local_gemm_t *local_gemm_create(int m, int n, int k, const scalar_t *A_loc, int 
  *
  *   A: m x n, riga i a partire da A + i*lda        row-major   (dal contesto)
  *   X: n x k, riga j a partire da X + j*ldx        row-major, k contiguo
+ *      Con X_LAYOUT=column (solo cuda_warp): X[j,c] = X[c*n+j], compatta.
+ *      In questa build ldx deve essere k: descrive la capienza n*ldx del
+ *      buffer, non lo stride fra colonne, che e' n. Non e' ammesso padding X.
  *   Y: m x k, riga i a partire da Y + i*ldy        row-major, k contiguo
  *
  * m, n, k, lda, ldx e ldy sono fissati da local_gemm_create. ldx e ldy
@@ -72,7 +86,7 @@ local_gemm_t *local_gemm_create(int m, int n, int k, const scalar_t *A_loc, int 
  * buffer, ma il backend verifica che non siano cambiati.
  * X e Y non devono sovrapporsi fra loro ne' con A (sono dichiarati restrict).
  *
- * Ogni backend deve onorare ldx e ldy anche quando sono maggiori di k, e i
+ * In row-major ogni backend onora ldx e ldy anche quando sono maggiori di k, e i
  * test li esercitano padded: e' l'interfaccia del KERNEL, e come tale resta
  * generale. Il DRIVER distribuito, pero', li tiene entrambi uguali a k, e li
  * impone: MPI_Bcast di X e MPI_Reduce di Y usano conteggi contigui, e

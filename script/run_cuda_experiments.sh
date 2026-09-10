@@ -54,6 +54,7 @@ SEED=""
 
 A_MODE="local"
 X_MODE="local"
+X_LAYOUT="row"
 CHECK=0
 
 NP=1
@@ -171,6 +172,9 @@ FLAG DEL PROBLEMA
   --check                     Abilita validazione seriale
   --a-mode local|global       Modalita' A                [default local]
   --x-mode local|global       Modalita' X                [default local]
+  --x-layout row|column       Layout di X (column solo cuda_warp) [default row]
+                              Conversione una volta nel preprocessing.
+                              Column aggiunge _xcolumn ai nomi dei risultati.
 
 FLAG MPI / GRIGLIA
   --np P                      Numero processi MPI        [default 1]
@@ -316,6 +320,7 @@ apply_config_kv() {
             ;;
         a_mode|a-mode) A_MODE="$value" ;;
         x_mode|x-mode) X_MODE="$value" ;;
+        x_layout|x-layout) X_LAYOUT="$value" ;;
 
         np)
             NP="$value"
@@ -562,6 +567,8 @@ while [[ $# -gt 0 ]]; do
             need_value "$@"; A_MODE="$2"; shift 2 ;;
         --x-mode)
             need_value "$@"; X_MODE="$2"; shift 2 ;;
+        --x-layout)
+            need_value "$@"; X_LAYOUT="$2"; shift 2 ;;
 
         --np)
             need_value "$@"
@@ -759,6 +766,29 @@ validate_common() {
     case "$X_MODE" in local|global) ;; *)
         echo "Errore: --x-mode deve essere local o global." >&2; exit 1 ;;
     esac
+    case "$X_LAYOUT" in row|column) ;; *)
+        echo "Errore: --x-layout deve essere row o column." >&2; exit 1 ;;
+    esac
+    if [[ "$X_LAYOUT" == "column" ]]; then
+        local layout_kernels=("$KERNEL")
+        case "$EXPERIMENT" in
+            compare) layout_kernels=("${KERNELS[@]}") ;;
+            registers)
+                if [[ "$KERNEL_EXPLICIT" -eq 0 ]]; then
+                    layout_kernels=("${KERNELS[@]}")
+                fi ;;
+            full|smem-pad-sweep|warp-tile-sweep)
+                echo "Errore: --x-layout column non supportato da $EXPERIMENT." >&2
+                exit 1 ;;
+        esac
+        local layout_kernel
+        for layout_kernel in "${layout_kernels[@]}"; do
+            if [[ "$layout_kernel" != "cuda_warp" ]]; then
+                echo "Errore: --x-layout column supportato solo da cuda_warp, non da $layout_kernel." >&2
+                exit 1
+            fi
+        done
+    fi
     case "$PREC" in double|float) ;; *)
         echo "Errore: --prec deve essere double o float." >&2; exit 1 ;;
     esac
@@ -894,6 +924,9 @@ finalize_output_dir() {
 
     EXPERIMENT_NAME="${EXPERIMENT_NAME// /_}"
     EXPERIMENT_NAME="${EXPERIMENT_NAME//\//_}"
+    if [[ "$X_LAYOUT" == "column" ]]; then
+        EXPERIMENT_NAME="${EXPERIMENT_NAME}_xcolumn"
+    fi
 
     if [[ "$OUTDIR_EXPLICIT" -eq 0 ]]; then
         OUTDIR="results/${EXPERIMENT_NAME}"
@@ -965,6 +998,9 @@ config_suffix() {
     if [[ "$kernel" == "cuda_warp_tiled" && "$WARP_COL_TILE" != "8" ]]; then
         suffix="${suffix}-tile${WARP_COL_TILE}"
     fi
+    if [[ "$X_LAYOUT" == "column" ]]; then
+        suffix="${suffix}-xcol"
+    fi
 
     echo "$suffix"
 }
@@ -992,12 +1028,15 @@ build_kernel() {
 
     if [[ "$kernel" == "cuda_warp_smem" ]]; then
         log "BUILD kernel=$kernel BLOCK=$block SMEM_PAD=$smem_pad PREC=$PREC"
+    elif [[ "$kernel" == "cuda_warp" ]]; then
+        log "BUILD kernel=$kernel BLOCK=$block PREC=$PREC X_LAYOUT=$X_LAYOUT"
     else
         log "BUILD kernel=$kernel BLOCK=$block PREC=$PREC"
     fi
 
     make \
         KERNEL="$kernel" \
+        X_LAYOUT="$X_LAYOUT" \
         BLOCK="$block" \
         PREC="$PREC" \
         SMEM_PAD="$smem_pad" \
@@ -1040,6 +1079,9 @@ handle_failure() {
 
     if [[ "$kernel" == "cuda_warp_tiled" ]]; then
         kernel="${kernel}(tile${WARP_COL_TILE})"
+    fi
+    if [[ "$X_LAYOUT" == "column" ]]; then
+        kernel="${kernel}(xcol)"
     fi
 
     init_failure_file
@@ -1121,6 +1163,7 @@ write_metadata() {
         echo "check=$CHECK"
         echo "a_mode=$A_MODE"
         echo "x_mode=$X_MODE"
+        echo "x_layout=$X_LAYOUT"
         echo "kernel=$KERNEL"
         echo "kernels=${KERNELS[*]}"
         echo "k_sweep=${K_SWEEP_KS[*]}"
@@ -1333,6 +1376,7 @@ experiment_registers() {
         set +e
         make -B \
             KERNEL="$kernel" \
+            X_LAYOUT="$X_LAYOUT" \
             BLOCK="$BLOCK" \
             PREC="$PREC" \
             SMEM_PAD="$SMEM_PAD" \
