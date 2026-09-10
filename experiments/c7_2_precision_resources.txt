@@ -1,0 +1,16 @@
+# C7.2 - risorse FP32/FP64: 6 compilazioni con -Xptxas -v, BLOCK=256.
+# ./script/run_cuda_experiments.sh --suite experiments/c7_2_precision_resources.txt
+# Ogni build include gia' tutti i k: selezionare K=3,8,20,32 dal log completo
+# *_ptxas_*.txt (non dal solo *_registers.txt, che omette i nomi funzione).
+# Raccogliere registers/thread, stack frame, spill stores/loads e shared statica.
+# Il numero di registri e' espresso in registri a 32 bit in entrambe le precisioni.
+# Nessuna esecuzione di benchmark: ks identifica i casi da analizzare, non nuove build.
+# Per smem la shared dinamica va correlata al piano runtime nei CSV di C7.1:
+# per i K specializzati, bytes = x_rows_per_tile * (K + 1) * sizeof(scalar_t).
+# blocks_per_sm e' una capacita' teorica; l'occupancy effettiva richiede profiling.
+c7_2_precision_resources/cuda_warp_double.conf
+c7_2_precision_resources/cuda_warp_float.conf
+c7_2_precision_resources/cuda_warp_smem_double.conf
+c7_2_precision_resources/cuda_warp_smem_float.conf
+c7_2_precision_resources/cuda_warp_tiled_double.conf
+c7_2_precision_resources/cuda_warp_tiled_float.conf
