@@ -1,0 +1,144 @@
+\chapter{Introduzione}
+\label{cap:introduzione}
+
+\section{Il problema}
+
+Il progetto realizza un nucleo di calcolo per il prodotto fra una matrice densa
+e un multivettore,
+\begin{equation}
+  Y \leftarrow A X ,
+  \qquad
+  A \in \mathbb{R}^{M \times N},\quad
+  X \in \mathbb{R}^{N \times k},\quad
+  Y \in \mathbb{R}^{M \times k},
+  \label{eq:problema}
+\end{equation}
+con $k$ \emph{piccolo}: il multivettore \`e una matrice densa alta e strettissima.
+Il codice funziona per $k$ generico ed \`e collaudato sui cinque valori richiesti
+dalla traccia, $k \in \{3, 6, 8, 20, 32\}$, oltre che su valori che non ricevono
+alcuna specializzazione ($k \in \{1, 7, 17, 40, 64\}$), usati proprio per
+misurare quanto vale la specializzazione stessa.
+
+La ristrettezza di $k$ non \`e un dettaglio: \`e la caratteristica che rende il
+problema diverso sia da un GEMM quadrato sia da $k$ prodotti matrice-vettore
+indipendenti. \`E troppo poco perch\'e una libreria general-purpose ammortizzi il
+proprio percorso di selezione dell'algoritmo, ed \`e abbastanza perch\'e il riuso
+in registro degli elementi di $A$ cambi radicalmente l'intensit\`a aritmetica del
+nucleo. Entrambe le affermazioni sono verificate sperimentalmente in questa
+relazione e non date per buone: la prima con il backend cuBLAS
+(\cref{sec:cublas}), la seconda con il confronto fra schema~A e schema~B
+(\cref{sec:schemi}).
+
+\section{Requisiti della traccia e dove sono soddisfatti}
+
+\Cref{tab:requisiti} mette in corrispondenza ogni requisito con il punto della
+relazione e del codice che lo soddisfa. \`E la mappa di lettura del documento.
+
+\begin{table}[H]
+\centering
+\caption{Requisiti della traccia e loro copertura.}
+\label{tab:requisiti}
+\footnotesize
+\begin{tabular}{@{}p{0.44\linewidth}p{0.26\linewidth}p{0.24\linewidth}@{}}
+\toprule
+\textbf{Requisito} & \textbf{Dove nel codice} & \textbf{Dove in relazione} \\
+\midrule
+$Y \leftarrow AX$, $A$ densa $M\times N$, $X$ multivettore $N\times k$
+  & \file{src/mpi/matmul\_mpi.c} & \cref{cap:problema} \\
+$k$ generico, collaudato su $3,6,8,20,32$
+  & \file{src/kernel/*} (specializzazioni + fallback) & \cref{sec:specializzazione} \\
+$M$, $N$ scelti dall'utente a runtime
+  & \file{src/bench/main.c} (\code{-M -N}) & \cref{app:cli} \\
+Parallelizzazione MPI con attenzione allo scambio dati
+  & \file{src/mpi/} & \cref{cap:mpi} \\
+Corretta gestione degli indici
+  & \file{src/index/index.c} + test dedicato & \cref{sec:indici}, \cref{sec:validazione-indici} \\
+Parallelizzazione interna al processo (CUDA)
+  & \file{src/kernel/cuda\_*.cu} & \cref{cap:cuda} \\
+$A$ distribuita su griglia di processi 2D, estensione scelta dall'utente
+  & \file{src/mpi/grid.c} (\code{--pr --pc}) & \cref{sec:griglia} \\
+$X$ e $Y$ su una sola riga/colonna della griglia
+  & \file{src/mpi/distrib.c} & \cref{sec:layout} \\
+Sviluppo in C
+  & tutto \file{src/} (C11; i soli \file{.cu} sono C++ per nvcc) & \cref{sec:interfaccia} \\
+Collaudo contro implementazione seriale minimale
+  & \file{src/serial/serial.c}, \code{--check} & \cref{cap:validazione} \\
+Funzioni ausiliarie di preprocessamento dei dati
+  & \file{src/gen/}, \file{src/index/}, \file{src/mpi/distrib.c} & \cref{sec:generazione} \\
+Misura delle prestazioni sul server di dipartimento
+  & \file{script/}, \file{experiments/} & \cref{cap:metodologia} \\
+Almeno 3 rapporti $M:N$ crescenti, incluso $M=N$
+  & campagna C1 & \cref{sec:c1} \\
+$\mathrm{FLOPS} = 2MNk/T$, trasferimenti CUDA esclusi da $T$
+  & \file{src/bench/main.c} & \cref{sec:metriche} \\
+Ripartizione del lavoro nel gruppo
+  & --- & \cref{sec:ripartizione} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Contributo e criteri di progetto}
+
+Tre criteri hanno guidato tutte le scelte descritte nel seguito, e conviene
+enunciarli qui perch\'e ricorrono in ogni capitolo.
+
+\paragraph{Una variabile per volta.} Ogni variante di kernel differisce dalla
+precedente per un solo aspetto, in modo che la differenza di tempo misurata sia
+attribuibile. \kernelname{cuda\_warp\_smem}, per esempio, \`e
+\kernelname{cuda\_warp} con cambiata soltanto la provenienza degli elementi di
+$X$: stesso ordine dei cicli, stessa lettura singola di $A$, stessa riduzione
+per shuffle. \`E ci\`o che rende il confronto una misura e non un aneddoto.
+
+\paragraph{Gli invarianti si impongono, non si sperano.} Diversi errori
+possibili in questo progetto non fanno fallire nulla: producono risultati
+sbagliati in silenzio. Un $\code{ldx} \neq k$ renderebbe scorretto il conteggio
+contiguo di \code{MPI\_Bcast}; una partizione degli indici applicata in modo
+incoerente fra colonne di $A$ e righe di $X$ darebbe somme sbagliate. Dove un
+invariante di questo tipo esiste, il codice lo verifica esplicitamente e
+termina il job con un messaggio, fuori dalla regione cronometrata.
+
+\paragraph{Ogni numero \`e riproducibile.} La generazione dei dati \`e
+deterministica e senza stato, ogni configurazione di build produce un binario
+con nome proprio, e ogni campagna scrive accanto ai risultati i metadati
+completi dell'ambiente (commit git, versione di \code{nvcc} e \code{mpirun},
+parametri). \`E la premessa perch\'e un confronto fra due righe di un CSV significhi
+qualcosa.
+
+\section{Struttura della relazione}
+
+\Cref{cap:problema} formalizza il problema e giustifica l'ordine dei cicli
+scelto per il nucleo locale. \Cref{cap:architettura} descrive l'architettura
+del software e l'interfaccia unica che rende il codice MPI indipendente dal
+backend. \Cref{cap:mpi} tratta la decomposizione a griglia 2D, la
+distribuzione dei dati e il modello di costo delle comunicazioni.
+\Cref{cap:kernel-cpu,cap:cuda} descrivono rispettivamente il nucleo di CPU e i
+quattro backend CUDA. \Cref{cap:roofline} costruisce il modello roofline che
+fa da riferimento a tutte le misure. \Cref{cap:metodologia} definisce metriche
+e campagne, \cref{cap:validazione} la strategia di correttezza,
+\cref{cap:risultati} presenta e discute i risultati.
+
+\section{Ripartizione del lavoro}
+\label{sec:ripartizione}
+
+\begin{daverificare}
+La traccia richiede che un elaborato di gruppo indichi la suddivisione del
+lavoro fra i componenti. Compilare la tabella seguente prima della consegna.
+\end{daverificare}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{@{}p{0.32\linewidth}p{0.3\linewidth}p{0.3\linewidth}@{}}
+\toprule
+\textbf{Attivit\`a} & \textbf{\autoreuno} & \textbf{\autoredue} \\
+\midrule
+Infrastruttura MPI e distribuzione dati & \dato & \dato \\
+Nucleo di CPU e specializzazioni & \dato & \dato \\
+Backend CUDA & \dato & \dato \\
+Campagne di misura e analisi & \dato & \dato \\
+Validazione e test & \dato & \dato \\
+Relazione & \dato & \dato \\
+\bottomrule
+\end{tabular}
+\caption{Ripartizione del lavoro. \TODO{compilare}}
+\end{table}

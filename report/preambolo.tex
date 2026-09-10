@@ -1,0 +1,186 @@
+% ---------------------------------------------------------------------------
+% Preambolo: pacchetti, stile, macro del progetto.
+% Nessun pacchetto esotico: tutto quello che serve sta in una TeX Live standard.
+% ---------------------------------------------------------------------------
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\IfFileExists{lmodern.sty}{\usepackage{lmodern}}{}
+\usepackage[italian]{babel}
+\usepackage{microtype}
+
+% Tolleranza tipografica: i nomi di file in tt non si sillabano, e senza un po'
+% di elasticita' finirebbero fuori dal margine.
+\tolerance=1200
+\emergencystretch=3em
+\hbadness=10000
+
+\usepackage[a4paper,top=2.6cm,bottom=2.6cm,left=2.7cm,right=2.7cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage[font=small,labelfont=bf]{caption}
+\usepackage{subcaption}
+\usepackage{fancyhdr}
+\usepackage{listings}
+\usepackage{tcolorbox}
+\usepackage{siunitx}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.16}
+\usepackage{pgfplotstable}
+\usepackage[hidelinks]{hyperref}
+\usepackage[italian]{cleveref}
+
+% ---------------------------------------------------------------------------
+% Unita' di misura
+% ---------------------------------------------------------------------------
+\sisetup{
+  detect-weight       = true,
+  detect-family       = true,
+  group-digits        = integer,
+  group-minimum-digits= 4,
+  output-decimal-marker = {,},
+  per-mode            = symbol
+}
+\DeclareSIUnit{\flop}{FLOP}
+\DeclareSIUnit{\gflops}{GFLOPS}
+\DeclareSIUnit{\gib}{GiB}
+\DeclareSIUnit{\mib}{MiB}
+\DeclareSIUnit{\kib}{KiB}
+
+% ---------------------------------------------------------------------------
+% Intestazioni
+% ---------------------------------------------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\nouppercase{\leftmark}}
+\fancyhead[R]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ---------------------------------------------------------------------------
+% Notazione ricorrente del progetto
+% ---------------------------------------------------------------------------
+\newcommand{\Mat}[1]{\ensuremath{#1}}
+\newcommand{\mloc}{\ensuremath{m_{\text{loc}}}}
+\newcommand{\nloc}{\ensuremath{n_{\text{loc}}}}
+\newcommand{\Prow}{\ensuremath{P_r}}
+\newcommand{\Pcol}{\ensuremath{P_c}}
+\newcommand{\Ai}{\ensuremath{I}}                  % intensita' aritmetica
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\file}[1]{\texttt{#1}}
+\newcommand{\kernelname}[1]{\texttt{#1}}
+
+% ---------------------------------------------------------------------------
+% Marcatori dei dati ancora da raccogliere.
+%
+% Sono volutamente VISIBILI: questa relazione viene compilata mentre le
+% campagne sono in corso, e un segnaposto che non si vede e' un segnaposto che
+% finisce in consegna. Per la versione finale basta commentare la riga
+% \todovisibiletrue qui sotto: i marcatori spariscono dal PDF e restano nel
+% sorgente.
+% ---------------------------------------------------------------------------
+\newif\iftodovisibile
+\todovisibiletrue          % <-- commentare questa riga per la consegna finale
+
+\definecolor{todorosso}{HTML}{B3261E}
+\definecolor{todogiallo}{HTML}{FFF4E5}
+\definecolor{grigiodato}{HTML}{9E9E9E}
+
+% Nota a margine da risolvere
+\newcommand{\TODO}[1]{%
+  \iftodovisibile
+    \textcolor{todorosso}{\textbf{[DA FARE: #1]}}%
+  \fi
+}
+
+% Singolo numero non ancora misurato, dentro una tabella
+\newcommand{\dato}{\textcolor{grigiodato}{--}}
+
+% Blocco di testo che dipende da misure non ancora disponibili
+\newenvironment{daverificare}
+  {\begin{tcolorbox}[colback=todogiallo,colframe=todorosso,boxrule=0.5pt,
+                     left=6pt,right=6pt,top=4pt,bottom=4pt,
+                     title=\small\textbf{Da completare con i dati della campagna}]}
+  {\end{tcolorbox}}
+
+% Ipotesi interpretativa non ancora confermata da un profilo
+\newenvironment{ipotesi}[1]
+  {\begin{tcolorbox}[colback=blue!3,colframe=blue!35,boxrule=0.5pt,
+                     left=6pt,right=6pt,top=4pt,bottom=4pt,
+                     title=\small\textbf{Ipotesi: #1}]}
+  {\end{tcolorbox}}
+
+% Segnaposto grafico: riquadro delle dimensioni della figura definitiva
+\newcommand{\figuradafare}[2][0.72\linewidth]{%
+  \begin{tcolorbox}[colback=todogiallo,colframe=todorosso,boxrule=0.6pt,
+                    width=#1,halign=center,valign=center,height=5.2cm]
+    \textcolor{todorosso}{\textbf{Figura da generare}}\\[2pt]
+    \small #2
+  \end{tcolorbox}%
+}
+
+% ---------------------------------------------------------------------------
+% Listati
+% ---------------------------------------------------------------------------
+\definecolor{codegrigio}{HTML}{F5F5F5}
+\definecolor{codecommento}{HTML}{4C7A34}
+\definecolor{codekeyword}{HTML}{1A4F9C}
+
+\lstdefinestyle{scpa}{
+  backgroundcolor=\color{codegrigio},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{codekeyword}\bfseries,
+  commentstyle=\color{codecommento}\itshape,
+  stringstyle=\color{todorosso},
+  numbers=none,
+  frame=single,
+  framesep=4pt,
+  rulecolor=\color{black!25},
+  breaklines=true,
+  breakatwhitespace=true,
+  showstringspaces=false,
+  columns=fullflexible,
+  keepspaces=true,
+  captionpos=b,
+  aboveskip=1.0em,
+  belowskip=1.0em,
+  literate={à}{{\`a}}1 {è}{{\`e}}1 {é}{{\'e}}1 {ì}{{\`i}}1
+           {ò}{{\`o}}1 {ù}{{\`u}}1 {°}{{$^\circ$}}1
+}
+\lstset{style=scpa}
+\lstdefinelanguage{cuda}[ANSI]{C++}{
+  morekeywords={__global__,__device__,__shared__,__restrict__,__syncthreads,
+                __shfl_down_sync,blockIdx,threadIdx,blockDim,cudaMalloc,
+                cudaMemcpy,cudaEventRecord,scalar_t}
+}
+\lstdefinelanguage{shell}{
+  morekeywords={make,mpirun,nvcc,module,ompi_info,nsys,ncu,nvidia-smi},
+  sensitive=true,
+  morecomment=[l]{\#}
+}
+\renewcommand{\lstlistingname}{Listato}
+
+% ---------------------------------------------------------------------------
+% Stile comune dei grafici
+% ---------------------------------------------------------------------------
+\pgfplotsset{
+  scpa/.style={
+    width=0.78\linewidth,
+    height=6cm,
+    grid=both,
+    grid style={line width=.1pt, draw=black!12},
+    major grid style={line width=.2pt,draw=black!30},
+    tick align=outside,
+    legend cell align=left,
+    legend style={font=\footnotesize,draw=black!25},
+    label style={font=\small},
+    tick label style={font=\footnotesize},
+    every axis plot/.append style={line width=1pt, mark size=2pt}
+  }
+}

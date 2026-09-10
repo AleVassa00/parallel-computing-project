@@ -1,0 +1,116 @@
+\babel@toc {italian}{}\relax 
+\babel@toc {italian}{}\relax 
+\contentsline {chapter}{\numberline {1}Introduzione}{1}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Il problema}{1}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Requisiti della traccia e dove sono soddisfatti}{1}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Contributo e criteri di progetto}{2}{section.1.3}%
+\contentsline {paragraph}{Una variabile per volta.}{2}{section*.3}%
+\contentsline {paragraph}{Gli invarianti si impongono, non si sperano.}{2}{section*.4}%
+\contentsline {paragraph}{Ogni numero \`e riproducibile.}{2}{section*.5}%
+\contentsline {section}{\numberline {1.4}Struttura della relazione}{3}{section.1.4}%
+\contentsline {section}{\numberline {1.5}Ripartizione del lavoro}{3}{section.1.5}%
+\contentsline {chapter}{\numberline {2}Il nucleo di calcolo}{4}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Formalizzazione e conteggio delle operazioni}{4}{section.2.1}%
+\contentsline {section}{\numberline {2.2}Ordine dei cicli: schema A contro schema B}{4}{section.2.2}%
+\contentsline {section}{\numberline {2.3}Precisione}{5}{section.2.3}%
+\contentsline {section}{\numberline {2.4}Generazione riproducibile dei dati}{5}{section.2.4}%
+\contentsline {chapter}{\numberline {3}Architettura del software}{7}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Moduli}{7}{section.3.1}%
+\contentsline {section}{\numberline {3.2}L'interfaccia unica del kernel locale}{7}{section.3.2}%
+\contentsline {subsection}{\numberline {3.2.1}Perch\'e il ciclo di vita ha tre fasi}{8}{subsection.3.2.1}%
+\contentsline {subsection}{\numberline {3.2.2}Lo stato in un contesto opaco}{8}{subsection.3.2.2}%
+\contentsline {subsection}{\numberline {3.2.3}Compatibilit\`a C / C++ e il test che la difende}{8}{subsection.3.2.3}%
+\contentsline {section}{\numberline {3.3}Il driver di misura}{8}{section.3.3}%
+\contentsline {section}{\numberline {3.4}Build: una configurazione, un binario}{9}{section.3.4}%
+\contentsline {chapter}{\numberline {4}Parallelizzazione MPI}{10}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Decomposizione a griglia bidimensionale}{10}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Partizionamento degli indici}{10}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Layout dei blocchi locali}{11}{section.4.3}%
+\contentsline {subsection}{\numberline {4.3.1}Le tre leading dimension non sono equivalenti}{11}{subsection.4.3.1}%
+\contentsline {section}{\numberline {4.4}Distribuzione iniziale dei dati}{11}{section.4.4}%
+\contentsline {paragraph}{\texttt {--a-mode local}.}{11}{section*.10}%
+\contentsline {paragraph}{\texttt {--a-mode global}.}{12}{section*.11}%
+\contentsline {paragraph}{\texttt {--x-mode local} / \texttt {global}.}{12}{section*.12}%
+\contentsline {section}{\numberline {4.5}L'algoritmo distribuito}{12}{section.4.5}%
+\contentsline {section}{\numberline {4.6}Modello di costo della comunicazione}{12}{section.4.6}%
+\contentsline {chapter}{\numberline {5}Il nucleo di CPU}{14}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Specializzazione su $k$}{14}{section.5.1}%
+\contentsline {subsection}{\numberline {5.1.1}Il microbenchmark che misura la specializzazione}{15}{subsection.5.1.1}%
+\contentsline {section}{\numberline {5.2}Perch\'e $\texttt {KB} = 32$}{15}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Ci\`o che il compilatore vede}{15}{section.5.3}%
+\contentsline {section}{\numberline {5.4}Il costo nascosto: la rilettura di $X$}{15}{section.5.4}%
+\contentsline {chapter}{\numberline {6}I backend CUDA}{17}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Struttura comune}{17}{section.6.1}%
+\contentsline {paragraph}{Perch\'e i \texttt {cudaEvent} e non l'orologio dell'host.}{17}{section*.15}%
+\contentsline {paragraph}{La differenza $t_{\text {local}} - t_{\text {kernel}}$.}{17}{section*.16}%
+\contentsline {paragraph}{Capienza della VRAM.}{18}{section*.17}%
+\contentsline {paragraph}{Un solo device.}{18}{section*.18}%
+\contentsline {section}{\numberline {6.2}\texttt {cuda\_naive}: la baseline}{18}{section.6.2}%
+\contentsline {section}{\numberline {6.3}\texttt {cuda\_warp}: un warp per riga}{18}{section.6.3}%
+\contentsline {section}{\numberline {6.4}\texttt {cuda\_warp\_smem}: la fetta di $X$ in shared memory}{18}{section.6.4}%
+\contentsline {paragraph}{Il difetto attaccato.}{19}{section*.19}%
+\contentsline {paragraph}{Il rimedio.}{19}{section*.20}%
+\contentsline {subsection}{\numberline {6.4.1}Il conflitto sui banchi e il padding a $k+1$}{19}{subsection.6.4.1}%
+\contentsline {subsection}{\numberline {6.4.2}Perch\'e il tile si dimensiona a runtime}{19}{subsection.6.4.2}%
+\contentsline {subsection}{\numberline {6.4.3}Perch\'e non ci sono uscite anticipate}{19}{subsection.6.4.3}%
+\contentsline {section}{\numberline {6.5}\texttt {cuda\_warp\_tiled}: meno accumulatori per lane}{20}{section.6.5}%
+\contentsline {section}{\numberline {6.6}\texttt {cublas}: il riferimento esterno}{20}{section.6.6}%
+\contentsline {subsection}{\numberline {6.6.1}Riga contro colonna: nessuna trasposizione}{20}{subsection.6.6.1}%
+\contentsline {subsection}{\numberline {6.6.2}L'attesa \`e che vada male}{20}{subsection.6.6.2}%
+\contentsline {section}{\numberline {6.7}Pi\`u rank MPI sulla stessa GPU}{21}{section.6.7}%
+\contentsline {chapter}{\numberline {7}Modello roofline}{22}{chapter.7}%
+\contentsline {section}{\numberline {7.1}Roofline della GPU}{22}{section.7.1}%
+\contentsline {subsection}{\numberline {7.1.1}Che cosa il modello non dice}{23}{subsection.7.1.1}%
+\contentsline {section}{\numberline {7.2}Roofline della CPU}{24}{section.7.2}%
+\contentsline {chapter}{\numberline {8}Metodologia sperimentale}{25}{chapter.8}%
+\contentsline {section}{\numberline {8.1}Ambiente di misura}{25}{section.8.1}%
+\contentsline {paragraph}{Binding obbligatorio.}{25}{section*.26}%
+\contentsline {section}{\numberline {8.2}Che cosa entra nel cronometro}{25}{section.8.2}%
+\contentsline {section}{\numberline {8.3}Stabilit\`a delle misure}{26}{section.8.3}%
+\contentsline {section}{\numberline {8.4}Le campagne}{26}{section.8.4}%
+\contentsline {subsection}{\numberline {8.4.1}C1 --- dimensioni crescenti per rapporto $M{:}N$}{27}{subsection.8.4.1}%
+\contentsline {subsection}{\numberline {8.4.2}C2 --- sweep su $k$, un backend per riga}{27}{subsection.8.4.2}%
+\contentsline {subsection}{\numberline {8.4.3}C3 --- baseline di CPU e specializzazione contro fallback}{27}{subsection.8.4.3}%
+\contentsline {subsection}{\numberline {8.4.4}C4 --- strong scaling}{27}{subsection.8.4.4}%
+\contentsline {subsection}{\numberline {8.4.5}C5 --- weak scaling}{28}{subsection.8.4.5}%
+\contentsline {subsection}{\numberline {8.4.6}C6 --- forma della griglia a $P$ fisso}{28}{subsection.8.4.6}%
+\contentsline {section}{\numberline {8.5}Riproducibilit\`a}{28}{section.8.5}%
+\contentsline {chapter}{\numberline {9}Correttezza e validazione}{29}{chapter.9}%
+\contentsline {section}{\numberline {9.1}L'oracolo seriale}{29}{section.9.1}%
+\contentsline {section}{\numberline {9.2}Una tolleranza che dipende da $N$}{29}{section.9.2}%
+\contentsline {section}{\numberline {9.3}Il test delle funzioni indice}{30}{section.9.3}%
+\contentsline {section}{\numberline {9.4}La matrice di collaudo}{30}{section.9.4}%
+\contentsline {chapter}{\numberline {10}Risultati}{32}{chapter.10}%
+\contentsline {section}{\numberline {10.1}Stato della raccolta dati}{32}{section.10.1}%
+\contentsline {section}{\numberline {10.2}C3 --- baseline di CPU}{32}{section.10.2}%
+\contentsline {subsection}{\numberline {10.2.1}Lettura: due regimi separati da una soglia di cache}{33}{subsection.10.2.1}%
+\contentsline {subsection}{\numberline {10.2.2}Conseguenza pratica}{34}{subsection.10.2.2}%
+\contentsline {subsection}{\numberline {10.2.3}Specializzazione contro fallback}{34}{subsection.10.2.3}%
+\contentsline {section}{\numberline {10.3}C2 --- confronto fra backend al variare di $k$}{35}{section.10.3}%
+\contentsline {subsection}{\numberline {10.3.1}Sweep sul padding della shared memory}{36}{subsection.10.3.1}%
+\contentsline {subsection}{\numberline {10.3.2}Sweep sulla dimensione del blocco}{36}{subsection.10.3.2}%
+\contentsline {section}{\numberline {10.4}C1 --- taglia e rapporto $M{:}N$}{36}{section.10.4}%
+\contentsline {section}{\numberline {10.5}C6 --- perch\'e la griglia \`e bidimensionale}{37}{section.10.5}%
+\contentsline {section}{\numberline {10.6}C4 --- strong scaling}{38}{section.10.6}%
+\contentsline {section}{\numberline {10.7}C5 --- weak scaling}{39}{section.10.7}%
+\contentsline {section}{\numberline {10.8}Sintesi}{39}{section.10.8}%
+\contentsline {chapter}{\numberline {11}Conclusioni}{40}{chapter.11}%
+\contentsline {section}{\numberline {11.1}Che cosa \`e stato realizzato}{40}{section.11.1}%
+\contentsline {section}{\numberline {11.2}Che cosa dicono i dati finora}{40}{section.11.2}%
+\contentsline {section}{\numberline {11.3}Lavori futuri}{41}{section.11.3}%
+\contentsline {paragraph}{Blocking del ciclo su $j$ sul nucleo di CPU.}{41}{section*.47}%
+\contentsline {paragraph}{Parallelizzazione OpenMP interna al processo.}{41}{section*.48}%
+\contentsline {paragraph}{MPI CUDA-aware.}{41}{section*.49}%
+\contentsline {paragraph}{MPS per la condivisione della GPU.}{41}{section*.50}%
+\contentsline {paragraph}{Profilazione con \texttt {ncu}.}{41}{section*.51}%
+\contentsline {chapter}{\numberline {A}Interfaccia a riga di comando e formato dei dati}{42}{appendix.Alph1}%
+\contentsline {section}{\numberline {A.1}Opzioni del driver}{42}{section.Alph1.1}%
+\contentsline {section}{\numberline {A.2}Colonne del CSV}{42}{section.Alph1.2}%
+\contentsline {chapter}{\numberline {B}Riproduzione dei risultati}{44}{appendix.Alph2}%
+\contentsline {section}{\numberline {B.1}Build}{44}{section.Alph2.1}%
+\contentsline {section}{\numberline {B.2}Validazione}{44}{section.Alph2.2}%
+\contentsline {section}{\numberline {B.3}Esecuzione singola}{44}{section.Alph2.3}%
+\contentsline {section}{\numberline {B.4}Campagne}{45}{section.Alph2.4}%
+\contentsline {section}{\numberline {B.5}Unione dei CSV di una campagna}{45}{section.Alph2.5}%
+\contentsline {section}{\numberline {B.6}Note operative sul server}{45}{section.Alph2.6}%
+\contentsline {section}{\numberline {B.7}Compilazione di questa relazione}{46}{section.Alph2.7}%

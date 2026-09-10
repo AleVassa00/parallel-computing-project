@@ -1,0 +1,117 @@
+\chapter{Riproduzione dei risultati}
+\label{app:riproducibilita}
+
+\section{Build}
+
+\begin{lstlisting}[language=shell,caption={Compilazione delle configurazioni usate nelle campagne.}]
+make                                  # bin/matmul_mpi  (double, scheme_a)
+make FORCE_GENERIC_K=1                # bin/matmul_mpi-generic
+make PREC=float                       # bin/matmul_mpi-float
+make KERNEL=cuda_naive                # richiede nvcc: solo sul server
+make KERNEL=cuda_warp
+make KERNEL=cuda_warp_smem
+make KERNEL=cuda_warp_smem SMEM_PAD=0
+make KERNEL=cuda_warp_tiled
+make KERNEL=cublas                    # aggiunge -lcublas da solo
+\end{lstlisting}
+
+Ogni comando stampa in chiusura quale binario ha prodotto e con quali variabili.
+Su una macchina priva di \code{nvcc} le build CUDA si fermano con un messaggio
+esplicito e tutto il resto continua a funzionare.
+
+\section{Validazione}
+
+Da eseguire su taglie piccole, prima delle campagne e per ogni combinazione di
+backend e precisione che si intende misurare.
+
+\begin{lstlisting}[language=shell]
+make test                     # funzioni indice, senza MPI
+make check-cxx                # kernel.h e util.h includibili da C++
+make check                    # prodotto distribuito contro oracolo, double
+make PREC=float check         # stessa validazione in singola precisione
+make check-padding            # lda = n_loc + 8
+make KERNEL=cuda_warp check
+make KERNEL=cuda_warp_smem check
+make KERNEL=cublas check
+\end{lstlisting}
+
+\section{Esecuzione singola}
+
+\begin{lstlisting}[language=shell]
+# CPU, 4 rank su griglia 2x2
+mpirun -np 4 --bind-to core --map-by core \
+  ./bin/matmul_mpi -M 8000 -N 8000 -k 8 --pr 2 --pc 2 --reps 10
+
+# GPU, rank singolo: la configurazione con cui si caratterizza un kernel
+mpirun -np 1 --bind-to core --map-by core ./bin/matmul_mpi-cuda_warp \
+  -M 20000 -N 20000 -k 8 --pr 1 --pc 1 --a-mode local --warmup 2 --reps 10
+\end{lstlisting}
+
+Il binding non \`e facoltativo sulle esecuzioni multi-rank: senza, le misure sono
+rumore.
+
+\section{Campagne}
+
+\begin{lstlisting}[language=shell]
+./script/run_cuda_experiments.sh --suite experiments/c3_cpu_baseline.txt
+./script/run_cuda_experiments.sh --suite experiments/c2_k_sweep.txt
+./script/run_cuda_experiments.sh --suite experiments/c1_size_ratio_cpu.txt
+./script/run_cuda_experiments.sh --suite experiments/c1_size_ratio_gpu.txt
+./script/run_cuda_experiments.sh --suite experiments/c6_grid_shape.txt
+./script/run_cuda_experiments.sh --suite experiments/c4_strong_scaling.txt
+./script/run_cuda_experiments.sh --suite experiments/c5_weak_scaling.txt
+\end{lstlisting}
+
+\begin{tcolorbox}[colback=todogiallo,colframe=todorosso,boxrule=0.5pt,
+                  title=\textbf{Prima di rilanciare una campagna}]
+Rilanciare sovrascrive i CSV della campagna. Archiviare la cartella:
+\begin{lstlisting}[language=shell]
+mv results/c4_strong_scaling results/c4_strong_scaling.$(date +%F_%H%M)
+\end{lstlisting}
+\end{tcolorbox}
+
+\section{Unione dei CSV di una campagna}
+
+Tutti i CSV aggregati di una cartella condividono l'intestazione:
+
+\begin{lstlisting}[language=shell]
+find results/c1_size_ratio_cpu -name '*.csv' \
+     ! -name '*_raw.csv' ! -name '*_failures.csv' \
+  | sort | xargs awk 'FNR==1 && NR!=1 {next} {print}' \
+  > results/c1_size_ratio_cpu/merged.csv
+\end{lstlisting}
+
+I file \code{*\_raw.csv} hanno un'altra intestazione e vanno uniti separatamente.
+
+\section{Note operative sul server}
+
+\begin{itemize}[left=0pt]
+  \item \textbf{Nodo di calcolo, non frontend.} Il nodo di login non ha accesso
+        diretto alla GPU: \code{nvcc --version},
+        \code{ompi\_info | grep cuda}, \code{deviceQuery} e \code{nvidia-smi}
+        vanno eseguiti sui nodi di calcolo attraverso lo scheduler, e cos\`i tutti
+        i benchmark.
+  \item \textbf{Trasporto MPI.} Il runner usa \code{btl=self,sm} per default. Il
+        componente \code{sm} non esiste in Open MPI 3.x/4.x, dove si chiama
+        \code{vader}: se le esecuzioni multi-rank falliscono con un errore di
+        BTL, verificare con \code{ompi\_info --param btl all} e aggiungere
+        \code{--btl self,vader} sulla riga di comando, che ha la precedenza sul
+        \code{.conf}.
+  \item \textbf{bash $\ge$ 4.4.} Il runner espande array potenzialmente vuoti
+        sotto \code{set -u}: su bash 3.2 (macOS) si ferma con
+        \code{unbound variable}. Sul server Linux non si presenta.
+  \item \textbf{Memoria della GPU.} Un blocco locale $\num{40000}^2$ in doppia
+        precisione richiede \SI{12.8}{\gib} contro i \SI{15.5}{\gib} della
+        scheda: il programma si ferma prima di allocare, indicando quanta memoria
+        serve e quanta \`e libera.
+\end{itemize}
+
+\section{Compilazione di questa relazione}
+
+\begin{lstlisting}[language=shell]
+cd report && make          # oppure: latexmk -pdf main.tex
+\end{lstlisting}
+
+Per la versione di consegna, commentare la riga \code{\textbackslash todovisibiletrue}
+in \file{preambolo.tex}: i marcatori dei dati mancanti spariscono dal PDF e
+restano nel sorgente.

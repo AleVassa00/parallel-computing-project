@@ -1,0 +1,76 @@
+\chapter{Interfaccia a riga di comando e formato dei dati}
+\label{app:cli}
+
+\section{Opzioni del driver}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{@{}llp{0.5\linewidth}@{}}
+\toprule
+\textbf{Opzione} & \textbf{Default} & \textbf{Significato} \\
+\midrule
+\code{-M <int>} & 1024 & righe di $A$ \\
+\code{-N <int>} & 1024 & colonne di $A$ (e righe di $X$) \\
+\code{-k <int>} & 8 & colonne del multivettore \\
+\code{--pr <int>} & pi\`u quadrata & righe della griglia di processi \\
+\code{--pc <int>} & pi\`u quadrata & colonne della griglia di processi \\
+\code{--reps <int>} & 10 & repetition cronometrate \\
+\code{--warmup <int>} & 2 & repetition di riscaldamento, non cronometrate \\
+\code{--seed <u64>} & fisso & seme del generatore \\
+\code{--a-mode <mode>} & \code{local} & \code{local}: ogni processo genera il
+  proprio blocco; \code{global}: il rank 0 materializza $A$ e la distribuisce \\
+\code{--x-mode <mode>} & \code{local} & come sopra per $X$, sulla sola riga 0
+  della griglia \\
+\code{--check} & off & valida contro il riferimento seriale \\
+\code{--csv} & off & stampa una riga CSV invece del report leggibile \\
+\code{--csv-header} & --- & stampa l'intestazione CSV ed esce \\
+\code{--csv-raw-file <path>} & --- & appende una riga per repetition a un CSV
+  ``raw'' \\
+\code{-h, --help} & --- & elenco delle opzioni \\
+\bottomrule
+\end{tabular}
+\caption{Opzioni di \file{bin/matmul\_mpi}.}
+\end{table}
+
+Le quattro combinazioni di \code{--a-mode} e \code{--x-mode} sono tutte valide e,
+a parit\`a di seed, producono gli stessi elementi globali.
+
+\section{Colonne del CSV}
+
+L'intestazione \`e emessa dal binario stesso (\code{--csv-header}), quindi non pu\`o
+divergere dalle colonne effettivamente scritte. \`E la ragione per cui tutti i CSV
+di una campagna si possono concatenare senza rischio.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.33\linewidth}p{0.6\linewidth}@{}}
+\toprule
+\textbf{Gruppo di colonne} & \textbf{Contenuto} \\
+\midrule
+\code{kernel, scalar, a\_mode, x\_mode} & identificazione della build e della
+  modalit\`a; \code{kernel} include i parametri che cambiano il codice generato \\
+\code{M, N, k, P, pr, pc, reps} & configurazione del problema \\
+\code{t\_bcast\_*, t\_local\_*, t\_reduce\_*} & tempi delle tre fasi, media e
+  deviazione standard \\
+\code{t\_total\_*} & tempo end-to-end reale: media, mediana, minimo, deviazione,
+  CV\% \\
+\code{t\_official\_*} & metrica ufficiale della \cref{eq:t-official}, stesse
+  statistiche \\
+\code{t\_kernel\_*} & solo kernel, misurato con \code{cudaEvent}; vale $-1$ sui
+  backend di CPU \\
+\code{t\_transfer\_runtime\_overhead\_*} & $t_{\text{local}} - t_{\text{kernel}}$:
+  trasferimenti \emph{e} overhead del runtime host \\
+\code{t\_setup\_s} & preprocessing del backend, fuori da tutte le metriche \\
+\code{gflops, gflops\_compute, gflops\_kernel} & le tre metriche di
+  \cref{sec:metriche} \\
+\code{rel\_err} & errore relativo contro l'oracolo, oppure $-1$ senza
+  \code{--check} \\
+\bottomrule
+\end{tabular}
+\caption{Struttura dell'intestazione CSV.}
+\end{table}
+
+Il CSV \emph{raw} ha un'altra intestazione --- una riga per repetition, senza
+statistiche --- e va unito separatamente da quello aggregato.

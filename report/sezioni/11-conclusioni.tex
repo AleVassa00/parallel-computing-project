@@ -1,0 +1,93 @@
+\chapter{Conclusioni}
+\label{cap:conclusioni}
+
+\section{Che cosa \`e stato realizzato}
+
+Il progetto implementa il prodotto $Y \leftarrow AX$ per matrice densa e
+multivettore stretto, distribuito su una griglia di processi bidimensionale con
+MPI e accelerato all'interno del singolo processo con CUDA. Il codice \`e in C11
+per la parte host e distribuita, in CUDA C++ per i kernel di device, e copre
+tutti i requisiti della traccia elencati in \cref{tab:requisiti}.
+
+Le scelte che hanno avuto l'effetto maggiore, e che sono anche quelle su cui
+poggia l'analisi:
+
+\begin{itemize}[nosep,left=0pt]
+  \item \textbf{lo schema~A} ($i \to j \to c$), che legge ogni elemento di $A$
+        una volta sola e lo riusa nei $k$ accumulatori in registro, portando
+        l'intensit\`a aritmetica da $2/s$ a $2k/s$
+        $\si{\flop\per\byte}$ --- il massimo ottenibile leggendo $A$ una volta;
+  \item \textbf{la griglia 2D}, che riduce il volume comunicato da $\Theta(kM)$
+        o $\Theta(kN)$ delle decomposizioni monodimensionali a
+        $\Theta(k\sqrt{MN}/\sqrt{P})$;
+  \item \textbf{il ciclo di vita a tre fasi} del kernel locale, che sposta fuori
+        dal cronometro tutto ci\`o che riguarda $A$ --- inclusa la copia H2D, che
+        altrimenti misurerebbe il PCIe invece della GPU --- rendendo la
+        prescrizione della traccia una propriet\`a strutturale e non una
+        sottrazione a posteriori;
+  \item \textbf{una variabile per volta} fra le varianti di kernel, che \`e la
+        condizione perch\'e ogni differenza misurata sia attribuibile.
+\end{itemize}
+
+\section{Che cosa dicono i dati finora}
+
+\begin{daverificare}
+Questa sezione va riscritta a raccolta ultimata. Al momento l'unica campagna
+disponibile \`e C3, e il suo risultato principale \`e riportato qui sotto.
+\end{daverificare}
+
+Il nucleo di CPU raggiunge \SI{10.9}{\giga\flop\per\second} a $k = 8$ su
+$\num{10000}\times\num{10000}$ in doppia precisione a rank singolo, e presenta
+una discontinuit\`a netta fra $k = 8$ e $k = 20$: il costo per elemento di $A$
+passa da \SI{1.47}{\nano\second} a \SI{7.68}{\nano\second}, mentre il lavoro
+cresce solo di $2{,}5\times$. L'analisi di \cref{sec:c3} attribuisce il
+fenomeno alla rilettura di $X$, che oltre una certa soglia esce dalla cache
+privata del core, e propone tre controlli per falsificare l'ipotesi. La firma a
+sostegno \`e un plateau di banda effettiva su $X$ intorno a
+\SIrange{17}{21}{\giga\byte\per\second}, costante su cinque valori di $k$ che
+coprono un fattore $3{,}2$.
+
+Il modello roofline prevede inoltre che sulla GPU, in doppia precisione, il
+nucleo sia compute-bound per ogni $k \ge 6$, con tetto a
+\SI{350}{\giga\flop\per\second} indipendente da $k$, mentre in singola
+precisione resti memory-bound per tutti i $k$ della traccia con tetto
+proporzionale a $k$. \`E una previsione forte e falsificabile, e le campagne C1 e
+C2 la mettono alla prova.
+
+\section{Lavori futuri}
+\label{sec:lavori-futuri}
+
+\paragraph{Blocking del ciclo su $j$ sul nucleo di CPU.} \`E la conseguenza
+diretta dell'analisi di \cref{sec:c3}: percorrere $X$ a fette che stiano nella
+cache privata, riusando ogni fetta su tutte le righe di $A$ prima di passare alla
+successiva. Non cambia lo schema, cambia solo l'ordine di visita, ed \`e lo stesso
+principio che \kernelname{cuda\_warp\_smem} applica sulla GPU con la shared
+memory. Se l'ipotesi sulla soglia di cache regge, \`e l'intervento con il
+rapporto guadagno/costo migliore dell'intero progetto per $k \ge 20$.
+
+\paragraph{Parallelizzazione OpenMP interna al processo.} La traccia ammette
+OpenMP \emph{oppure} CUDA e il progetto ha scelto CUDA. Un backend OpenMP dietro
+la stessa interfaccia \code{local\_gemm} permetterebbe di usare i circa venti
+core del nodo anche quando la GPU \`e occupata, e di misurare il regime ibrido
+MPI+OpenMP con lo stesso cronometro degli altri.
+
+\paragraph{MPI CUDA-aware.} L'interfaccia \code{local\_gemm} \`e stata progettata
+agnostica rispetto alla posizione della memoria proprio per consentirlo:
+passando puntatori device direttamente a \code{MPI\_Bcast} e \code{MPI\_Reduce}
+si eliminerebbero H2D di $X$ e D2H di $Y$ dal cammino di ogni invocazione, senza
+riscrivere n\'e \code{mpi\_matmul} n\'e i kernel. Il primo passo \`e verificare il
+supporto sul nodo di calcolo con \code{ompi\_info | grep cuda}.
+
+\paragraph{MPS per la condivisione della GPU.} Con MPS attivo i contesti di pi\`u
+rank non si alternerebbero sulla scheda (\cref{sec:serializzazione}), e i
+numeri multi-rank su GPU tornerebbero interpretabili come tempo di kernel invece
+che come throughput aggregato. \`E anche il modo per replicare, con analisi
+esplicita della serializzazione, i benchmark multi-griglia su GPU --- un punto
+che i lavori di confronto lasciano scoperto.
+
+\paragraph{Profilazione con \code{ncu}.} Le ipotesi formulate nei capitoli
+precedenti hanno tutte un contatore hardware che le decide: occupancy e banda L2
+per \kernelname{cuda\_warp\_smem}, conflitti di banco per lo sweep su
+\code{SMEM\_PAD}, registri per warp per \kernelname{cuda\_warp\_tiled}, kernel
+interno selezionato per \kernelname{cublas}. \`E il passo che trasforma le
+spiegazioni proposte in spiegazioni verificate.

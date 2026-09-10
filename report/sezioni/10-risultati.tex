@@ -1,0 +1,497 @@
+\chapter{Risultati}
+\label{cap:risultati}
+
+\section{Stato della raccolta dati}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Stato delle sei campagne al momento di questa versione della relazione.}
+\label{tab:stato-campagne}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Campagna} & \textbf{Stato} & \textbf{Dati disponibili} & \textbf{Sezione} \\
+\midrule
+C3 (baseline CPU) & parziale & build specializzata, $P=1$, $10000^2$ & \cref{sec:c3} \\
+C3 (build generica) & \textcolor{todorosso}{da eseguire} & --- & \cref{sec:c3-generic} \\
+C2 ($k$-sweep, 6 backend) & \textcolor{todorosso}{da eseguire} & --- & \cref{sec:ris-c2} \\
+C1 (taglia $\times$ rapporto) & \textcolor{todorosso}{da eseguire} & --- & \cref{sec:ris-c1} \\
+C6 (forma della griglia) & \textcolor{todorosso}{da eseguire} & --- & \cref{sec:ris-c6} \\
+C4 (strong scaling) & \textcolor{todorosso}{da eseguire} & --- & \cref{sec:ris-c4} \\
+C5 (weak scaling) & \textcolor{todorosso}{da eseguire} & --- & \cref{sec:ris-c5} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{daverificare}
+Tempo macchina stimato per completare la raccolta: circa \SI{45}{\minute},
+escluse le compilazioni, nell'ordine C3 (build generica) $\to$ C2 $\to$ C1
+$\to$ C6 $\to$ C4 $\to$ C5. Le sezioni che seguono sono gi\`a strutturate con le
+tabelle e le figure definitive: resta da sostituire i segnaposto con i numeri.
+\end{daverificare}
+
+\section{C3 --- baseline di CPU}
+\label{sec:c3}
+
+Configurazione: \kernelname{scheme\_a}, doppia precisione, $M = N = \num{10000}$,
+$P = 1$ (griglia $1 \times 1$), \code{--reps 20 --warmup 5}, seed
+\num{20252026}, generazione locale di $A$ e $X$. Senza comunicazione e senza GPU:
+\`e il nucleo di calcolo puro, ed \`e il denominatore di ogni speedup della
+relazione.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Campagna C3, build specializzata. $t$ \`e il tempo ufficiale medio su 20
+repetition; le ultime due colonne sono derivate, non misurate, e sono definite
+nel testo.}
+\label{tab:c3-misure}
+\begin{tabular}{@{}rrrrrr@{}}
+\toprule
+$k$ & $t$ [\si{\second}] & CV [\%] & GFLOPS & $B_A$ [\si{\giga\byte\per\second}] & $B_X$ [\si{\giga\byte\per\second}] \\
+\midrule
+3  & 0,1336 & 1,38 & 4,49  & 5,99 & 18,0 \\
+6  & 0,1424 & 1,17 & 8,43  & 5,62 & 33,7 \\
+8  & 0,1473 & 1,10 & 10,87 & 5,43 & 43,5 \\
+20 & 0,7680 & 0,37 & 5,21  & 1,04 & 20,8 \\
+32 & 1,3073 & 0,43 & 4,90  & 0,61 & 19,6 \\
+\midrule
+\multicolumn{6}{@{}l}{\footnotesize\itshape fallback generico (due passaggi su $A$, cfr.\ \cref{eq:passaggi})}\\
+40 & 1,7591 & 0,46 & 4,55  & 0,45 & 18,2 \\
+64 & 3,0332 & 0,37 & 4,22  & 0,26 & 16,9 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Il coefficiente di variazione resta fra $0{,}37\%$ e $1{,}38\%$: tutte le
+differenze discusse qui sotto sono di ordini di grandezza superiori alla
+dispersione delle misure. Il preprocessing del backend
+($t_{\text{setup}} \approx \SI{1.4}{\micro\second}$) \`e trascurabile, come atteso
+per un backend che si limita a registrare un puntatore.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[scpa,
+  xlabel={$k$}, ylabel={GFLOPS},
+  xmin=0, xmax=68, ymin=0, ymax=12,
+  legend pos=north east, width=0.8\linewidth, height=6cm]
+\addplot[blue!70!black, mark=*] coordinates {(3,4.491) (6,8.425) (8,10.866) (20,5.208) (32,4.896)};
+\addlegendentry{specializzato}
+\addplot[red!60!black, mark=square*, dashed] coordinates {(40,4.548) (64,4.220)};
+\addlegendentry{fallback generico}
+\end{axis}
+\end{tikzpicture}
+\caption{C3: prestazioni del nucleo di CPU al variare di $k$. Il massimo cade a
+$k = 8$; oltre, il throughput crolla.}
+\label{fig:c3-gflops}
+\end{figure}
+
+\subsection{Lettura: due regimi separati da una soglia di cache}
+
+La curva di \cref{fig:c3-gflops} ha una forma che non si spiega con il solo
+conteggio delle operazioni: fra $k = 8$ e $k = 20$ il lavoro cresce di
+$2{,}5\times$ ma il tempo cresce di $5{,}2\times$. Il modo pi\`u diretto di
+guardare il fenomeno \`e normalizzare rispetto al numero di elementi di $A$
+elaborati, che \`e costante:
+\begin{equation}
+  \tau(k) = \frac{t(k)}{MN}
+  \qquad\text{[tempo per elemento di } A\text{]}.
+\end{equation}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Costo per elemento di $A$ e dimensione di $X_{\text{loc}}$.}
+\label{tab:c3-tau}
+\begin{tabular}{@{}rrrr@{}}
+\toprule
+$k$ & $\tau$ [\si{\nano\second}] & $\tau/\tau_{k=3}$ & $|X_{\text{loc}}|$ \\
+\midrule
+3  & 1,34 & 1,00 & \SI{0.24}{\mega\byte} \\
+6  & 1,42 & 1,07 & \SI{0.48}{\mega\byte} \\
+8  & 1,47 & 1,10 & \SI{0.64}{\mega\byte} \\
+20 & 7,68 & 5,75 & \SI{1.60}{\mega\byte} \\
+32 & 13,07 & 9,78 & \SI{2.56}{\mega\byte} \\
+40 & 17,59 & 13,17 & \SI{3.20}{\mega\byte} \\
+64 & 30,33 & 22,70 & \SI{5.12}{\mega\byte} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Per $k \in \{3, 6, 8\}$ il costo per elemento di $A$ \`e \textbf{quasi
+costante}: triplicare il numero di FMA per elemento aumenta il tempo del
+$10\%$. \`E la firma di un regime in cui il collo di bottiglia non \`e il calcolo
+ma lo streaming di $A$: la banda effettiva su $A$,
+$B_A = MN s / t$, vale \SIrange{5.4}{6.0}{\giga\byte\per\second}, un valore
+plausibile per un singolo core, e le FMA aggiuntive si nascondono dietro le
+latenze di memoria.
+
+Da $k = 20$ in poi il comportamento cambia natura. Se il limite fosse la banda su
+$A$, $\tau$ resterebbe piatto; se fosse il picco di calcolo, $\tau$ crescerebbe
+\emph{proporzionalmente} a $k$. Non fa n\'e l'una n\'e l'altra cosa: da $k=8$ a
+$k=20$ cresce di $5{,}2\times$ per $2{,}5\times$ di lavoro. Il candidato che
+spiega il fattore \`e il traffico su $X$ della \cref{eq:traffico-x}. Definendo
+\begin{equation}
+  B_X = \frac{MNk\,s}{t}
+  \qquad\text{[banda effettiva sulla rilettura di } X\text{]},
+\end{equation}
+la colonna corrispondente di \cref{tab:c3-misure} mostra un valore
+sostanzialmente \textbf{costante} intorno a
+\SIrange{17}{21}{\giga\byte\per\second} per tutti i $k \ge 20$ --- inclusi
+$k = 40$ e $k = 64$, che passano dal fallback e leggono $A$ due volte. Un
+plateau di banda su cinque punti che coprono un fattore $3{,}2$ in $k$ \`e una
+firma difficile da attribuire al caso.
+
+\begin{ipotesi}{oltre $k \approx 8$ la rilettura di $X$ esce dalla cache privata}
+Nello schema~A ogni riga di $A$ percorre tutta $X_{\text{loc}}$. Finch\'e
+$X_{\text{loc}}$ sta nella cache privata del core, quelle riletture costano
+poco e il nucleo \`e limitato dallo streaming di $A$ ($k \le 8$: $B_A$ costante,
+$\tau$ piatto). Quando $X_{\text{loc}}$ supera quella capacit\`a --- fra
+\SI{0.64}{\mega\byte} a $k=8$ e \SI{1.6}{\mega\byte} a $k=20$ --- ogni riga di
+$A$ ricomincia a leggere $X$ dal livello successivo della gerarchia, e il tempo
+diventa proporzionale a $MNks$ diviso la banda di quel livello: da qui il
+plateau di $B_X$.
+
+Il valore del plateau, \SIrange{17}{21}{\giga\byte\per\second}, \`e
+coerente con una banda di cache condivisa su singolo core, e nettamente
+superiore alla banda DRAM per core che si legge nel regime $k \le 8$
+($\sim \SI{6}{\giga\byte\per\second}$): non si tratta quindi di traffico verso
+la memoria centrale.
+
+\textbf{Come falsificarla.} (i) Leggere la capacit\`a della cache privata con
+\code{lscpu -C} e verificare che cada fra \SI{0.64}{} e \SI{1.6}{\mega\byte};
+(ii) contare i miss del livello sospetto con \code{perf stat -e} sui $k$ ai due
+lati della soglia; (iii) ripetere C3 a $N$ dimezzato: se l'ipotesi \`e giusta, la
+soglia in $k$ deve raddoppiare, perch\'e $|X_{\text{loc}}| = Nks$.
+\end{ipotesi}
+
+L'ipotesi alternativa --- spill degli accumulatori oltre il numero di registri
+vettoriali disponibili --- \`e compatibile con il salto fra $k=8$ e $k=20$, ma non
+spiega perch\'e $B_X$ resti costante fino a $k = 64$ n\'e perch\'e il fallback a
+$\code{KB} = 32$, che tiene al massimo 32 accumulatori indipendentemente da $k$,
+mostri lo stesso plateau. Le due cause non si escludono, e il terzo controllo
+elencato sopra le separa in modo netto. \`E la verifica da eseguire prima della
+consegna.
+
+\subsection{Conseguenza pratica}
+
+Se l'ipotesi regge, il rimedio \`e noto e non richiede di cambiare schema: basta
+bloccare il ciclo su $j$ in fette di $X$ che stiano in cache, riusando ogni
+fetta su tutte le righe di $A$ prima di passare alla successiva --- lo stesso
+principio che \kernelname{cuda\_warp\_smem} applica sulla GPU con la shared
+memory (\cref{sec:smem}). \`E il primo dei lavori futuri
+(\cref{sec:lavori-futuri}), ed \`e anche il motivo per cui vale la pena
+identificare la causa e non limitarsi a osservare che ``oltre $k=8$ va peggio''.
+
+\subsection{Specializzazione contro fallback}
+\label{sec:c3-generic}
+
+\begin{daverificare}
+Eseguire \file{experiments/c3\_cpu\_baseline/generic.conf} (build
+\code{FORCE\_GENERIC\_K=1}) e completare \cref{tab:c3-generic}. Controllo di
+consistenza obbligatorio: le righe $k = 40$ e $k = 64$ devono coincidere entro il
+rumore nelle due build, perch\'e in entrambe passano dal fallback. Se non
+coincidono, la differenza sugli altri $k$ \`e rumore e non specializzazione.
+\end{daverificare}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Effetto della specializzazione su $k$, stesso problema e stessa
+sessione.}
+\label{tab:c3-generic}
+\begin{tabular}{@{}rrrr@{}}
+\toprule
+$k$ & GFLOPS specializzato & GFLOPS generico & speedup \\
+\midrule
+3  & 4,49  & \dato & \dato \\
+6  & 8,43  & \dato & \dato \\
+8  & 10,87 & \dato & \dato \\
+20 & 5,21  & \dato & \dato \\
+32 & 4,90  & \dato & \dato \\
+\midrule
+40 & 4,55  & \dato & \dato\ \footnotesize(atteso $\approx 1$) \\
+64 & 4,22  & \dato & \dato\ \footnotesize(atteso $\approx 1$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{C2 --- confronto fra backend al variare di $k$}
+\label{sec:ris-c2}
+
+\begin{daverificare}
+Suite \file{experiments/c2\_k\_sweep.txt}, $P = 1$, $M = N = \num{10000}$.
+Colonna da leggere: \code{gflops\_kernel} sui backend GPU, \code{gflops} su
+\kernelname{scheme\_a}. Compilare \cref{tab:c2} e generare
+\cref{fig:c2}. Da riportare in tabella anche $t_{\text{setup}}$ e
+$t_{\text{local}} - t_{\text{kernel}}$ dei backend GPU: la separazione fra
+kernel e trasferimenti \`e una scelta di metodo che vale la pena documentare con
+i numeri.
+\end{daverificare}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{C2: GFLOPS per backend e per $k$ (doppia precisione, $P=1$).}
+\label{tab:c2}
+\begin{tabular}{@{}lrrrrr|rrrrr@{}}
+\toprule
+& \multicolumn{5}{c|}{\textbf{$k$ specializzati}} & \multicolumn{5}{c}{\textbf{$k$ dal fallback}} \\
+\textbf{Backend} & 3 & 6 & 8 & 20 & 32 & 1 & 7 & 17 & 40 & 64 \\
+\midrule
+\kernelname{scheme\_a} & 4,49 & 8,43 & 10,87 & 5,21 & 4,90 & \dato & \dato & \dato & 4,55 & 4,22 \\
+\kernelname{cuda\_naive} & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato \\
+\kernelname{cuda\_warp} & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato \\
+\kernelname{cuda\_warp\_smem} & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato \\
+\kernelname{cuda\_warp\_tiled} & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato \\
+\kernelname{cublas} & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\figuradafare[0.8\linewidth]{GFLOPS in funzione di $k$, una curva per backend,
+scala logaritmica sull'asse $y$. Sovrapporre come linea orizzontale il tetto
+FP64 di \cref{tab:picchi-gpu} (\SI{350}{\giga\flop\per\second}): la distanza
+da quel tetto \`e il risultato, non il numero assoluto.}
+\caption{C2: confronto fra backend al variare di $k$.}
+\label{fig:c2}
+\end{figure}
+
+Le tre domande a cui questa campagna deve rispondere, e che vanno affrontate
+esplicitamente nel commento ai dati:
+
+\begin{enumerate}[nosep,left=0pt]
+  \item \textbf{Quanto vale il passaggio da \kernelname{cuda\_naive} a
+        \kernelname{cuda\_warp}?} \`E la misura del recupero del riuso di $A$ in
+        registro e della coalescenza, cio\`e del salto di intensit\`a aritmetica
+        della \cref{eq:intensita}. Ci si attende un guadagno crescente con
+        $k$, perch\'e \`e $k$ il fattore di riuso perduto dalla baseline.
+  \item \textbf{La shared memory guadagna qualcosa?} Il roofline di
+        \cref{sec:roofline-gpu} prevede di no, per $k \ge 6$ in FP64: se la
+        misura lo conferma, la conferma \emph{\`e} il risultato. Il controllo
+        incrociato \`e ripetere il confronto in FP32, dove il modello prevede un
+        regime memory-bound e quindi un guadagno.
+  \item \textbf{Dove sta il crossover fra \kernelname{cuda\_warp\_smem} e
+        \kernelname{cuda\_warp\_tiled}?} Il primo tiene $k$ accumulatori per
+        lane, il secondo ne tiene \code{WARP\_COL\_TILE} al prezzo di rileggere
+        $A$: il rapporto fra i due tempi in funzione di $k$ individua il punto in
+        cui la pressione sui registri costa pi\`u della rilettura.
+\end{enumerate}
+
+\subsection{Sweep sul padding della shared memory}
+
+\begin{daverificare}
+Confronto \kernelname{cuda\_warp\_smem} con \code{SMEM\_PAD=1} contro
+\code{SMEM\_PAD=0} a $k = 32$, dove l'analisi di \cref{sec:bank-conflict}
+prevede il conflitto a 32 vie. \`E una previsione puntuale e falsificabile: il
+padding deve mostrare un guadagno a $k = 32$ e nessun effetto apprezzabile a
+$k = 3$.
+\end{daverificare}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{@{}rrrr@{}}
+\toprule
+$k$ & \code{SMEM\_PAD=0} & \code{SMEM\_PAD=1} & guadagno \\
+\midrule
+3  & \dato & \dato & \dato \\
+8  & \dato & \dato & \dato \\
+32 & \dato & \dato & \dato\ \footnotesize(atteso: il pi\`u alto) \\
+\bottomrule
+\end{tabular}
+\caption{Effetto del padding sul conflitto di banchi. \TODO{eseguire}}
+\end{table}
+
+\subsection{Sweep sulla dimensione del blocco}
+
+\begin{daverificare}
+\code{BLOCK} $\in \{64, 128, 192, 256, 384, 512, 1024\}$ su
+\kernelname{cuda\_warp}, a $k$ fisso. Serve a documentare che il default $256$
+non \`e stato scelto solo per argomento teorico (divisore di 1024, quattro blocchi
+per SM) ma anche misurato. I valori $192$ e $384$ sono i controlli: se
+l'argomento sull'occupancy \`e corretto, devono essere peggiori dei divisori di
+1024.
+\end{daverificare}
+
+\section{C1 --- taglia e rapporto $M{:}N$}
+\label{sec:ris-c1}
+
+\begin{daverificare}
+Suite \file{c1\_size\_ratio\_cpu.txt} e \file{c1\_size\_ratio\_gpu.txt}, i dodici
+punti di \cref{tab:c1-punti}. \`E la campagna esplicitamente richiesta dalla
+traccia e non pu\`o mancare nella consegna.
+\end{daverificare}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{C1: GFLOPS per passo e rapporto. Una tabella per backend.}
+\label{tab:c1}
+\begin{tabular}{@{}lrrr|rrr@{}}
+\toprule
+& \multicolumn{3}{c|}{\textbf{CPU (\kernelname{scheme\_a})}} & \multicolumn{3}{c}{\textbf{GPU}} \\
+\textbf{Passo} & $1{:}1$ & $3{:}1$ & $1{:}2$ & $1{:}1$ & $3{:}1$ & $1{:}2$ \\
+\midrule
+s1 & \dato & \dato & \dato & \dato & \dato & \dato \\
+s2 & \dato & \dato & \dato & \dato & \dato & \dato \\
+s3 & \dato & \dato & \dato & \dato & \dato & \dato \\
+s4 & \dato & \dato & \dato & \dato & \dato & \dato \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\figuradafare[0.8\linewidth]{GFLOPS in funzione di $MN$ (asse $x$ logaritmico),
+tre curve per i tre rapporti, un pannello per CPU e uno per GPU. Poich\'e il
+lavoro \`e uguale a parit\`a di passo, ogni scostamento verticale fra le tre curve
+\`e effetto della \emph{forma}.}
+\caption{C1: effetto della taglia e del rapporto $M{:}N$.}
+\label{fig:c1}
+\end{figure}
+
+Da discutere nel commento: la crescita con la taglia (l'ammortamento dei costi
+fissi, e su GPU il raggiungimento di parallelismo sufficiente a saturare gli SM)
+e, separatamente, la distanza fra le tre curve, che \`e l'effetto della forma
+previsto in \cref{sec:modello-comunicazione} e in
+\cref{sec:roofline-gpu} --- con l'attesa che il rapporto $3{:}1$
+($M$ grande, molti warp) sia favorevole su GPU e che $1{:}2$ lo sia meno.
+
+\section{C6 --- perch\'e la griglia \`e bidimensionale}
+\label{sec:ris-c6}
+
+\begin{daverificare}
+Suite \file{c6\_grid\_shape.txt}, tutte le fattorizzazioni di $P = 8, 16, 20$.
+\`E la campagna che giustifica sperimentalmente il requisito centrale della
+traccia; le forme $1 \times P$ e $P \times 1$ sono le due decomposizioni
+monodimensionali e vanno sullo stesso grafico.
+\end{daverificare}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{C6: $P = 20$, tutte le forme ordinate.}
+\label{tab:c6}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Forma $\Prow \times \Pcol$ & $t_{\text{bcast}}$ & $t_{\text{reduce}}$ & $t_{\text{total}}$ & GFLOPS \\
+\midrule
+$1 \times 20$ \footnotesize(1D) & \dato & \dato & \dato & \dato \\
+$2 \times 10$ & \dato & \dato & \dato & \dato \\
+$4 \times 5$  & \dato & \dato & \dato & \dato \\
+$5 \times 4$  & \dato & \dato & \dato & \dato \\
+$10 \times 2$ & \dato & \dato & \dato & \dato \\
+$20 \times 1$ \footnotesize(1D) & \dato & \dato & \dato & \dato \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\figuradafare[0.8\linewidth]{Due assi $y$ sovrapposti: $t_{\text{bcast}}$ e
+$t_{\text{reduce}}$ lungo la sequenza di forme. La \cref{eq:volume} prevede
+che si muovano in direzioni \emph{opposte} e che il minimo del totale cada in
+mezzo, non agli estremi.}
+\caption{C6: broadcast e reduce in funzione della forma della griglia.}
+\label{fig:c6}
+\end{figure}
+
+Questa \`e la verifica pi\`u diretta del modello di costo: la
+\cref{eq:ottimo} predice, per $M = N$ e $P = 20$, un ottimo vicino a
+$4 \times 5$ o $5 \times 4$, e un peggioramento marcato agli estremi. Se i dati
+lo confermano, la scelta di \code{grid\_default\_shape} risulta giustificata da
+una misura e non da un'intuizione; se non lo confermano, il modello va corretto,
+ed \`e comunque un risultato da riportare.
+
+\section{C4 --- strong scaling}
+\label{sec:ris-c4}
+
+\begin{daverificare}
+Suite \file{c4\_strong\_scaling.txt}: $\num{20000} \times \num{20000}$,
+$P \in \{1,2,4,8,16,20\}$, $k \in \{3, 32\}$.
+\end{daverificare}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{C4: speedup ed efficienza a problema fisso.}
+\label{tab:c4}
+\begin{tabular}{@{}rrrrr|rrrr@{}}
+\toprule
+& \multicolumn{4}{c|}{$k = 3$} & \multicolumn{4}{c}{$k = 32$} \\
+$P$ & $t$ & speedup & eff.\ & \% comm. & $t$ & speedup & eff.\ & \% comm. \\
+\midrule
+1  & \dato & 1,00 & 1,00 & \dato & \dato & 1,00 & 1,00 & \dato \\
+2  & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato \\
+4  & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato \\
+8  & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato \\
+16 & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato \\
+20 & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\figuradafare[0.8\linewidth]{A sinistra: speedup contro $P$, con la retta ideale
+come riferimento, due curve ($k=3$ e $k=32$). A destra: scomposizione di
+$t_{\text{total}}$ in $t_{\text{bcast}}$, $t_{\text{local}}$,
+$t_{\text{reduce}}$ come frazioni impilate.}
+\caption{C4: strong scaling e composizione del tempo.}
+\label{fig:c4}
+\end{figure}
+
+L'attesa, dalla \cref{eq:costo-comm}: con $k = 3$ la comunicazione \`e una
+frazione piccola e la scalabilit\`a resta vicina all'ideale; con $k = 32$ il
+volume comunicato \`e dieci volte tanto ed \`e l\`i che l'efficienza si degrada. Il
+pannello di destra deve rendere visibile \emph{quale} delle due collettive
+domina, e il confronto con la legge di Amdahl applicata alla frazione non
+parallelizzabile misurata chiude l'analisi.
+
+\section{C5 --- weak scaling}
+\label{sec:ris-c5}
+
+\begin{daverificare}
+Suite \file{c5\_weak\_scaling.txt}: blocco locale costante $5000 \times 5000$,
+$M = 5000\Prow$, $N = 5000\Pcol$.
+\end{daverificare}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{C5: tempo a lavoro per processo costante.}
+\label{tab:c5}
+\begin{tabular}{@{}rlrrrr@{}}
+\toprule
+$P$ & Griglia & $M \times N$ & $t_{\text{total}}$ & $t_{\text{comm}}$ & efficienza \\
+\midrule
+1  & $1\times1$ & $5000 \times 5000$ & \dato & \dato & 1,00 \\
+2  & \dato & \dato & \dato & \dato & \dato \\
+4  & \dato & \dato & \dato & \dato & \dato \\
+8  & \dato & \dato & \dato & \dato & \dato \\
+16 & \dato & \dato & \dato & \dato & \dato \\
+20 & \dato & \dato & \dato & \dato & \dato \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Poich\'e il lavoro per rank \`e costante, il tempo ideale \`e piatto e tutto ci\`o che
+sale \`e comunicazione pura: \`e la misura pi\`u pulita del costo delle collettive,
+e il confronto con la previsione della \cref{eq:costo-comm} permette di
+stimare $\alpha$ e $\beta$ per interpolazione. Va ricordato nel commento che su
+una griglia 2D il weak scaling cambia anche il rapporto $M{:}N$
+(\cref{sec:modello-comunicazione}), quindi l'effetto misurato qui non \`e
+puramente quello di $P$.
+
+\section{Sintesi}
+
+\begin{daverificare}
+Completare a raccolta ultimata con: la tabella riassuntiva
+(backend $\times$ $k$, migliore configurazione, GFLOPS, \% del tetto roofline
+pertinente); il confronto fra la previsione di \cref{sec:roofline-gpu} e la
+misura, con lo scarto; l'esito dei tre punti elencati in \cref{sec:ris-c2}.
+\end{daverificare}

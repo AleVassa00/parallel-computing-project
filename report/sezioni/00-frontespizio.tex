@@ -1,0 +1,50 @@
+\begin{titlepage}
+\centering
+\thispagestyle{empty}
+
+\vspace*{1.2cm}
+
+{\large\scshape Universit\`a degli Studi di Roma ``Tor Vergata''\par}
+\vspace{0.3cm}
+{\normalsize Macroarea di Ingegneria \\ Corso di Laurea Magistrale in Ingegneria Informatica\par}
+
+\vspace{2.0cm}
+
+\rule{\linewidth}{0.5pt}\\[0.6cm]
+{\LARGE\bfseries \titolorelazione \par}
+\vspace{0.5cm}
+{\large \sottotitolorelazione \par}
+\rule{\linewidth}{0.5pt}
+
+\vspace{1.6cm}
+
+{\large \corso \\ \annoaccademico \par}
+
+\vspace{2.4cm}
+
+\begin{minipage}{0.46\textwidth}
+  \centering
+  {\small\itshape Autori}\\[4pt]
+  \autoreuno\\{\small\matricolauno}\\[8pt]
+  \autoredue\\{\small\matricoladue}
+\end{minipage}
+
+\vfill
+
+{\small Codice sorgente: \url{\repository}}\\[4pt]
+{\small Versione della relazione del \today}
+
+\iftodovisibile
+\vspace{0.8cm}
+\begin{tcolorbox}[colback=todogiallo,colframe=todorosso,boxrule=0.6pt,width=0.85\linewidth]
+  \small\centering
+  \textcolor{todorosso}{\textbf{Bozza di lavoro.}} I marcatori in rosso segnalano
+  i punti che dipendono da campagne di misura non ancora concluse. Per la
+  versione di consegna, commentare \code{\textbackslash todovisibiletrue} in
+  \file{preambolo.tex}.
+\end{tcolorbox}
+\fi
+
+\vspace{0.5cm}
+\end{titlepage}
+\cleardoublepage

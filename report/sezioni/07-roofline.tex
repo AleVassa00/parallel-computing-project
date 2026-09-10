@@ -1,0 +1,193 @@
+\chapter{Modello roofline}
+\label{cap:roofline}
+
+Il modello roofline mette in relazione l'intensit\`a aritmetica di un nucleo con
+le due sole cose che possono limitarlo, la potenza di calcolo e la banda di
+memoria:
+\begin{equation}
+  P_{\text{ottenibile}}(\Ai) \;=\; \min\bigl(P_{\text{picco}},\ B \cdot \Ai\bigr),
+  \qquad
+  \Ai_{\text{crossover}} = \frac{P_{\text{picco}}}{B} .
+  \label{eq:roofline}
+\end{equation}
+Serve qui a due scopi: dire \emph{prima} della misura quale regime aspettarsi per
+ogni $k$, e dare un metro con cui giudicare i numeri ottenuti. Un kernel che
+raggiunge il $70\%$ del tetto pertinente \`e un buon kernel; lo stesso numero
+assoluto, confrontato con il tetto sbagliato, non dice nulla.
+
+Dalla \cref{eq:intensita}, con lo schema~A e contando il solo traffico su $A$:
+\begin{equation}
+  \Ai(k) = \frac{2k}{s} =
+  \begin{cases}
+    k/4 & \text{FP64 } (s = 8) \\[2pt]
+    k/2 & \text{FP32 } (s = 4)
+  \end{cases}
+  \label{eq:ai-k}
+\end{equation}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Intensit\`a aritmetica del nucleo, in $\si{\flop\per\byte}$, per i $k$
+della traccia.}
+\label{tab:ai}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+& $k=3$ & $k=6$ & $k=8$ & $k=20$ & $k=32$ \\
+\midrule
+FP64 & 0,75 & 1,50 & 2,00 & 5,00 & 8,00 \\
+FP32 & 1,50 & 3,00 & 4,00 & 10,00 & 16,00 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Roofline della GPU}
+\label{sec:roofline-gpu}
+
+\begin{daverificare}
+I valori di picco in \cref{tab:picchi-gpu} sono quelli nominali della Quadro RTX
+5000 (TU104). Confermarli sul nodo di calcolo con \code{deviceQuery} (clock,
+numero di SM, larghezza e frequenza del bus di memoria) e, per la banda
+effettivamente raggiungibile, con una misura tipo STREAM su device: il rapporto
+fra banda nominale e banda misurata \`e tipicamente $0{,}75$--$0{,}85$, e usare
+quella misurata sposta il punto di crossover.
+\end{daverificare}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Picchi nominali della GPU di misura e punti di crossover derivati.}
+\label{tab:picchi-gpu}
+\begin{tabular}{@{}lrl@{}}
+\toprule
+\textbf{Grandezza} & \textbf{Valore} & \textbf{Origine} \\
+\midrule
+CUDA core & 3072 & specifica TU104 \\
+Clock boost & \SI{1.815}{\giga\hertz} & specifica \\
+Picco FP32 & \SI{11.1}{\tera\flop\per\second} & $2 \times 3072 \times f$ \\
+Picco FP64 & \SI{0.35}{\tera\flop\per\second} & FP32/32 (rapporto Turing) \\
+Banda di memoria & \SI{448}{\giga\byte\per\second} & GDDR6, 256 bit, \SI{14}{\giga\bit\per\second} \\
+Memoria & \SI{15.5}{\gib} & disponibile \\
+\midrule
+Crossover FP64 & \SI{0.78}{\flop\per\byte} & $P_{\text{picco}}/B$ \\
+Crossover FP32 & \SI{24.9}{\flop\per\byte} & $P_{\text{picco}}/B$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Il confronto fra \cref{tab:ai} e \cref{tab:picchi-gpu} d\`a la previsione, ed \`e
+il risultato pi\`u utile di tutto il modello:
+
+\begin{tcolorbox}[colback=black!3,colframe=black!30,title=\textbf{Previsione}]
+\begin{itemize}[nosep,left=0pt]
+  \item \textbf{In FP64} il crossover cade a $\Ai = 0{,}78$, cio\`e a
+        $k \approx 3{,}1$. Il nucleo \`e quindi \emph{memory-bound solo per
+        $k = 3$} --- e appena --- e \textbf{compute-bound per ogni $k \ge 6$}.
+        Il tetto pertinente per i quattro $k$ pi\`u grandi \`e
+        \SI{350}{\giga\flop\per\second}, e non dipende da $k$: le curve
+        GFLOPS($k$) dei backend GPU in doppia precisione dovrebbero appiattirsi.
+  \item \textbf{In FP32} il crossover cade a $\Ai = 24{,}9$, cio\`e a
+        $k \approx 50$. Il nucleo \`e quindi \textbf{memory-bound per tutti i $k$
+        della traccia}, e il tetto vale $B \cdot k/2 = 224k$
+        $\si{\giga\flop\per\second}$: cresce \emph{linearmente} con $k$ e per
+        $k = 32$ arriva a \SI{7.2}{\tera\flop\per\second}, venti volte il tetto
+        FP64.
+\end{itemize}
+Le due precisioni si trovano quindi in regimi \emph{qualitativamente} diversi, e
+questo \`e l'argomento quantitativo con cui il progetto discute la scelta della
+precisione: la doppia non costa il fattore 2 del traffico, costa il fattore 32
+del picco FP64 di una scheda Turing.
+\end{tcolorbox}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[scpa,
+  xmode=log, ymode=log,
+  xlabel={Intensit\`a aritmetica $\Ai$ [\si{\flop\per\byte}]},
+  ylabel={GFLOPS ottenibili},
+  domain=0.1:200, xmin=0.1, xmax=200, ymin=20, ymax=20000,
+  legend pos=south east,
+  width=0.85\linewidth, height=7cm,
+]
+\addplot[blue!70!black, thick, samples=400]{min(11140, 448*x)};
+\addlegendentry{tetto FP32}
+\addplot[red!70!black, thick, samples=400]{min(348, 448*x)};
+\addlegendentry{tetto FP64}
+
+% intensita' dei k della traccia, in FP64
+\foreach \k/\ai in {3/0.75, 6/1.5, 8/2, 20/5, 32/8} {
+  \addplot[black!45, densely dashed, line width=0.6pt, forget plot, samples=2] coordinates {(\ai,20) (\ai,20000)};
+}
+\node[font=\scriptsize,anchor=north west,rotate=90,fill=white,inner sep=1pt] at (axis cs:0.75,9000) {$k{=}3$};
+\node[font=\scriptsize,anchor=north west,rotate=90,fill=white,inner sep=1pt] at (axis cs:1.5,9000) {$k{=}6$};
+\node[font=\scriptsize,anchor=north west,rotate=90,fill=white,inner sep=1pt] at (axis cs:2,9000) {$k{=}8$};
+\node[font=\scriptsize,anchor=north west,rotate=90,fill=white,inner sep=1pt] at (axis cs:5,9000) {$k{=}20$};
+\node[font=\scriptsize,anchor=north west,rotate=90,fill=white,inner sep=1pt] at (axis cs:8,9000) {$k{=}32$};
+\end{axis}
+\end{tikzpicture}
+\caption{Roofline della GPU di misura. Le verticali tratteggiate sono le
+intensit\`a aritmetiche FP64 dei cinque $k$ della traccia. In FP64 solo $k=3$
+cade a sinistra del ginocchio; in FP32 tutti i $k$ della traccia restano nella
+regione limitata dalla banda.}
+\label{fig:roofline-gpu}
+\end{figure}
+
+\subsection{Che cosa il modello non dice}
+
+Due limiti vanno enunciati, perch\'e altrimenti il modello verrebbe usato per
+concludere pi\`u di quanto possa.
+
+Il primo: l'intensit\`a della \cref{eq:ai-k} conta il solo traffico su $A$ verso
+la DRAM. Il traffico su $X$, che vale $\mloc \nloc k$ elementi
+(\cref{eq:traffico-x}), non compare perch\'e $X$ sta in L2 --- ma esiste, e
+consuma banda L2. Il roofline classico a un solo livello non lo vede; \`e
+esattamente il traffico che \kernelname{cuda\_warp\_smem} riduce
+(\cref{sec:smem}), e la ragione per cui un kernel pu\`o restare sotto il tetto
+pur avendo l'intensit\`a giusta.
+
+Il secondo: il tetto di calcolo presuppone che ci sia abbastanza parallelismo
+per saturare gli SM. Con un warp per riga di $Y$, i warp disponibili sono
+$\mloc$: una matrice larga e bassa (rapporto $M{:}N$ sfavorevole) pu\`o affamare
+la GPU di parallelismo pur avendo la stessa intensit\`a aritmetica. \`E
+precisamente il motivo per cui la campagna C1 varia il rapporto $M{:}N$ a
+\emph{lavoro costante}: separa l'effetto della forma da quello della taglia.
+
+\section{Roofline della CPU}
+\label{sec:roofline-cpu}
+
+\begin{daverificare}
+Completare \cref{tab:picchi-cpu} con i dati del server: modello del
+processore, numero di core fisici per socket, frequenza sostenuta con
+vettorizzazione attiva, larghezza SIMD, dimensione di L1/L2/L3, banda misurata
+con STREAM a un core e a tutti i core. Il modello del nucleo di CPU non \`e
+completabile senza la dimensione di L2, perch\'e la soglia discussa in
+\cref{sec:rilettura-x} \`e proprio quella.
+\end{daverificare}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Parametri del nodo di calcolo (da completare).}
+\label{tab:picchi-cpu}
+\begin{tabular}{@{}lp{0.36\linewidth}p{0.3\linewidth}@{}}
+\toprule
+\textbf{Grandezza} & \textbf{Valore} & \textbf{Come ottenerlo} \\
+\midrule
+Modello CPU & \dato & \code{lscpu} \\
+Socket $\times$ core fisici & 2 $\times$ \dato & \code{lscpu} \\
+Frequenza sostenuta & \dato & \code{turbostat} o \code{perf} \\
+Larghezza SIMD & \dato (AVX2 / AVX-512) & \code{lscpu | grep Flags} \\
+L1d / L2 per core, L3 per socket & \dato & \code{lscpu -C} \\
+Banda STREAM, 1 core & \dato & STREAM triad \\
+Banda STREAM, tutti i core & \dato & STREAM triad \\
+Picco FP64, 1 core & \dato & $2 \times \text{SIMD} \times \text{FMA} \times f$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Anche senza questi valori, i dati gi\`a raccolti in campagna C3 permettono di
+ricavare per via inversa le grandezze rilevanti, ed \`e ci\`o che
+\cref{sec:c3} fa: dal tempo misurato si ottiene la banda effettiva su $A$ e
+quella su $X$, e il confronto fra le due individua il livello di gerarchia che
+sta limitando il nucleo per ciascun $k$.

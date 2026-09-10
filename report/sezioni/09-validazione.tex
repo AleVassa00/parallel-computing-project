@@ -1,0 +1,164 @@
+\chapter{Correttezza e validazione}
+\label{cap:validazione}
+
+La traccia chiede il collaudo funzionale contro un'implementazione seriale
+minimale. Il progetto la usa come oracolo, ma la strategia di correttezza \`e
+articolata su quattro livelli, perch\'e i modi di sbagliare sono di natura
+diversa e un solo controllo non li copre.
+
+\section{L'oracolo seriale}
+
+\file{src/serial/serial.c} \`e la trascrizione letterale della
+\cref{eq:definizione}: tre cicli annidati nell'ordine $i \to c \to j$, cio\`e lo
+schema~B. La scelta \`e deliberata: l'oracolo deve essere \emph{ovviamente}
+corretto, non veloce, e usare un ordine dei cicli diverso da quello dei backend
+riduce la probabilit\`a che un errore concettuale sull'ordinamento passi
+inosservato in entrambi.
+
+Con \code{--check} il rank 0 raccoglie $Y$ distribuita, ricostruisce da s\'e $A$ e
+$X$ globali attraverso il generatore (\cref{sec:generazione}) --- senza
+riceverle da nessuno --- calcola l'oracolo e confronta. Il costo \`e $O(MNk)$
+seriale, che \`e proprio il motivo per cui la validazione non fa mai parte di una
+campagna di misura.
+
+\section{Una tolleranza che dipende da $N$}
+\label{sec:tolleranza}
+
+La tolleranza del confronto non \`e una costante, e non pu\`o esserlo: ogni
+elemento di $Y$ \`e una riduzione su $N$ termini, e l'errore di arrotondamento di
+una riduzione dipende da $N$.
+
+Con dati a media nulla --- che \`e esattamente ci\`o che il generatore produce, e
+per questo motivo --- gli arrotondamenti hanno segno indipendente e l'errore
+cresce come $\varepsilon\sqrt{N}$, non come il pessimistico $\varepsilon N$ del
+caso in cui tutti i termini abbiano lo stesso segno. La costante del modello \`e
+\textbf{misurata}, non stimata: confrontando il prodotto distribuito con l'oracolo
+su $N = 257 \dots \num{40000}$, in entrambe le precisioni, l'errore relativo in
+norma $L_2$ vale
+\begin{equation}
+  \mathrm{err} \;\approx\; 0{,}17 \cdot \varepsilon \sqrt{N},
+\end{equation}
+con un rapporto che resta fra $0{,}11$ e $0{,}17$ su tutto l'intervallo. La
+soglia adottata \`e quindi
+\begin{equation}
+  \mathrm{tol}(N) = 8 \cdot \varepsilon \cdot \sqrt{N},
+  \label{eq:tolleranza}
+\end{equation}
+cio\`e un margine uniforme di circa $47\times$ sul modello, su tutte le taglie e
+in entrambe le precisioni.
+
+Il confronto con una soglia fissa mostra perch\'e la scelta conta, e sbaglia in
+due modi opposti proprio nell'intervallo di taglie che il progetto misura:
+
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{@{}llp{0.55\linewidth}@{}}
+\toprule
+\textbf{Soglia fissa} & \textbf{Difetto} & \textbf{Conseguenza} \\
+\midrule
+\code{double}, $10^{-12}$ & troppo larga
+  & a $N = 257$ l'errore reale \`e $5{,}6\cdot10^{-16}$: la soglia \`e $\sim 1800$
+    volte l'errore, e a $N = \num{40000}$ ancora $\sim 140$ volte. Un bug che
+    gonfiasse l'errore di due ordini di grandezza passerebbe per PASS. \\
+\addlinespace
+\code{float}, $10^{-5}$ & si restringe con $N$
+  & il margine passa da $33\times$ a $N = 257$ a $2{,}5\times$ a
+    $N = \num{40000}$, che \`e la taglia a cui la campagna lavora. Basta un
+    backend con un altro ordine di riduzione per produrre un FAIL su un
+    risultato corretto --- e siccome il binario esce con stato non nullo, quel
+    FAIL abortisce la campagna. \\
+\bottomrule
+\end{tabular}
+\caption{Perch\'e una soglia costante non funziona in nessuna delle due
+precisioni.}
+\end{table}
+
+Un ultimo dettaglio che conta: $N$ nella \cref{eq:tolleranza} \`e il numero
+\emph{globale} di colonne di $A$, non $\nloc$, perch\'e \`e su tutte e $N$ che
+l'oracolo somma.
+
+\section{Il test delle funzioni indice}
+\label{sec:validazione-indici}
+
+Le tre funzioni di \cref{sec:indici} hanno un test isolato
+(\file{test/test\_index.c}, \code{make test}) che non richiede MPI. Verifica su
+molte combinazioni $(n, p)$, inclusi i casi limite $p > n$ e $n \bmod p \neq 0$,
+tre propriet\`a:
+\begin{itemize}[nosep,left=0pt]
+  \item $\sum_i \mathrm{size}(n,p,i) = n$: la partizione copre tutto;
+  \item $\mathrm{start}(n,p,i+1) = \mathrm{start}(n,p,i) + \mathrm{size}(n,p,i)$:
+        le parti sono contigue e non si sovrappongono;
+  \item $\mathrm{owner}$ \`e l'inversa di $\mathrm{start}$/$\mathrm{size}$: le due
+        direzioni sono coerenti.
+\end{itemize}
+Sono i controlli che intercettano l'errore di un solo elemento, cio\`e proprio
+quello che si propagherebbe in silenzio in tutto il resto del sistema.
+
+\section{La matrice di collaudo}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{I controlli eseguiti e che cosa ciascuno intercetta.}
+\label{tab:collaudo}
+\begin{tabular}{@{}p{0.34\linewidth}p{0.58\linewidth}@{}}
+\toprule
+\textbf{Comando} & \textbf{Che cosa protegge} \\
+\midrule
+\code{make test} & partizionamento degli indici, senza MPI \\
+\code{make check-cxx} & \file{kernel.h} e \file{util.h} restano includibili da
+  C++: intercetta le regressioni di \code{extern "C"} e \code{restrict} su
+  qualunque macchina, anche senza \code{nvcc} \\
+\code{make check} & prodotto distribuito contro oracolo seriale, doppia
+  precisione \\
+\code{make PREC=float check} & stessa validazione in singola precisione: \`e il
+  caso in cui una tolleranza sbagliata si manifesta \\
+\code{make check-padding} & $\code{lda} = \nloc + 8$: verifica che tutti i
+  backend onorino la leading dimension di $A$ \\
+\code{make KERNEL=<nome> check} & la stessa validazione su ciascun backend GPU,
+  che ha un ordine di riduzione diverso da quello di CPU \\
+\code{make -B KERNEL=cuda\_warp EXTRA\_NVCCFLAGS='-Xptxas -v'} & ispezione
+  dell'uso dei registri per warp: non \`e correttezza ma \`e il controllo che dice
+  se la specializzazione su $k$ sta facendo ci\`o che si crede \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La validazione va eseguita su ogni combinazione di backend e precisione
+\emph{prima} della campagna corrispondente, su taglie piccole. Un backend
+validato solo in doppia precisione non \`e validato: l'ordine della riduzione
+cambia con il kernel, e in singola precisione l'effetto \`e misurabile.
+
+\begin{daverificare}
+Riportare l'esito effettivo dei controlli sul server, con il valore di
+\code{rel\_err} misurato e la soglia corrispondente, per almeno: backend di CPU
+in \code{double} e \code{float}; \kernelname{cuda\_warp} e
+\kernelname{cuda\_warp\_smem} in entrambe le precisioni; \kernelname{cublas};
+il caso con padding. Una tabella con colonne
+(backend, precisione, $N$, \code{rel\_err}, \code{tol}, esito) \`e la forma pi\`u
+compatta.
+\end{daverificare}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Esiti della validazione. \TODO{compilare dopo l'esecuzione sul server}}
+\label{tab:esiti-validazione}
+\begin{tabular}{@{}llrrrl@{}}
+\toprule
+\textbf{Backend} & \textbf{Precisione} & $N$ & \code{rel\_err} & \code{tol} & \textbf{Esito} \\
+\midrule
+\kernelname{scheme\_a} & double & \dato & \dato & \dato & \dato \\
+\kernelname{scheme\_a} & float & \dato & \dato & \dato & \dato \\
+\kernelname{scheme\_a} (padding) & double & \dato & \dato & \dato & \dato \\
+\kernelname{cuda\_naive} & double & \dato & \dato & \dato & \dato \\
+\kernelname{cuda\_warp} & double & \dato & \dato & \dato & \dato \\
+\kernelname{cuda\_warp} & float & \dato & \dato & \dato & \dato \\
+\kernelname{cuda\_warp\_smem} & double & \dato & \dato & \dato & \dato \\
+\kernelname{cuda\_warp\_smem} & float & \dato & \dato & \dato & \dato \\
+\kernelname{cuda\_warp\_tiled} & double & \dato & \dato & \dato & \dato \\
+\kernelname{cublas} & double & \dato & \dato & \dato & \dato \\
+\bottomrule
+\end{tabular}
+\end{table}

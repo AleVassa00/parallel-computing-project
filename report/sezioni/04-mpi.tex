@@ -1,0 +1,255 @@
+\chapter{Parallelizzazione MPI}
+\label{cap:mpi}
+
+\section{Decomposizione a griglia bidimensionale}
+\label{sec:griglia}
+
+I $P$ processi sono organizzati in una griglia cartesiana
+$\Prow \times \Pcol = P$, creata con \code{MPI\_Cart\_create} e
+\code{reorder = 1}. La forma \`e scelta dall'utente con \code{--pr} e
+\code{--pc}; in assenza di indicazione, \code{grid\_default\_shape} prende la
+fattorizzazione pi\`u quadrata di $P$ (se $P$ \`e primo, $1 \times P$).
+
+Da \code{MPI\_Cart\_sub} si ricavano due sotto-comunicatori:
+\code{row\_comm}, che raccoglie i processi di una stessa \emph{riga} della
+griglia, e \code{col\_comm}, che raccoglie quelli di una stessa \emph{colonna}.
+Sono i due assi lungo cui viaggiano le uniche due collettive del cammino
+cronometrato.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.95,every node/.style={font=\footnotesize}]
+  % griglia 2x3 di processi
+  \foreach \r in {0,1} {
+    \foreach \c in {0,1,2} {
+      \draw[fill=black!4] (\c*2.1,-\r*1.5) rectangle ++(1.9,1.3);
+      \node at (\c*2.1+0.95,-\r*1.5+0.65) {$(\r,\c)$};
+    }
+  }
+  \node[anchor=east] at (-0.25,0.65) {riga 0};
+  \node[anchor=east] at (-0.25,-0.85) {riga 1};
+  \node at (0.95,1.15) {col.\ 0};
+  \node at (3.05,1.15) {col.\ 1};
+  \node at (5.15,1.15) {col.\ 2};
+  % frecce
+  \draw[->,thick,blue!60!black] (0.95,0.15) -- (0.95,-0.75)
+      node[midway,right,xshift=2pt] {\code{Bcast}(X)};
+  \draw[->,thick,red!60!black] (5.05,-0.85) -- (2.15,-0.85);
+  \draw[->,thick,red!60!black] (2.95,-0.85) -- (2.15,-0.85)
+      node[midway,above,yshift=1pt] {\code{Reduce}(Y)};
+\end{tikzpicture}
+\caption{Griglia $2\times 3$. $X$ scende lungo le colonne
+(\code{col\_comm}), i contributi parziali di $Y$ si sommano lungo le righe
+(\code{row\_comm}) verso la colonna 0.}
+\label{fig:griglia}
+\end{figure}
+
+Il codice fa affidamento su una propriet\`a dei sotto-comunicatori: in un
+comunicatore con una sola dimensione residua i rank sono ordinati per coordinata
+crescente, quindi il rank $0$ di \code{col\_comm} \`e il processo di riga $0$
+(root del broadcast di $X$) e il rank $0$ di \code{row\_comm} \`e il processo di
+colonna $0$ (root della reduce di $Y$). La propriet\`a \`e \emph{verificata} in
+\code{grid\_create} confrontando i rank con le coordinate cartesiane: dopo
+\code{reorder = 1} i rank possono differire da quelli di
+\code{MPI\_COMM\_WORLD}, e appoggiarsi a un'ipotesi non controllata darebbe
+risultati sbagliati in silenzio.
+
+\section{Partizionamento degli indici}
+\label{sec:indici}
+
+La partizione \`e a blocchi, con il resto distribuito sulle prime parti. Per $n$
+elementi su $p$ parti, la parte $i$ ha dimensione e offset
+\begin{equation}
+  \mathrm{size}(n,p,i) = \Bigl\lfloor \frac{n}{p} \Bigr\rfloor +
+      \begin{cases} 1 & i < n \bmod p\\ 0 & \text{altrimenti}\end{cases}
+  \qquad
+  \mathrm{start}(n,p,i) = i\Bigl\lfloor \frac{n}{p} \Bigr\rfloor +
+      \min(i,\ n \bmod p).
+  \label{eq:partizione}
+\end{equation}
+La funzione inversa $\mathrm{owner}(n,p,g)$ restituisce la parte che possiede
+l'indice globale $g$ senza scorrere le parti. Le tre funzioni sono in
+\file{src/index/index.c}, sono indipendenti da MPI e hanno un test dedicato
+(\cref{sec:validazione-indici}): sono il punto in cui un errore di un solo
+elemento si propagherebbe silenziosamente in tutto il resto.
+
+Lo sbilanciamento massimo introdotto \`e di un elemento per dimensione, cio\`e al
+pi\`u una riga e una colonna di differenza fra due blocchi locali. Alle taglie
+delle campagne ($M, N \ge 3200$) l'effetto sul tempo \`e sotto il rumore di
+misura; \`e invece rilevante che la partizione sia \emph{la stessa} ovunque, come
+discusso subito sotto.
+
+\section{Layout dei blocchi locali}
+\label{sec:layout}
+
+La matrice $A$ \`e tagliata lungo entrambe le dimensioni, $X$ e $Y$ lungo una
+sola:
+\begin{equation}
+  A_{\text{loc}} : \mloc \times \nloc,
+  \qquad
+  X_{\text{loc}} : \nloc \times k \ \ (\text{riga } 0),
+  \qquad
+  Y_{\text{loc}} : \mloc \times k \ \ (\text{colonna } 0),
+\end{equation}
+con $\mloc = \mathrm{size}(M, \Prow, \text{my\_row})$ e
+$\nloc = \mathrm{size}(N, \Pcol, \text{my\_col})$.
+
+Il multivettore non viene mai tagliato lungo $k$. Due ragioni: $k$ \`e piccolo, e
+frammentarlo produrrebbe messaggi dominati dalla latenza invece che dalla banda;
+ed \`e proprio da $k$ che viene tutto il riuso di $A$ in registro
+(\cref{sec:schemi}), che una divisione ridurrebbe.
+
+\begin{tcolorbox}[colback=black!3,colframe=black!30,title=\textbf{Invariante critico}]
+Il numero di righe locali di $X$ deve venire dalla \emph{stessa} partizione con
+cui si tagliano le colonne di $A$, e il numero di righe locali di $Y$ dalla
+stessa con cui si tagliano le righe di $A$. Se le due divergono, i risultati
+sono sbagliati in modo silenzioso.
+
+Qui l'invariante \`e garantito \emph{per costruzione}: esistono soltanto $\mloc$
+e $\nloc$, calcolati una volta sola in \code{layout\_init}, e non due coppie di
+valori da tenere allineate. La struttura \code{layout\_t} \`e il punto unico di
+verit\`a sulla forma dei blocchi.
+\end{tcolorbox}
+
+\subsection{Le tre leading dimension non sono equivalenti}
+\label{sec:padding}
+
+$\code{lda}$ \`e l'unica leading dimension che pu\`o essere maggiore della
+larghezza del blocco. $\code{ldx}$ e $\code{ldy}$ valgono \emph{sempre} $k$, e
+il codice lo impone con un controllo esplicito in \code{mpi\_matmul}.
+
+La ragione \`e che $X$ e $Y$ attraversano una collettiva. \code{MPI\_Bcast} e
+\code{MPI\_Reduce} usano conteggi contigui ($\nloc \cdot k$ e $\mloc \cdot k$
+elementi): descrivere uno stride richiederebbe di costruire un
+\code{MPI\_Type\_vector}, committarlo e liberarlo \emph{a ogni invocazione},
+cio\`e tre chiamate al runtime MPI dentro la regione cronometrata --- esattamente
+ci\`o che la misura non deve contenere. $A$, al contrario, non attraversa nessuna
+collettiva: il suo padding resta un fatto locale al kernel, e pu\`o quindi essere
+studiato. Il target \code{make check-padding} compila con
+$\code{lda} = \nloc + 8$ e verifica che tutti i backend onorino la leading
+dimension.
+
+Il controllo su $\code{ldx}$ e $\code{ldy}$ costa due confronti fra interi ed \`e
+fuori dal cronometro. \`E un buon esempio del criterio enunciato in
+\cref{cap:introduzione}: violare quell'invariante non farebbe fallire nulla,
+produrrebbe solo numeri sbagliati.
+
+\section{Distribuzione iniziale dei dati}
+\label{sec:distribuzione-a}
+
+Le modalit\`a di inizializzazione di $A$ e $X$ sono indipendenti
+(\code{--a-mode}, \code{--x-mode}), e tutte e quattro le combinazioni sono
+valide. Entrambe hanno \code{local} come default e producono gli stessi elementi
+globali a parit\`a di seed, per la propriet\`a del generatore discussa in
+\cref{sec:generazione}.
+
+\paragraph{\code{--a-mode local}.} Ogni processo genera direttamente il proprio
+blocco 2D di $A$ dagli indici globali. Non esiste mai una copia globale, quindi
+non esiste un limite di memoria dato dal singolo nodo.
+
+\paragraph{\code{--a-mode global}.} Il grid rank $0$ materializza $A$ completa e
+la distribuisce. \`E il caso interessante dal punto di vista MPI: i sottoblocchi
+2D \textbf{non sono contigui} nella matrice row-major globale. Il mittente
+descrive il blocco da inviare con un \code{MPI\_Type\_vector} di $\mloc$ blocchi
+da $\nloc$ elementi e stride $N$; il destinatario ne descrive uno con stride
+$\code{lda}$, che pu\`o essere diverso. \`E il caso generale --- due layout diversi
+sui due lati della stessa comunicazione --- e non richiede nessun buffer
+intermedio n\'e nessuna copia manuale.
+
+\paragraph{\code{--x-mode local} / \code{global}.} Nel primo caso i processi
+della riga $0$ generano direttamente le proprie righe di $X$. Nel secondo il
+grid rank $0$ materializza la $X$ compatta $N \times k$ e un
+\code{MPI\_Scatterv} sulla sola riga $0$ ne distribuisce i blocchi di righe:
+entrambi i lati sono contigui, perch\'e $\code{ldx} = k$ ovunque, quindi non
+serve nessun datatype derivato. Il successivo broadcast lungo \code{col\_comm}
+\`e identico nelle due modalit\`a.
+
+Generazione e distribuzione iniziale sono \textbf{preprocessing}, escluse dai
+tempi ufficiali. La modalit\`a \code{global} rappresenta uno scenario in cui
+l'input \`e inizialmente centralizzato; non \`e presentata come una modalit\`a pi\`u
+performante.
+
+\section{L'algoritmo distribuito}
+
+Una invocazione del prodotto esegue tre passi:
+
+\begin{lstlisting}[language=C,caption={Il corpo di \code{mpi\_matmul}, senza i cronometri.}]
+MPI_Bcast(X_loc, n_loc*k, SCALAR_MPI_TYPE, 0, grid->col_comm);
+local_gemm(ctx, X_loc, layout->ldx, Y_loc_part, layout->ldy);
+MPI_Reduce(Y_loc_part, Y_row_col0, m_loc*k, SCALAR_MPI_TYPE,
+           MPI_SUM, 0, grid->row_comm);
+\end{lstlisting}
+
+\begin{enumerate}[nosep,left=0pt]
+  \item \textbf{Broadcast di $X$ lungo \code{col\_comm}.} Tutti i processi di una
+        colonna della griglia lavorano sulle stesse colonne di $A$, quindi
+        servono loro le stesse righe di $X$. Il root \`e il processo di riga $0$,
+        l'unico che possiede inizialmente quella fetta.
+  \item \textbf{Prodotto locale.} Il risultato \`e \emph{parziale}: il processo
+        $(r,c)$ calcola il contributo delle sole colonne
+        $[\text{col}_0, \text{col}_0 + \nloc)$ di $A$ alle righe
+        $[\text{row}_0, \text{row}_0 + \mloc)$ di $Y$.
+  \item \textbf{Reduce lungo \code{row\_comm}.} I $\Pcol$ contributi parziali
+        della stessa banda di righe vivono sui processi di una stessa riga della
+        griglia: sommandoli si ottiene $Y$. Il \code{count} \`e $\mloc \cdot k$,
+        non $1$: la riduzione agisce lungo la dimensione dei processi e
+        preserva la posizione, producendo $\mloc \cdot k$ somme indipendenti. Il
+        root \`e il processo di colonna $0$, che \`e gi\`a il proprietario designato
+        di quella porzione di $Y$: nessuna ridistribuzione finale \`e necessaria.
+\end{enumerate}
+
+\section{Modello di costo della comunicazione}
+\label{sec:modello-comunicazione}
+
+Nel modello $\alpha$--$\beta$, un messaggio di $n$ byte costa
+$\alpha + \beta n$. Con algoritmi ad albero per le due collettive e $s$ byte per
+scalare, il costo di comunicazione per invocazione \`e
+\begin{equation}
+  T_{\text{comm}} \;\approx\;
+  \underbrace{\log_2(\Prow)\Bigl(\alpha + \beta\, s\, k\,\tfrac{N}{\Pcol}\Bigr)}_{\text{Bcast di } X}
+  \;+\;
+  \underbrace{\log_2(\Pcol)\Bigl(\alpha + (\beta s + \gamma)\, k\,\tfrac{M}{\Prow}\Bigr)}_{\text{Reduce di } Y},
+  \label{eq:costo-comm}
+\end{equation}
+dove $\gamma$ \`e il costo per elemento della somma eseguita dalla reduce.
+
+Il termine che decide la forma ottima della griglia \`e il volume:
+\begin{equation}
+  V(\Prow,\Pcol) \;=\; k\Bigl(\frac{N}{\Pcol} + \frac{M}{\Prow}\Bigr),
+  \qquad \Prow \Pcol = P .
+  \label{eq:volume}
+\end{equation}
+Minimizzando con il vincolo $\Prow\Pcol = P$ si ottiene
+\begin{equation}
+  \Prow^{\star} = \sqrt{P\,\frac{M}{N}},
+  \qquad
+  \Pcol^{\star} = \sqrt{P\,\frac{N}{M}},
+  \qquad
+  V^{\star} = \frac{2k\sqrt{MN}}{\sqrt{P}} .
+  \label{eq:ottimo}
+\end{equation}
+
+Due letture, entrambe verificate sperimentalmente in \cref{cap:risultati}:
+
+\begin{itemize}[nosep,left=0pt]
+  \item \textbf{Perch\'e 2D e non 1D.} Le due decomposizioni monodimensionali
+        sono i casi degeneri $\Prow = 1$ (volume $kM$, nessun broadcast ma
+        reduce su tutti i $P$ processi) e $\Pcol = 1$ (volume $kN$, nessuna
+        reduce ma broadcast su tutti i $P$). In entrambi il volume \emph{non
+        decresce} con $P$, mentre la griglia 2D lo fa scendere come
+        $1/\sqrt{P}$. \`E il motivo per cui la traccia richiede una griglia
+        bidimensionale, ed \`e ci\`o che la campagna C6 misura direttamente
+        confrontando tutte le fattorizzazioni di $P$, forme degeneri comprese.
+  \item \textbf{Perch\'e la forma ottima dipende da $M{:}N$.} Per $M = N$ la
+        griglia migliore \`e quella quadrata, cio\`e proprio quella che
+        \code{grid\_default\_shape} sceglie da s\'e; per $M = 3N$ conviene invece
+        $\Prow > \Pcol$. La campagna C1 varia il rapporto $M{:}N$ a lavoro
+        costante e rende visibile questo effetto separandolo da quello della
+        taglia.
+\end{itemize}
+
+Un'osservazione che va tenuta presente leggendo il weak scaling (campagna C5):
+su una griglia 2D con blocco locale costante, $M$ segue $\Prow$ e $N$ segue
+$\Pcol$, quindi cambiare $P$ cambia \emph{anche} il rapporto $M{:}N$. \`E
+inerente alla decomposizione, ed \`e la ragione per cui l'effetto della forma
+viene misurato separatamente in C1 e C6.

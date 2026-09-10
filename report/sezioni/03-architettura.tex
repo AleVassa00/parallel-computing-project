@@ -1,0 +1,188 @@
+\chapter{Architettura del software}
+\label{cap:architettura}
+
+\section{Moduli}
+
+Il codice \`e diviso per responsabilit\`a, non per file: ogni cartella di
+\file{src/} ha un compito unico e dipende solo da quelle sotto di s\'e.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Struttura di \file{src/}.}
+\label{tab:moduli}
+\begin{tabular}{@{}p{0.20\linewidth}p{0.72\linewidth}@{}}
+\toprule
+\textbf{Modulo} & \textbf{Responsabilit\`a} \\
+\midrule
+\file{common/} & tipo scalare unico (\code{scalar\_t}), tolleranza di
+  validazione, utility di terminazione e cronometro \\
+\file{index/} & partizionamento a blocchi degli indici globali: dimensione,
+  offset e proprietario di ogni blocco \\
+\file{gen/} & generatore riproducibile senza stato (\cref{sec:generazione}) \\
+\file{serial/} & implementazione seriale minimale, usata come oracolo \\
+\file{kernel/} & \code{local\_gemm}: un file per implementazione, \code{.c} o
+  \code{.cu}, tutte dietro la stessa interfaccia \\
+\file{mpi/} & griglia cartesiana, layout dei blocchi, distribuzione dei dati,
+  algoritmo distribuito $Y = AX$ \\
+\file{bench/} & driver di misura e validazione, parsing delle opzioni, output CSV \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La dipendenza pi\`u importante \`e quella che \textbf{non} esiste: \file{mpi/} non
+include mai un header di un backend specifico. Vede solo
+\file{kernel/kernel.h}, e non ha modo di sapere se sotto giri lo schema~A
+scalare o un kernel CUDA.
+
+\section{L'interfaccia unica del kernel locale}
+\label{sec:interfaccia}
+
+Ogni backend implementa tre funzioni e due canali di misura:
+
+\begin{lstlisting}[language=C,caption={Interfaccia di \file{src/kernel/kernel.h}.}]
+local_gemm_t *local_gemm_create(int m, int n, int k,
+                                const scalar_t *A_loc,
+                                int lda, int ldx, int ldy);
+
+void local_gemm(local_gemm_t *ctx,
+                const scalar_t *RESTRICT X, int ldx,
+                scalar_t *RESTRICT Y, int ldy);
+
+void local_gemm_destroy(local_gemm_t *ctx);
+
+double local_gemm_last_compute_seconds(const local_gemm_t *ctx);
+double local_gemm_setup_seconds(const local_gemm_t *ctx);
+const char *kernel_name(void);
+\end{lstlisting}
+
+La scelta del backend \`e del \code{Makefile} (variabile \code{KERNEL}), non del
+codice: non esiste nessun \code{switch} a runtime fra implementazioni, e quindi
+nessun costo n\'e nessuna possibilit\`a di misurare per sbaglio un percorso
+diverso da quello che si crede.
+
+\subsection{Perch\'e il ciclo di vita ha tre fasi}
+\label{sec:tre-fasi}
+
+La separazione fra \code{create}, \code{local\_gemm} e \code{destroy} \`e la
+scelta architetturale con l'effetto pi\`u diretto sulle misure, e discende da una
+asimmetria del problema:
+
+\begin{center}
+\emph{$A$ non cambia mai fra un'invocazione e l'altra; $X$ e $Y$ cambiano sempre.}
+\end{center}
+
+$X$ arriva da un \code{MPI\_Bcast} e $Y$ deve tornare a un \code{MPI\_Reduce},
+quindi entrambe attraversano ogni invocazione. $A$, invece, viene generata (o
+ricevuta) una volta sola e resta identica per tutte le repetition. Tutto ci\`o che
+riguarda $A$ pu\`o dunque stare in \code{create}, che \`e preprocessing e non viene
+cronometrato.
+
+Per il backend di CPU questo \`e quasi vuoto: \code{create} registra forma e
+puntatore. Per i backend CUDA \`e invece il punto in cui $A$ viene copiata in VRAM
+\emph{una volta sola}. Il guadagno non \`e cosmetico: con $A$ dell'ordine dei
+gigabyte, una \code{cudaMemcpy} H2D per invocazione misurerebbe la banda PCIe e
+non la GPU. La traccia consente esplicitamente di escludere dal tempo $T$ i
+trasferimenti da e verso la scheda, e l'architettura rende questa esclusione una
+propriet\`a strutturale invece che una sottrazione a posteriori.
+
+Nella stessa fase vengono allocati anche i buffer di $X$ e $Y$ sul device e viene
+eseguita una \code{cudaDeviceSynchronize} finale. La conseguenza \`e che nessuna
+allocazione, e nessuna coda residua della copia di $A$, pu\`o cadere dentro la
+prima repetition, neppure con \code{--warmup 0}.
+
+\subsection{Lo stato in un contesto opaco}
+
+Lo stato del backend vive in una \code{struct local\_gemm\_context} opaca, non in
+variabili statiche di modulo. Il tipo \`e dichiarato in \file{kernel.h} e definito
+in ciascun \code{.c}/\code{.cu}, quindi ogni backend gli d\`a i campi che gli
+servono: il backend di CPU tiene forma e puntatore ad $A$, i backend CUDA
+tengono i tre puntatori device, i due \code{cudaEvent} e i tempi.
+
+Tre conseguenze pratiche: \`e esplicito nel tipo chi possiede la copia di $A$;
+non esiste inizializzazione globale nascosta; il backend resta riutilizzabile,
+perch\'e nulla vieta di avere pi\`u contesti vivi contemporaneamente.
+
+\subsection{Compatibilit\`a C / C++ e il test che la difende}
+
+I file \code{.cu} sono compilati da \code{nvcc} come C++, mentre il resto del
+progetto \`e C11 compilato da \code{mpicc}. Due differenze toccano proprio
+l'header condiviso: \code{restrict} non \`e una parola chiave del C++
+(si scrive \code{\_\_restrict\_\_}) e i nomi delle funzioni C++ vengono decorati,
+quindi senza \code{extern "C"} un backend \code{.cu} compilerebbe ma non
+linkerebbe.
+
+Entrambe le protezioni sono nell'header. La parte interessante \`e che la
+propriet\`a \`e \emph{verificata}: il target \code{make check-cxx} compila una
+sonda C++ che include \file{kernel.h} e \file{util.h}, cos\`i una regressione si
+manifesta come errore di build su qualunque macchina --- anche senza
+\code{nvcc} --- e non come un errore di link sul server il giorno della
+campagna.
+
+\section{Il driver di misura}
+
+\file{src/bench/main.c} \`e l'unico punto che conosce sia MPI sia il kernel sia
+le metriche. Fa, nell'ordine:
+
+\begin{enumerate}[nosep,left=0pt]
+  \item parsing e validazione delle opzioni (\cref{app:cli});
+  \item creazione della griglia cartesiana e calcolo del layout locale;
+  \item generazione o distribuzione di $A$ e $X$ (preprocessing);
+  \item \code{local\_gemm\_create} (preprocessing del backend);
+  \item \code{--warmup} invocazioni non cronometrate;
+  \item \code{--reps} invocazioni cronometrate, con i tempi delle tre fasi
+        raccolti per ogni repetition;
+  \item riduzione dei tempi fra i rank, calcolo di media, mediana, minimo,
+        deviazione standard e coefficiente di variazione;
+  \item validazione opzionale contro l'oracolo seriale (\code{--check});
+  \item stampa leggibile oppure riga CSV.
+\end{enumerate}
+
+Il fatto che warm-up e misura siano due cicli distinti sullo stesso codice, e non
+un ciclo unico con i primi giri scartati a posteriori, \`e voluto: le
+repetition cronometrate non contengono nessun ramo che le distingua dalle altre.
+
+\section{Build: una configurazione, un binario}
+\label{sec:build}
+
+Ogni scostamento dalla configurazione di default produce un binario con un nome
+proprio, come mostrato in \cref{tab:binari}. Non esiste un solo
+\file{bin/matmul\_mpi} riscritto a ogni \code{make}.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Corrispondenza fra configurazione di build e binario prodotto.}
+\label{tab:binari}
+\begin{tabular}{@{}p{0.46\linewidth}p{0.46\linewidth}@{}}
+\toprule
+\textbf{Comando} & \textbf{Binario} \\
+\midrule
+\code{make} & \file{bin/matmul\_mpi} \\
+\code{make PREC=float} & \file{bin/matmul\_mpi-float} \\
+\code{make FORCE\_GENERIC\_K=1} & \file{bin/matmul\_mpi-generic} \\
+\code{make TEST\_A\_PADDING=8} & \file{bin/matmul\_mpi-pad8} \\
+\code{make KERNEL=cuda\_naive} & \file{bin/matmul\_mpi-cuda\_naive} \\
+\code{make KERNEL=cuda\_warp} & \file{bin/matmul\_mpi-cuda\_warp} \\
+\code{make KERNEL=cuda\_warp\_smem} & \file{bin/matmul\_mpi-cuda\_warp\_smem} \\
+\code{make KERNEL=cuda\_warp\_smem SMEM\_PAD=0} & \file{bin/matmul\_mpi-cuda\_warp\_smem-smempad0} \\
+\code{make KERNEL=cuda\_warp\_tiled} & \file{bin/matmul\_mpi-cuda\_warp\_tiled} \\
+\code{make KERNEL=cublas} & \file{bin/matmul\_mpi-cublas} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Il motivo \`e sperimentale, non organizzativo: una build non pu\`o sovrascriverne
+un'altra e far misurare in singola precisione una campagna che si credeva in
+doppia. Nello stesso spirito, \code{kernel\_name()} riporta nel CSV anche i
+parametri che cambiano il codice generato --- per esempio
+\code{cuda\_warp\_tiled(tile8)} oppure il suffisso \code{(blk512)} quando la
+dimensione del blocco non \`e quella di default --- cos\`i le righe di uno sweep
+restano distinguibili anche a distanza di settimane.
+
+Il \code{Makefile} riconosce da s\'e se il backend richiesto \`e C o CUDA: se
+esiste \file{src/kernel/<nome>.cu} lo compila con \code{nvcc -arch=sm\_75} e
+linka \code{-lcudart} (e \code{-lcublas} per il backend cuBLAS). Su una macchina
+priva di \code{nvcc} la build CUDA si ferma con un messaggio esplicito, mentre
+tutto il resto del progetto continua a compilare: \`e la propriet\`a che ha
+permesso di sviluppare su una macchina ARM64 senza GPU e misurare sul server.

@@ -1,0 +1,48 @@
+% ===========================================================================
+% Relazione di progetto
+% Sistemi di Calcolo Parallelo e Applicazioni - A.A. 2025/2026
+% Prodotto matrice densa x multivettore  Y <- A X  in MPI + CUDA
+%
+% Compilazione:   latexmk -pdf main.tex      (oppure: make)
+% ===========================================================================
+\documentclass[11pt,a4paper,oneside]{report}
+
+\input{preambolo}
+
+% --- Dati di testata ------------------------------------------------------
+\newcommand{\titolorelazione}{Prodotto matrice densa per multivettore\\ in MPI e CUDA}
+\newcommand{\sottotitolorelazione}{Progetto di fine corso}
+\newcommand{\corso}{Sistemi di Calcolo Parallelo e Applicazioni}
+\newcommand{\annoaccademico}{A.A. 2025/2026}
+\newcommand{\autoreuno}{Alessandro Vassallo}
+\newcommand{\matricolauno}{0366572}
+\newcommand{\autoredue}{Andrea Galluzzi}
+\newcommand{\matricoladue}{0365026}
+\newcommand{\repository}{https://github.com/AleVassa00/parallel-computing-project}
+
+\begin{document}
+
+\input{sezioni/00-frontespizio}
+
+\pagenumbering{roman}
+\tableofcontents
+\cleardoublepage
+\pagenumbering{arabic}
+
+\input{sezioni/01-introduzione}
+\input{sezioni/02-problema}
+\input{sezioni/03-architettura}
+\input{sezioni/04-mpi}
+\input{sezioni/05-kernel-cpu}
+\input{sezioni/06-kernel-cuda}
+\input{sezioni/07-roofline}
+\input{sezioni/08-metodologia}
+\input{sezioni/09-validazione}
+\input{sezioni/10-risultati}
+\input{sezioni/11-conclusioni}
+
+\appendix
+\input{sezioni/A-interfaccia}
+\input{sezioni/B-riproducibilita}
+
+\end{document}

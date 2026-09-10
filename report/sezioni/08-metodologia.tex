@@ -1,0 +1,259 @@
+\chapter{Metodologia sperimentale}
+\label{cap:metodologia}
+
+\section{Ambiente di misura}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Ambiente software del server di dipartimento, come registrato nei
+metadati della campagna C3.}
+\label{tab:ambiente}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Componente} & \textbf{Versione} \\
+\midrule
+Compilatore CUDA & \code{nvcc} 12.8 (V12.8.61) \\
+MPI & Open MPI 5.0.9 \\
+Architettura GPU di compilazione & \code{sm\_75} (Turing) \\
+Compilatore host & \code{mpicc}, C11, \code{-O3 -march=native} \\
+Compilatore device & \code{nvcc}, C++14, \code{-O3 -lineinfo} \\
+Modello CPU, cache, frequenza & \dato\ \TODO{completare con \code{lscpu}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Il server \`e un nodo a doppio socket con GPU singola. Il frontend non ha accesso
+diretto alla GPU: tutte le verifiche d'ambiente (\code{nvcc --version},
+\code{ompi\_info | grep cuda}, \code{deviceQuery}, \code{nvidia-smi}) e tutti i
+benchmark vanno eseguiti sui nodi di calcolo attraverso lo scheduler, non sul
+nodo di login. \`E un dettaglio operativo, ma \`e la causa pi\`u frequente di
+misure invalide.
+
+\paragraph{Binding obbligatorio.} Tutte le esecuzioni multi-rank usano
+\code{--bind-to core --map-by core}. Senza binding i processi migrano fra i
+socket, la localit\`a NUMA salta e le misure diventano rumore: non \`e un
+affinamento, \`e una precondizione.
+
+\section{Che cosa entra nel cronometro}
+\label{sec:metriche}
+
+Per ogni repetition e per ogni rank vengono misurati i tempi delle tre fasi,
+poi ridotti fra i rank con \code{MPI\_MAX} --- repetition per repetition, prima
+di qualunque media. Prendere il massimo \`e la scelta corretta perch\'e le
+collettive sincronizzano: il tempo del prodotto distribuito \`e quello del rank
+pi\`u lento, e mediare prima di massimizzare lo sottostimerebbe.
+
+Il \textbf{tempo ufficiale} vale
+\begin{equation}
+  t_{\text{official}} =
+  \begin{cases}
+    t_{\text{total}} & \text{backend CPU} \\[2pt]
+    t_{\text{bcast}} + t_{\text{kernel}} + t_{\text{reduce}} & \text{backend CUDA}
+  \end{cases}
+  \label{eq:t-official}
+\end{equation}
+dove $t_{\text{total}}$ \`e misurato direttamente dall'inizio del broadcast alla
+fine della reduce. Sui backend CUDA la sostituzione di $t_{\text{local}}$ con
+$t_{\text{kernel}}$ realizza \emph{esattamente} la prescrizione della traccia:
+il tempo di trasferimento da e verso la scheda non entra in $T$, ma resta
+misurato e discusso a parte.
+
+Le tre metriche riportate sono:
+\begin{align}
+  \code{gflops} &= \frac{2MNk}{\overline{\max_r t_{\text{official}}}} \cdot 10^{-9}
+    &&\text{metrica ufficiale} \\
+  \code{gflops\_compute} &= \frac{2MNk}{\overline{\max_r t_{\text{compute}}}} \cdot 10^{-9}
+    &&\text{solo calcolo} \\
+  \code{gflops\_kernel} &= \frac{2MNk}{\overline{\max_r t_{\text{kernel}}}} \cdot 10^{-9}
+    &&\text{alias CUDA}
+\end{align}
+con $t_{\text{compute}} = t_{\text{local}}$ su CPU e $t_{\text{kernel}}$ su CUDA.
+Sui backend di CPU, dove il kernel \emph{\`e} l'invocazione e non c'\`e nulla da
+separare, $t_{\text{kernel}}$ e \code{gflops\_kernel} valgono $-1$: il valore
+negativo dice ``non applicabile'' e rende riconoscibili a colpo d'occhio le righe
+GPU nel CSV. Su GPU la colonna da leggere \`e \code{gflops\_kernel}; su CPU \`e
+\code{gflops}.
+
+$t_{\text{setup}}$ riporta separatamente il preprocessing del backend, che per
+costruzione sta fuori da tutte e tre le metriche: \`e riportato, non nascosto.
+
+\section{Stabilit\`a delle misure}
+
+Ogni configurazione esegue \code{--warmup} invocazioni non cronometrate (default
+$2$) seguite da \code{--reps} cronometrate ($10$ o $20$ secondo la campagna). Per
+ogni serie il CSV riporta media, mediana, minimo, deviazione standard e
+coefficiente di variazione
+\begin{equation}
+  \mathrm{CV}\% = 100 \cdot \frac{\sigma}{\mu} .
+\end{equation}
+
+Il CV \`e la colonna che dice, riga per riga, se la media significa qualcosa.
+Nella campagna C3 vale fra $0{,}37\%$ e $1{,}38\%$
+(\cref{tab:c3-misure}), quindi le differenze discusse in \cref{sec:c3} sono
+ordini di grandezza sopra la dispersione. \`E un controllo che va rifatto per ogni
+campagna, non una propriet\`a acquisita: una riga con CV alto va indagata prima
+di essere interpretata.
+
+Oltre al CSV aggregato, ogni esecuzione pu\`o produrre un CSV \emph{raw} con una
+riga per repetition, pensato per lo studio della varianza: ha un'intestazione
+diversa e va unito separatamente.
+
+\section{Le campagne}
+\label{sec:campagne}
+
+Le campagne sono descritte da file \code{.conf} raggruppati in \emph{suite}, e
+lanciate dal runner \file{run\_cuda\_experiments.sh} in \file{script/}. Tutti i
+\code{.conf} di una campagna condividono la cartella di output e hanno nomi
+distinti, quindi i loro CSV non si sovrascrivono.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Le sei campagne, nell'ordine di esecuzione consigliato.}
+\label{tab:campagne}
+\begin{tabular}{@{}llp{0.42\linewidth}ll@{}}
+\toprule
+\textbf{ID} & \textbf{Suite} & \textbf{A che domanda risponde} & \textbf{$P$} & \textbf{Durata} \\
+\midrule
+C3 & \file{c3\_cpu\_baseline} & qual \`e il denominatore di ogni speedup, e quanto vale la specializzazione su $k$ & 1 & \SI{5}{\minute} \\
+C2 & \file{c2\_k\_sweep} & come si comporta ogni backend al variare di $k$, incluso il fallback generico & 1 & \SI{10}{\minute} \\
+C1 & \file{c1\_size\_ratio\_\{cpu,gpu\}} & \textbf{obbligatoria}: dimensioni crescenti su 3 rapporti $M{:}N$ & 1 & \SI{8}{\minute} \\
+C6 & \file{c6\_grid\_shape} & quale forma di griglia conviene a $P$ fisso, cio\`e perch\'e 2D & 8/16/20 & \SI{6}{\minute} \\
+C4 & \file{c4\_strong\_scaling} & come scala a problema fisso & 1--20 & \SI{5}{\minute} \\
+C5 & \file{c5\_weak\_scaling} & quanto costa la sola comunicazione & 1--20 & \SI{5}{\minute} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+C3 e C2 vengono per primi perch\'e producono i numeri di riferimento che tutte le
+altre citano. Cinque campagne su sei (tutte tranne le righe GPU di C2 e C1) non
+richiedono \code{nvcc}: se la build CUDA non funziona, la parte MPI del progetto
+resta interamente misurabile.
+
+\subsection{C1 --- dimensioni crescenti per rapporto $M{:}N$}
+\label{sec:c1}
+
+\`E la campagna esplicitamente richiesta dalla traccia: misure ripetute per $M$ e
+$N$ crescenti, su almeno tre rapporti, insieme che deve contenere $M = N$.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{I dodici punti di C1: quattro passi (fattore 4 in $MN$) per tre
+rapporti, scelti in modo che a parit\`a di passo il lavoro sia lo stesso entro il
+$5\%$.}
+\label{tab:c1-punti}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+\textbf{Passo} & $1{:}1$ & $3{:}1$ ($M = 3N$) & $1{:}2$ ($N = 2M$) & $MN$ \\
+\midrule
+s1 & $3200 \times 3200$ & $5400 \times 1800$ & $2250 \times 4500$ & $\sim 1{,}0\cdot 10^{7}$ \\
+s2 & $6400 \times 6400$ & $10800 \times 3600$ & $4500 \times 9000$ & $\sim 4{,}0\cdot 10^{7}$ \\
+s3 & $12800 \times 12800$ & $21600 \times 7200$ & $9000 \times 18000$ & $\sim 1{,}6\cdot 10^{8}$ \\
+s4 & $25600 \times 25600$ & $43200 \times 14400$ & $18000 \times 36000$ & $\sim 6{,}4\cdot 10^{8}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Il disegno \`e la parte che conta: poich\'e il lavoro \`e uguale a parit\`a di
+passo, le tre curve si sovrappongono sullo stesso asse e la differenza che si
+legge \`e la \textbf{forma} del blocco, non la taglia. Conta perch\'e il rapporto
+$M{:}N$ decide quanto pesa il broadcast di $X$ ($\sim \nloc k$) contro la reduce
+di $Y$ ($\sim \mloc k$), e su GPU quanti warp esistono ($\mloc$) contro quanto \`e
+lungo il ciclo interno ($\nloc$): una matrice larga e bassa affama la GPU di
+parallelismo.
+
+Al passo s4 la sola $A$ occupa circa \SI{5}{\giga\byte} in doppia precisione:
+entra nella VRAM da \SI{15.5}{\gib}, ma \`e il primo punto che pu\`o fallire. Le
+suite sono in ordine di taglia crescente e hanno \code{continue\_on\_error=1},
+quindi un eventuale esaurimento della memoria non invalida i punti gi\`a raccolti.
+
+\subsection{C2 --- sweep su $k$, un backend per riga}
+\label{sec:c2}
+
+$k \in \{3, 6, 8, 20, 32\}$ (i cinque della traccia, tutti specializzati) seguiti
+da $k \in \{1, 7, 17, 40, 64\}$, che attraversano il fallback. La differenza fra
+le due famiglie di righe \emph{\`e} la misura di quanto vale la specializzazione.
+Su \kernelname{scheme\_a}, $k = 40$ e $k = 64$ costano anche una rilettura di $A$
+(\cref{eq:passaggi}), e vanno letti tenendone conto.
+
+Sei backend sulla stessa griglia di $k$: \kernelname{scheme\_a},
+\kernelname{cuda\_naive}, \kernelname{cuda\_warp}, \kernelname{cuda\_warp\_smem},
+\kernelname{cuda\_warp\_tiled}, \kernelname{cublas}.
+
+\subsection{C3 --- baseline di CPU e specializzazione contro fallback}
+
+Due ruoli in una campagna sola: il \emph{denominatore} di ogni speedup della
+relazione (il nucleo a 1 rank, senza comunicazione e senza GPU), e il
+microbenchmark \code{FORCE\_GENERIC\_K=0} contro \code{FORCE\_GENERIC\_K=1} sullo
+stesso problema. Le due build sono binari distinti con \code{kernel\_name()}
+diverso, quindi le righe restano distinguibili nel CSV. Il controllo di
+consistenza su $k = 40$ e $k = 64$ \`e descritto in
+\cref{sec:specializzazione}.
+
+\subsection{C4 --- strong scaling}
+\label{sec:c4}
+
+Problema fisso $\num{20000} \times \num{20000}$ ($A$ da circa
+\SI{3.2}{\giga\byte}), $P \in \{1,2,4,8,16,20\}$ sulla forma pi\`u quadrata --- la
+stessa che \code{grid\_default\_shape} sceglierebbe da s\'e. A $P = 20$ il blocco
+locale \`e $5000 \times 4000$, abbastanza grande da non stare in cache.
+
+$k \in \{3, 32\}$ perch\'e calcolo e comunicazione crescono \emph{entrambi} con
+$k$, ma da basi diverse: con $k = 3$ la scalabilit\`a attesa \`e quasi ideale, con
+$k = 32$ il broadcast e la reduce pesano dieci volte tanto ed \`e l\`i che ci si
+attende la rottura. Le colonne da riportare sono \code{gflops} pi\`u la terna
+$t_{\text{bcast}}$, $t_{\text{local}}$, $t_{\text{reduce}}$ come frazione di
+$t_{\text{total}}$.
+
+\subsection{C5 --- weak scaling}
+\label{sec:c5}
+
+Blocco locale costante a $5000 \times 5000$ per processo, cio\`e
+$M = 5000\Prow$ e $N = 5000\Pcol$. Il lavoro per rank non cambia da $P = 1$ a
+$P = 20$, quindi il tempo ideale \`e piatto e tutto ci\`o che sale \`e comunicazione
+pura. Separa calcolo e comunicazione meglio dello strong scaling, dove i due
+effetti si sovrappongono. Va letta ricordando l'osservazione di
+\cref{sec:modello-comunicazione}: su una griglia 2D il weak scaling cambia
+anche il rapporto $M{:}N$.
+
+\subsection{C6 --- forma della griglia a $P$ fisso}
+\label{sec:c6}
+
+Esegue \emph{tutte} le fattorizzazioni ordinate di $P$: per $P = 8$ le forme
+$1{\times}8$, $2{\times}4$, $4{\times}2$, $8{\times}1$; per $P = 16$ cinque
+forme; per $P = 20$ sei. \`E la campagna che giustifica sperimentalmente la
+griglia \textbf{2D} invece di una 1D, cio\`e il requisito centrale della traccia:
+le forme degeneri $1{\times}P$ e $P{\times}1$ \emph{sono} le due decomposizioni
+monodimensionali, quindi il confronto \`e diretto e sullo stesso grafico.
+
+$t_{\text{bcast}}$ e $t_{\text{reduce}}$ vanno letti \textbf{in coppia}: per la
+\cref{eq:volume} devono muoversi in direzioni opposte lungo la sequenza di
+forme, e l'ottimo sta in mezzo. \`E una previsione falsificabile, ed \`e il modo
+in cui la campagna verifica il modello di costo invece di limitarsi a
+illustrarlo.
+
+\section{Riproducibilit\`a}
+
+Ogni campagna scrive accanto ai CSV un file di metadati con: comando eseguito,
+timestamp, tutti i parametri del \code{.conf}, commit git e stato del working
+tree, versione di \code{nvcc} e di \code{mpirun}, informazioni sulla GPU. Un
+risultato senza questi metadati non \`e confrontabile con un altro raccolto due
+settimane dopo.
+
+Tre regole operative discendono dall'organizzazione dei file, e sono documentate
+nel repository perch\'e violarle costa una campagna:
+
+\begin{itemize}[nosep,left=0pt]
+  \item \textbf{rilanciare una campagna sovrascrive i suoi CSV}: la cartella va
+        archiviata prima di ripetere;
+  \item \textbf{la validazione si fa a parte}: nessuna campagna usa
+        \code{--check}, perch\'e l'oracolo seriale costa $O(MNk)$ sul rank 0 e
+        falserebbe i tempi. Si valida prima, su taglie piccole
+        (\cref{cap:validazione});
+  \item \textbf{trasporto MPI}: il runner usa \code{btl=self,sm} per default; il
+        componente \code{sm} non esiste in Open MPI 3.x/4.x, dove si chiama
+        \code{vader}. Se le esecuzioni multi-rank falliscono con un errore di
+        BTL, va verificato con \code{ompi\_info --param btl all}.
+\end{itemize}
