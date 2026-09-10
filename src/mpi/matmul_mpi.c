@@ -55,6 +55,8 @@ void mpi_matmul(const grid_t *grid, const layout_t *layout, local_gemm_t *local_
 
     if (times_struct_rep != NULL) {
         const double kernel_time = local_gemm_last_compute_seconds(local_gemm_context);
+        const double h2d_X_transfer_time = local_gemm_last_h2d_X_seconds(local_gemm_context);
+        const double d2h_Y_transfer_time = local_gemm_last_d2h_Y_seconds(local_gemm_context);
 
         times_struct_rep->bcast_time = t1 - t0;
         times_struct_rep->local_phase_time = t2 - t1;
@@ -67,5 +69,21 @@ void mpi_matmul(const grid_t *grid, const layout_t *layout, local_gemm_t *local_
         times_struct_rep->official_time = (kernel_time >= 0.0)
                       ? times_struct_rep->bcast_time + kernel_time + times_struct_rep->reduce_time
                       : times_struct_rep->total_time;
+
+        /* Voci escluse dal tempo ufficiale e raccolte per discuterle a parte.
+         * Vengono dagli stessi event gia' letti sopra, quindi non aggiungono
+         * nessuna sincronizzazione: e' pura lettura di stato congelato. */
+        times_struct_rep->h2d_X_transfer_time = h2d_X_transfer_time;
+        times_struct_rep->d2h_Y_transfer_time = d2h_Y_transfer_time;
+
+        /* L'overhead del runtime e' cio' che AVANZA, non una misura diretta:
+         * il tempo della fase locale meno le tre cose che sappiamo nominare.
+         * Solo un backend che le misura tutte e tre puo' produrlo, altrove
+         * resta il sentinella negativo. */
+        times_struct_rep->launch_overhead_time =
+            (kernel_time >= 0.0 && h2d_X_transfer_time >= 0.0 && d2h_Y_transfer_time >= 0.0)
+              ? times_struct_rep->local_phase_time - kernel_time
+                    - h2d_X_transfer_time - d2h_Y_transfer_time
+              : -1.0;
     }
 }

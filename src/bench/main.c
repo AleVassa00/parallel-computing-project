@@ -4,7 +4,12 @@
  *
  * Le modalita' predefinite generano localmente i blocchi di A e X; le modalita'
  * alternative materializzano il rispettivo input sul grid rank 0 e lo
- * distribuiscono. Tutti questi percorsi sono preprocessing. */
+ * distribuiscono. Tutti questi percorsi sono preprocessing.
+ *
+ * Preprocessing, I/O e trasferimenti da e verso la scheda restano FUORI dalla
+ * metrica ufficiale, come la consegna richiede, ma vengono cronometrati voce
+ * per voce e pubblicati in coda al CSV: la consegna consente di misurarli e
+ * discuterli a parte, e un costo che non si misura non si puo' discutere. */
 
 #include <mpi.h>
 
@@ -58,12 +63,22 @@ static const char *CSV_HEADER =
     "t_kernel_mean_s,t_kernel_median_s,t_kernel_min_s,t_kernel_std_s,t_kernel_cv_pct,"
     "t_transfer_runtime_overhead_mean_s,t_transfer_runtime_overhead_std_s,"
     "t_setup_s,gflops,gflops_compute,gflops_kernel,"
-    "blocks_per_sm,x_rows_per_tile,threads,rel_err";
+    "blocks_per_sm,x_rows_per_tile,rel_err,"
+    /* Da qui in poi: tempi ESCLUSI dalla metrica ufficiale, raccolti perche'
+     * la consegna consente di misurarli e discuterli a parte. Sono in coda
+     * cosi' che le colonne storiche restino nella stessa posizione. */
+    "t_setup_device_init_s,t_setup_device_alloc_s,t_setup_h2d_A_s,bw_h2d_A_gbs,"
+    "t_h2d_X_mean_s,t_h2d_X_std_s,bw_h2d_X_gbs,"
+    "t_d2h_Y_mean_s,t_d2h_Y_std_s,bw_d2h_Y_gbs,"
+    "t_launch_overhead_mean_s,t_launch_overhead_std_s,"
+    "t_prep_alloc_buffers_s,t_prep_gen_A_s,t_prep_distrib_A_s,"
+    "t_prep_gen_X_s,t_prep_distrib_X_s,t_prep_total_s,t_io_csv_raw_s";
 
 static const char *CSV_RAW_HEADER =
     "kernel,scalar,a_mode,x_mode,M,N,k,P,pr,pc,rep,"
     "t_bcast_s,t_local_s,t_reduce_s,t_total_s,t_official_s,t_kernel_s,"
-    "t_transfer_runtime_overhead_s,gflops,gflops_compute,gflops_kernel";
+    "t_transfer_runtime_overhead_s,gflops,gflops_compute,gflops_kernel,"
+    "t_h2d_X_s,t_d2h_Y_s,t_launch_overhead_s";
 
 static const char *a_mode_name(a_mode_t mode)
 {
@@ -308,7 +323,10 @@ static void append_raw_csv(const char *path,
                            const double *total_times,
                            const double *official_times,
                            const double *kernel_times,
-                           const double *non_kernel_local_times)
+                           const double *non_kernel_local_times,
+                           const double *h2d_X_transfer_times,
+                           const double *d2h_Y_transfer_times,
+                           const double *launch_overhead_times)
 {
     FILE *fp;
     long file_size;
@@ -356,7 +374,8 @@ static void append_raw_csv(const char *path,
         fprintf(fp,
                 "%s,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,"
                 "%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,"
-                "%.6f,%.6f,%.6f\n",
+                "%.6f,%.6f,%.6f,"
+                "%.9e,%.9e,%.9e\n",
                 kernel_name(), SCALAR_NAME,
                 a_mode_name(options->a_mode), x_mode_name(options->x_mode),
                 options->M, options->N, options->k,
@@ -364,7 +383,9 @@ static void append_raw_csv(const char *path,
                 bcast_times[rep], local_phase_times[rep], reduce_times[rep],
                 total_times[rep], official_times[rep], kernel_times[rep],
                 non_kernel_local_times[rep],
-                rep_gflops, rep_gflops_compute, rep_gflops_kernel);
+                rep_gflops, rep_gflops_compute, rep_gflops_kernel,
+                h2d_X_transfer_times[rep], d2h_Y_transfer_times[rep],
+                launch_overhead_times[rep]);
     }
 
     if (fclose(fp) != 0)
@@ -387,9 +408,17 @@ int main(int argc, char **argv)
     double *official_times, *kernel_times, *non_kernel_local_times;
     double *sorted_total_times, *sorted_official_times, *sorted_kernel_times;
 
+    /* Voci per ripetizione escluse dal tempo ufficiale: i due trasferimenti
+     * host<->device e cio' che di essi non e' PCIe ma runtime. */
+    double *h2d_X_transfer_times, *d2h_Y_transfer_times, *launch_overhead_times;
+
     double mean_bcast_time, mean_local_phase_time, mean_reduce_time;
     double mean_total_time, mean_official_time, mean_kernel_time;
     double mean_compute_time, mean_non_kernel_local_time = -1.0;
+
+    double mean_h2d_X_transfer_time = -1.0, std_h2d_X_transfer_time = 0.0;
+    double mean_d2h_Y_transfer_time = -1.0, std_d2h_Y_transfer_time = 0.0;
+    double mean_launch_overhead_time = -1.0, std_launch_overhead_time = 0.0;
 
     double std_bcast_time, std_local_phase_time, std_reduce_time;
     double std_total_time, std_official_time, std_kernel_time;
@@ -401,7 +430,39 @@ int main(int argc, char **argv)
 
     double gflops, gflops_compute, rel_err = -1.0;
     double gflops_kernel = -1.0, setup_time;
-    int blocks_per_sm, x_rows_per_tile, threads;
+
+    /* --------------------------------------------------------------------
+     * Tempi "da discutere a parte" (consegna): preprocessing, trasferimenti
+     * da e verso la scheda e I/O. Nessuno di essi entra in t_official.
+     * -------------------------------------------------------------------- */
+
+    /* Preprocessing: tutto cio' che accade UNA volta sola prima della prima
+     * ripetizione cronometrata. Ogni voce e' il tempo di QUESTO processo; la
+     * riduzione finale prende il massimo, che e' il cammino critico. */
+    double prep_section_start;
+    double prep_alloc_local_buffers_time = 0.0;
+    double prep_gen_A_time = 0.0;
+    double prep_distrib_A_time = 0.0;   /* resta 0 con --a-mode local */
+    double prep_gen_X_time = 0.0;
+    double prep_distrib_X_time = 0.0;   /* resta 0 con --x-mode local */
+    double prep_total_time = 0.0;
+
+    /* Scomposizione del preprocessing del backend (t_setup): su CUDA sono
+     * contesto, VRAM e la sola copia H2D di A; su CPU valgono zero. */
+    double setup_device_init_time, setup_device_alloc_time, setup_h2d_A_time;
+
+    /* Byte che attraversano il PCIe, sommati su tutti i rank che condividono
+     * la scheda: e' il numeratore delle bande qui sotto. */
+    double bytes_h2d_A_all_ranks, bytes_h2d_X_all_ranks, bytes_d2h_Y_all_ranks;
+    double bandwidth_h2d_A_gbs = -1.0;
+    double bandwidth_h2d_X_gbs = -1.0;
+    double bandwidth_d2h_Y_gbs = -1.0;
+
+    /* I/O: la scrittura del CSV per ripetizione. E' l'unico I/O del driver
+     * (gli input sono generati, non letti da file) e la consegna lo esclude
+     * dalla misura tanto quanto i trasferimenti. */
+    double io_csv_raw_write_time = -1.0;
+    int blocks_per_sm, x_rows_per_tile;
     int world_rank, world_size, rep;
 
     MPI_Init(&argc, &argv);
@@ -451,27 +512,43 @@ int main(int argc, char **argv)
                 "warning: grid %dx%d is larger than the matrix %dx%d, "
                 "some processes own no data\n", options.pr, options.pc, options.M, options.N);
 
-    /* Allocazione dei blocchi locali. */
+    /* Allocazione dei blocchi locali. Prima voce del preprocessing: non e'
+     * gratuita quando A e' dell'ordine dei GB, e va misurata invece che
+     * assunta trascurabile. */
+    prep_section_start = now_seconds();
     A_loc = xmalloc((size_t)layout.m_loc * layout.lda * sizeof *A_loc);
     X_loc = xmalloc((size_t)layout.n_loc * layout.ldx * sizeof *X_loc);
     Y_loc_part = xmalloc((size_t)layout.m_loc * layout.ldy * sizeof *Y_loc_part);
     if (grid.my_col == 0)
         Y_row_col0 = xmalloc((size_t)layout.m_loc * layout.ldy * sizeof *Y_row_col0);
+    prep_alloc_local_buffers_time = now_seconds() - prep_section_start;
 
     if (options.a_mode == A_MODE_LOCAL) {
         /* Modalita' predefinita: ogni processo genera direttamente il proprio
          * blocco e fa anche il first touch delle proprie pagine. */
+        prep_section_start = now_seconds();
         gen_block_A(A_loc, layout.lda, layout.m_loc, layout.n_loc,
                     layout.row0, layout.col0, layout.N, options.seed);
+        prep_gen_A_time = now_seconds() - prep_section_start;
     } else {
         /* Modalita' alternativa: soltanto il grid rank 0 materializza la
          * matrice globale. Lo stesso generatore e gli stessi indici globali
          * garantiscono valori identici alla generazione locale. */
+        /* Il tempo di generazione e quello di distribuzione restano separati:
+         * il primo e' lavoro del solo rank 0, il secondo e' una collettiva che
+         * tutti pagano, e mescolarli renderebbe il confronto fra le due
+         * modalita' di input illeggibile. */
+        prep_section_start = now_seconds();
         if (grid.rank == 0) {
             A_global_root = xmalloc((size_t)layout.M * (size_t)layout.N * sizeof *A_global_root);
             gen_block_A(A_global_root, layout.N, layout.M, layout.N, 0, 0, layout.N, options.seed);
         }
+        prep_gen_A_time = now_seconds() - prep_section_start;
+
+        prep_section_start = now_seconds();
         distribute_global_A(&grid, &layout, A_global_root, A_loc);
+        prep_distrib_A_time = now_seconds() - prep_section_start;
+
         xfree(A_global_root);
         A_global_root = NULL;
     }
@@ -490,21 +567,29 @@ int main(int argc, char **argv)
      * global il grid rank 0 genera X compatta e la distribuisce sulla riga 0.
      * In entrambi i casi mpi_matmul esegue poi lo stesso broadcast verticale. */
     if (options.x_mode == X_MODE_LOCAL) {
+        prep_section_start = now_seconds();
         if (grid.my_row == 0)
             gen_block_X(X_loc, layout.ldx, layout.n_loc, layout.k,
                         layout.col0, options.seed);
+        prep_gen_X_time = now_seconds() - prep_section_start;
     } else {
         /* MPI_Scatterv usa conteggi e displacement int. Controllare prima
          * dell'allocazione evita di materializzare un buffer non distribuibile. */
         if (layout.N > INT_MAX / layout.k)
             die("global X element count exceeds the MPI int count range");
+        prep_section_start = now_seconds();
         if (grid.rank == 0) {
             X_global_root = xmalloc((size_t)layout.N * (size_t)layout.k
                                     * sizeof *X_global_root);
             gen_block_X(X_global_root, layout.k, layout.N, layout.k,
                         0, options.seed);
         }
+        prep_gen_X_time = now_seconds() - prep_section_start;
+
+        prep_section_start = now_seconds();
         distribute_global_X(&grid, &layout, X_global_root, X_loc);
+        prep_distrib_X_time = now_seconds() - prep_section_start;
+
         xfree(X_global_root);
         X_global_root = NULL;
     }
@@ -519,6 +604,9 @@ int main(int argc, char **argv)
     sorted_total_times = xmalloc((size_t)options.reps * sizeof *sorted_total_times);
     sorted_official_times = xmalloc((size_t)options.reps * sizeof *sorted_official_times);
     sorted_kernel_times = xmalloc((size_t)options.reps * sizeof *sorted_kernel_times);
+    h2d_X_transfer_times = xmalloc((size_t)options.reps * sizeof *h2d_X_transfer_times);
+    d2h_Y_transfer_times = xmalloc((size_t)options.reps * sizeof *d2h_Y_transfer_times);
+    launch_overhead_times = xmalloc((size_t)options.reps * sizeof *launch_overhead_times);
 
     for (rep = 0; rep < options.warmup_reps; rep++)
         mpi_matmul(&grid, &layout, local_gemm_context, X_loc, Y_loc_part, Y_row_col0, NULL);
@@ -539,6 +627,14 @@ int main(int argc, char **argv)
         official_times[rep] = times_struct_rep.official_time;
         kernel_times[rep] = times_struct_rep.kernel_time;
         non_kernel_local_times[rep] = (times_struct_rep.kernel_time >= 0.0) ? times_struct_rep.local_phase_time - times_struct_rep.kernel_time : -1.0;
+
+        /* Le tre voci escluse dal tempo ufficiale: i due trasferimenti e cio'
+         * che avanza della fase locale, che e' overhead del runtime e non
+         * PCIe. Vengono raccolte qui, insieme a tutto il resto, per non
+         * aggiungere niente al cammino cronometrato. */
+        h2d_X_transfer_times[rep] = times_struct_rep.h2d_X_transfer_time;
+        d2h_Y_transfer_times[rep] = times_struct_rep.d2h_Y_transfer_time;
+        launch_overhead_times[rep] = times_struct_rep.launch_overhead_time;
     }
 
     /* Il tempo di una invocazione e' il MASSIMO fra i processi, non quello del
@@ -557,10 +653,46 @@ int main(int argc, char **argv)
      * CPU sopravvive al massimo, perche' li' e' negativo su tutti i rank. */
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : kernel_times, kernel_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : non_kernel_local_times, non_kernel_local_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
+    /* Stesso criterio per le tre voci escluse dalla misura ufficiale. */
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : h2d_X_transfer_times, h2d_X_transfer_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : d2h_Y_transfer_times, d2h_Y_transfer_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : launch_overhead_times, launch_overhead_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
 
     setup_time = local_gemm_setup_seconds(local_gemm_context);
+    setup_device_init_time = local_gemm_setup_device_init_seconds(local_gemm_context);
+    setup_device_alloc_time = local_gemm_setup_device_alloc_seconds(local_gemm_context);
+    setup_h2d_A_time = local_gemm_setup_h2d_A_seconds(local_gemm_context);
+
+    /* Il totale del preprocessing si compone LOCALMENTE e solo dopo si riduce,
+     * per lo stesso motivo di t_official: la somma dei massimi di fasi diverse
+     * non e' il cammino critico di nessun processo reale. Va fatto prima delle
+     * riduzioni, che sovrascrivono i valori locali sul rank 0. */
+    prep_total_time = prep_alloc_local_buffers_time
+                    + prep_gen_A_time + prep_distrib_A_time
+                    + prep_gen_X_time + prep_distrib_X_time
+                    + setup_time;
+
+    /* I byte si SOMMANO invece di prendere il massimo: i rank condividono
+     * l'unica scheda, quindi la banda utile e' quella aggregata sul bus. */
+    bytes_h2d_A_all_ranks = (double)local_gemm_bytes_h2d_A(local_gemm_context);
+    bytes_h2d_X_all_ranks = (double)local_gemm_bytes_h2d_X_per_call(local_gemm_context);
+    bytes_d2h_Y_all_ranks = (double)local_gemm_bytes_d2h_Y_per_call(local_gemm_context);
 
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &setup_time, &setup_time, 1, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &setup_device_init_time, &setup_device_init_time, 1, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &setup_device_alloc_time, &setup_device_alloc_time, 1, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &setup_h2d_A_time, &setup_h2d_A_time, 1, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
+
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &prep_alloc_local_buffers_time, &prep_alloc_local_buffers_time, 1, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &prep_gen_A_time, &prep_gen_A_time, 1, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &prep_distrib_A_time, &prep_distrib_A_time, 1, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &prep_gen_X_time, &prep_gen_X_time, 1, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &prep_distrib_X_time, &prep_distrib_X_time, 1, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &prep_total_time, &prep_total_time, 1, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
+
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &bytes_h2d_A_all_ranks, &bytes_h2d_A_all_ranks, 1, MPI_DOUBLE, MPI_SUM, 0, grid.grid_comm);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &bytes_h2d_X_all_ranks, &bytes_h2d_X_all_ranks, 1, MPI_DOUBLE, MPI_SUM, 0, grid.grid_comm);
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &bytes_d2h_Y_all_ranks, &bytes_d2h_Y_all_ranks, 1, MPI_DOUBLE, MPI_SUM, 0, grid.grid_comm);
 
     /* Configurazione scelta dal backend, non una misura: dice COME il lavoro e'
      * stato mappato sull'hardware, ed e' quello che rende leggibili le curve di
@@ -571,11 +703,9 @@ int main(int argc, char **argv)
      * sopravvive al massimo perche' li' e' -1 su tutti. */
     blocks_per_sm = local_gemm_blocks_per_sm(local_gemm_context);
     x_rows_per_tile = local_gemm_x_rows_per_tile(local_gemm_context);
-    threads = local_gemm_threads(local_gemm_context);
 
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &blocks_per_sm, &blocks_per_sm, 1, MPI_INT, MPI_MAX, 0, grid.grid_comm);
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &x_rows_per_tile, &x_rows_per_tile, 1, MPI_INT, MPI_MAX, 0, grid.grid_comm);
-    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &threads, &threads, 1, MPI_INT, MPI_MAX, 0, grid.grid_comm);
 
     if (options.check)
         rel_err = check_against_serial(&grid, &layout, Y_row_col0, options.seed);
@@ -599,6 +729,28 @@ int main(int argc, char **argv)
         std_official_time = vec_stddev(official_times, options.reps);
         std_kernel_time = vec_stddev(kernel_times, options.reps);
         std_non_kernel_local_time = vec_stddev(non_kernel_local_times, options.reps);
+
+        /* Le voci escluse dal tempo ufficiale ricevono lo stesso trattamento
+         * statistico di quelle incluse: una media senza dispersione non e'
+         * discutibile, e su un bus condiviso da piu' rank la dispersione e'
+         * proprio cio' che si vuole vedere. */
+        mean_h2d_X_transfer_time = vec_mean(h2d_X_transfer_times, options.reps);
+        std_h2d_X_transfer_time = vec_stddev(h2d_X_transfer_times, options.reps);
+        mean_d2h_Y_transfer_time = vec_mean(d2h_Y_transfer_times, options.reps);
+        std_d2h_Y_transfer_time = vec_stddev(d2h_Y_transfer_times, options.reps);
+        mean_launch_overhead_time = vec_mean(launch_overhead_times, options.reps);
+        std_launch_overhead_time = vec_stddev(launch_overhead_times, options.reps);
+
+        /* Banda effettiva sul PCIe: byte sommati su tutti i rank diviso il
+         * tempo del rank piu' lento, cioe' quanto il bus ha davvero trasportato
+         * nella finestra in cui e' stato occupato. Il sentinella negativo
+         * sopravvive quando il backend non trasferisce nulla. */
+        if (setup_h2d_A_time > 0.0 && bytes_h2d_A_all_ranks > 0.0)
+            bandwidth_h2d_A_gbs = bytes_h2d_A_all_ranks / setup_h2d_A_time / 1.0e9;
+        if (mean_h2d_X_transfer_time > 0.0 && bytes_h2d_X_all_ranks > 0.0)
+            bandwidth_h2d_X_gbs = bytes_h2d_X_all_ranks / mean_h2d_X_transfer_time / 1.0e9;
+        if (mean_d2h_Y_transfer_time > 0.0 && bytes_d2h_Y_all_ranks > 0.0)
+            bandwidth_d2h_Y_gbs = bytes_d2h_Y_all_ranks / mean_d2h_Y_transfer_time / 1.0e9;
 
         median_total_time = vec_median(sorted_total_times, total_times, options.reps);
         median_official_time = vec_median(sorted_official_times, official_times, options.reps);
@@ -628,10 +780,19 @@ int main(int argc, char **argv)
             gflops_kernel = gflops_compute;
         }
 
-        append_raw_csv(options.csv_raw_file, &options, &grid,
-                       bcast_times, local_phase_times, reduce_times,
-                       total_times, official_times, kernel_times,
-                       non_kernel_local_times);
+        /* L'unico I/O del driver, e anch'esso escluso dalla misura ufficiale:
+         * lo si cronometra qui per potere dire di quanto, invece di affermare
+         * che e' trascurabile. La riga aggregata viene stampata dopo, quindi
+         * puo' riportare il tempo appena misurato. */
+        if (options.csv_raw_file != NULL) {
+            const double io_csv_raw_start = now_seconds();
+            append_raw_csv(options.csv_raw_file, &options, &grid,
+                           bcast_times, local_phase_times, reduce_times,
+                           total_times, official_times, kernel_times,
+                           non_kernel_local_times, h2d_X_transfer_times,
+                           d2h_Y_transfer_times, launch_overhead_times);
+            io_csv_raw_write_time = now_seconds() - io_csv_raw_start;
+        }
 
         if (options.csv) {
             printf("%s,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,"
@@ -644,7 +805,13 @@ int main(int argc, char **argv)
                    "%.9e,%.9e,"
                    "%.9e,"
                    "%.6f,%.6f,%.6f,"
-                   "%d,%d,%d,%.3e\n",
+                   "%d,%d,%.3e,"
+                   "%.9e,%.9e,%.9e,%.6f,"
+                   "%.9e,%.9e,%.6f,"
+                   "%.9e,%.9e,%.6f,"
+                   "%.9e,%.9e,"
+                   "%.9e,%.9e,%.9e,"
+                   "%.9e,%.9e,%.9e,%.9e\n",
                    kernel_name(), SCALAR_NAME, a_mode_name(options.a_mode),
                    x_mode_name(options.x_mode),
                    options.M, options.N, options.k,
@@ -661,7 +828,17 @@ int main(int argc, char **argv)
                    mean_non_kernel_local_time, std_non_kernel_local_time,
                    setup_time,
                    gflops, gflops_compute, gflops_kernel,
-                   blocks_per_sm, x_rows_per_tile, threads, rel_err);
+                   blocks_per_sm, x_rows_per_tile, rel_err,
+                   setup_device_init_time, setup_device_alloc_time,
+                   setup_h2d_A_time, bandwidth_h2d_A_gbs,
+                   mean_h2d_X_transfer_time, std_h2d_X_transfer_time,
+                   bandwidth_h2d_X_gbs,
+                   mean_d2h_Y_transfer_time, std_d2h_Y_transfer_time,
+                   bandwidth_d2h_Y_gbs,
+                   mean_launch_overhead_time, std_launch_overhead_time,
+                   prep_alloc_local_buffers_time, prep_gen_A_time,
+                   prep_distrib_A_time, prep_gen_X_time, prep_distrib_X_time,
+                   prep_total_time, io_csv_raw_write_time);
         } else {
             double bytes_A = (double)options.M * options.N * sizeof(scalar_t);
             printf("matmul_mpi  M=%d N=%d k=%d  grid=%dx%d (P=%d)  %s  kernel=%s  A=%s X=%s\n",
@@ -706,19 +883,62 @@ int main(int argc, char **argv)
                 printf("  Official distribution   median %.3f ms   min %.3f ms\n",
                        median_official_time * 1e3, min_official_time * 1e3);
             }
-            printf("  Backend setup           %.3f ms   (preprocessing, fuori dalla misura)\n",
-                   setup_time * 1e3);
             if (x_rows_per_tile > 0 || blocks_per_sm > 0)
                 printf("  Piano del backend       %d righe di X per tile   %d blocchi per SM\n",
                        x_rows_per_tile, blocks_per_sm);
-            if (threads > 0)
-                printf("  Thread OpenMP per rank  %d\n", threads);
             printf("  GFLOPS MPI              %.3f\n", gflops);
             printf("  GFLOPS compute-only     %.3f\n", gflops_compute);
             if (gflops_kernel > 0.0)
                 printf("  GFLOPS kernel-only      %.3f\n", gflops_kernel);
             printf("                          (2*M*N*k = %.3f GFLOP; official T = official mean)\n",
                    2.0 * (double)options.M * (double)options.N * (double)options.k / 1e9);
+            /* ------------------------------------------------------------
+             * Tempi esclusi dalla misura ufficiale.
+             *
+             * La consegna li tiene fuori da T ma consente di misurarli e
+             * discuterli: stamparli qui, sotto un titolo che dice cosa sono,
+             * evita sia di gonfiare la metrica sia di far sparire costi che
+             * esistono davvero.
+             * ------------------------------------------------------------ */
+            printf("  --- tempi esclusi da T, misurati per la discussione ---\n");
+            printf("  Preprocessing totale    %.3f ms\n", prep_total_time * 1e3);
+            printf("    alloc buffer locali   %.3f ms\n",
+                   prep_alloc_local_buffers_time * 1e3);
+            printf("    generazione di A      %.3f ms\n", prep_gen_A_time * 1e3);
+            if (options.a_mode == A_MODE_GLOBAL)
+                printf("    distribuzione di A    %.3f ms   (MPI_Type_vector + Send/Recv)\n",
+                       prep_distrib_A_time * 1e3);
+            printf("    generazione di X      %.3f ms\n", prep_gen_X_time * 1e3);
+            if (options.x_mode == X_MODE_GLOBAL)
+                printf("    distribuzione di X    %.3f ms   (MPI_Scatterv)\n",
+                       prep_distrib_X_time * 1e3);
+            printf("    setup del backend     %.3f ms\n", setup_time * 1e3);
+            if (setup_h2d_A_time > 0.0 || setup_device_init_time > 0.0) {
+                printf("      contesto CUDA       %.3f ms\n", setup_device_init_time * 1e3);
+                printf("      cudaMalloc in VRAM  %.3f ms\n", setup_device_alloc_time * 1e3);
+                printf("      H2D di A            %.3f ms", setup_h2d_A_time * 1e3);
+                if (bandwidth_h2d_A_gbs > 0.0)
+                    printf("   %.2f GB/s   (%.1f MiB)", bandwidth_h2d_A_gbs,
+                           bytes_h2d_A_all_ranks / 1048576.0);
+                printf("\n");
+            }
+            if (mean_h2d_X_transfer_time >= 0.0) {
+                printf("  Trasferimenti per invocazione (esclusi da T, inclusi in t_local)\n");
+                printf("    H2D di X              %.3f ms   std %.3f ms",
+                       mean_h2d_X_transfer_time * 1e3, std_h2d_X_transfer_time * 1e3);
+                if (bandwidth_h2d_X_gbs > 0.0)
+                    printf("   %.2f GB/s", bandwidth_h2d_X_gbs);
+                printf("\n");
+                printf("    D2H di Y              %.3f ms   std %.3f ms",
+                       mean_d2h_Y_transfer_time * 1e3, std_d2h_Y_transfer_time * 1e3);
+                if (bandwidth_d2h_Y_gbs > 0.0)
+                    printf("   %.2f GB/s", bandwidth_d2h_Y_gbs);
+                printf("\n");
+                printf("    overhead del runtime  %.3f ms   std %.3f ms   (cio' che resta)\n",
+                       mean_launch_overhead_time * 1e3, std_launch_overhead_time * 1e3);
+            }
+            if (io_csv_raw_write_time >= 0.0)
+                printf("  I/O CSV per ripetizione %.3f ms\n", io_csv_raw_write_time * 1e3);
             if (options.check)
                 printf("  validation              relative L2 error %.3e   tol %.3e   [%s]\n",
                        rel_err, scalar_check_tol(options.N),
@@ -745,6 +965,9 @@ int main(int argc, char **argv)
     xfree(sorted_total_times);
     xfree(sorted_official_times);
     xfree(sorted_kernel_times);
+    xfree(h2d_X_transfer_times);
+    xfree(d2h_Y_transfer_times);
+    xfree(launch_overhead_times);
     grid_free(&grid);
     MPI_Finalize();
 

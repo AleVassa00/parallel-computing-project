@@ -18,6 +18,14 @@ for prec in double float; do
         -Dlocal_gemm_destroy=reference_destroy \
         -Dlocal_gemm_last_compute_seconds=reference_last_compute_seconds \
         -Dlocal_gemm_setup_seconds=reference_setup_seconds -Dkernel_name=reference_name \
+        -Dlocal_gemm_last_h2d_X_seconds=reference_last_h2d_X_seconds \
+        -Dlocal_gemm_last_d2h_Y_seconds=reference_last_d2h_Y_seconds \
+        -Dlocal_gemm_bytes_h2d_A=reference_bytes_h2d_A \
+        -Dlocal_gemm_bytes_h2d_X_per_call=reference_bytes_h2d_X_per_call \
+        -Dlocal_gemm_bytes_d2h_Y_per_call=reference_bytes_d2h_Y_per_call \
+        -Dlocal_gemm_setup_device_init_seconds=reference_setup_device_init_seconds \
+        -Dlocal_gemm_setup_device_alloc_seconds=reference_setup_device_alloc_seconds \
+        -Dlocal_gemm_setup_h2d_A_seconds=reference_setup_h2d_A_seconds \
         -c src/kernel/cuda_warp.cu -o "$ref"
     "$mpicc" -O3 -std=c11 -Isrc -c src/common/util.c -o "$out/util.o"
 

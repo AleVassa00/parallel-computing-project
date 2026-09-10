@@ -92,6 +92,13 @@ libreria".
 Su GPU la colonna da leggere e' `gflops_kernel`; su CPU e' `gflops`
 (`t_kernel` vale -1, dove il kernel *e'* l'invocazione).
 
+Le colonne in coda al CSV (`t_h2d_X_mean_s`, `t_d2h_Y_mean_s`,
+`t_launch_overhead_mean_s`, `t_setup_h2d_A_s`, le tre `bw_*_gbs` e le voci
+`t_prep_*`) non entrano in nessuna di queste metriche: sono i tempi che la
+consegna esclude da T e consente di discutere a parte. Sono il materiale con
+cui si risponde a "quanto costa portare i dati sulla scheda rispetto a
+calcolarci sopra", che a k piccolo non e' una domanda oziosa.
+
 ### C3 - baseline di CPU e specializzazione vs fallback
 
 `c3_cpu_baseline.txt` -> `results/c3_cpu_baseline/`

@@ -22,6 +22,19 @@ typedef struct {
      * ("non applicabile": la risposta e' gia' t_local); su CUDA e' il tempo
      * misurato dai cudaEvent. */
     double kernel_time;
+    /* Le due voci che la consegna esclude dal tempo ufficiale ma consente di
+     * misurare e discutere a parte: i trasferimenti host<->device di questa
+     * invocazione, letti dagli event del backend. Negativi su CPU. */
+    double h2d_X_transfer_time;
+    double d2h_Y_transfer_time;
+    /* Cio' che resta della fase locale una volta tolti kernel e trasferimenti:
+     * e' l'overhead del runtime CUDA (lancio, record ed eventuale attesa),
+     * l'unico modo per sapere se la differenza t_local-t_kernel e' PCIe o no.
+     *
+     *   t_local = h2d_X + kernel + d2h_Y + launch_overhead
+     *
+     * Negativo su CPU, dove non c'e' nessuna delle tre voci. */
+    double launch_overhead_time;
 } matmul_time_t;
 
 /* Y = A*X distribuito. Tutti i processi eseguono lo stesso codice.

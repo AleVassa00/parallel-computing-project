@@ -523,10 +523,29 @@ struct local_gemm_context {
     int m_loc, n_loc, k;
     int lda, ldx, ldy;
     scalar_t *dA_loc, *dX_loc, *dY_loc_part;
-    cudaEvent_t ev_start, ev_stop;
+    /* Tre coppie di event, non una: la consegna esclude dal tempo ufficiale i
+     * trasferimenti da e verso la scheda ma consente di misurarli a parte, e
+     * per farlo servono confini propri. Gli event sono l'unico strumento
+     * corretto: la D2H parte quando il kernel ha finito, quindi un cronometro
+     * sull'host le attribuirebbe anche l'attesa del calcolo. */
+    cudaEvent_t ev_h2d_X_start, ev_h2d_X_stop;
+    cudaEvent_t ev_kernel_start, ev_kernel_stop;
+    cudaEvent_t ev_d2h_Y_start, ev_d2h_Y_stop;
     tile_plan_t plan;   /* calcolato una volta sola: k e n_loc non cambiano piu' */
     double t_setup;
     double t_last;
+    double t_last_h2d_X;   /* H2D di X, ultima invocazione (< 0 = mai) */
+    double t_last_d2h_Y;   /* D2H di Y, ultima invocazione (< 0 = mai) */
+    /* Scomposizione di t_setup: contesto, VRAM e la sola copia H2D di A.
+     * Sommate valgono meno del totale, che comprende anche i controlli sugli
+     * argomenti e la creazione degli event. */
+    double t_setup_device_init;
+    double t_setup_device_alloc;
+    double t_setup_h2d_A;
+    /* Byte che attraversano davvero il PCIe, per convertire i tempi in banda. */
+    size_t bytes_h2d_A;
+    size_t bytes_h2d_X_per_call;
+    size_t bytes_d2h_Y_per_call;
 };
 
 static size_t nonzero(size_t bytes) {
@@ -561,9 +580,16 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
     local_gemm_context->dX_loc = NULL;
     local_gemm_context->dY_loc_part = NULL;
     local_gemm_context->t_last = -1.0;
+    local_gemm_context->t_last_h2d_X = -1.0;
+    local_gemm_context->t_last_d2h_Y = -1.0;
 
+    /* Voce 1 del preprocessing: creazione del contesto CUDA. E' un costo
+     * fisso, indipendente dalla taglia, e va tenuto separato dalle altre due
+     * per non farlo passare per un costo di trasferimento. */
+    const double t_device_init_start = now_seconds();
     CUDA_CHECK(cudaSetDevice(CUDA_DEVICE_ID));
     CUDA_CHECK(cudaFree(0));
+    local_gemm_context->t_setup_device_init = now_seconds() - t_device_init_start;
 
     bytes_A = (size_t)m_loc * (size_t)lda * sizeof(scalar_t);
     bytes_X = (size_t)n_loc * (size_t)ldx * sizeof(scalar_t);
@@ -581,6 +607,9 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
      *
      * La catena si ferma alla prima allocazione che non entra: le successive
      * non vengono nemmeno tentate, ed err arriva al controllo qui sotto. */
+    /* Voce 2 del preprocessing: le allocazioni in VRAM. Crescono con la
+     * taglia del blocco locale ma non sono un trasferimento. */
+    const double t_device_alloc_start = now_seconds();
     err = cudaMalloc((void **)&local_gemm_context->dA_loc, nonzero(bytes_A));
     if (err == cudaSuccess)
         err = cudaMalloc((void **)&local_gemm_context->dX_loc, nonzero(bytes_X));
@@ -601,18 +630,41 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
             (double)free_b / BYTES_PER_GIB, (double)total_b / BYTES_PER_GIB);
     }
     CUDA_CHECK(err);
+    local_gemm_context->t_setup_device_alloc = now_seconds() - t_device_alloc_start;
 
     /* A non cambia mai fra un'invocazione e l'altra: la H2D avviene una volta
      * sola, qui nel preprocessing. X e Y sono gia' dimensionate sopra, quindi
      * nessuna cudaMalloc puo' cadere nella prima repetition, neppure con
      * --warmup 0. */
+    /* Voce 3 del preprocessing, e l'unica delle tre che e' PCIe: e' il
+     * trasferimento che la separazione fra create e local_gemm ha tolto dal
+     * cammino misurato, ed e' quindi quello che va discusso a parte. */
+    const double t_h2d_A_start = now_seconds();
     if (bytes_A > 0)
         CUDA_CHECK(cudaMemcpy(local_gemm_context->dA_loc, A_loc, bytes_A, cudaMemcpyHostToDevice));
+    /* Una copia da memoria paginabile puo' ritornare prima che il DMA sia
+     * concluso: senza questa attesa il tempo misurato sarebbe quello di
+     * accodamento, non quello del trasferimento. */
+    CUDA_CHECK(cudaDeviceSynchronize());
+    local_gemm_context->t_setup_h2d_A = now_seconds() - t_h2d_A_start;
+
+    /* Byte che attraversano davvero il bus, nelle stesse condizioni in cui
+     * sono stati cronometrati: e' cio' che rende i tempi convertibili in
+     * banda e confrontabili con il picco del PCIe. */
+    local_gemm_context->bytes_h2d_A = (bytes_A > 0) ? bytes_A : 0;
+    local_gemm_context->bytes_h2d_X_per_call =
+        (n_loc > 0 && k > 0) ? (size_t)n_loc * (size_t)ldx * sizeof(scalar_t) : 0;
+    local_gemm_context->bytes_d2h_Y_per_call =
+        (m_loc > 0 && k > 0) ? (size_t)m_loc * (size_t)ldy * sizeof(scalar_t) : 0;
 
     CUDA_CHECK(cudaMemset(local_gemm_context->dY_loc_part, 0, nonzero(bytes_Y)));
 
-    CUDA_CHECK(cudaEventCreate(&local_gemm_context->ev_start));
-    CUDA_CHECK(cudaEventCreate(&local_gemm_context->ev_stop));
+    CUDA_CHECK(cudaEventCreate(&local_gemm_context->ev_kernel_start));
+    CUDA_CHECK(cudaEventCreate(&local_gemm_context->ev_kernel_stop));
+    CUDA_CHECK(cudaEventCreate(&local_gemm_context->ev_h2d_X_start));
+    CUDA_CHECK(cudaEventCreate(&local_gemm_context->ev_h2d_X_stop));
+    CUDA_CHECK(cudaEventCreate(&local_gemm_context->ev_d2h_Y_start));
+    CUDA_CHECK(cudaEventCreate(&local_gemm_context->ev_d2h_Y_stop));
 
     /* Il piano di tiling si calcola QUI, e non in launch_smem_kernel, per una
      * ragione di misura e non di stile.
@@ -643,25 +695,49 @@ void local_gemm(local_gemm_t *local_gemm_context, const scalar_t *RESTRICT X_loc
     if (ldx != local_gemm_context->ldx || ldy != local_gemm_context->ldy)
         die("cuda_warp_smem: leading dimensions changed between calls " "(ldx %d -> %d, ldy %d -> %d)", local_gemm_context->ldx, ldx, local_gemm_context->ldy, ldy);
 
+    /* H2D di X: dentro l'invocazione perche' X e' il risultato del Bcast
+     * appena concluso, ma delimitata dai suoi event per poterla sottrarre
+     * dal tempo ufficiale e discuterla a parte. I record ci sono anche
+     * quando non c'e' niente da copiare: cosi' il tempo e' definito
+     * (circa zero) invece che indefinito. */
+    CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_h2d_X_start, 0));
     if (n_loc > 0 && k > 0)
         CUDA_CHECK(cudaMemcpy(local_gemm_context->dX_loc, X_loc, (size_t)n_loc * (size_t)ldx * sizeof(scalar_t), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_h2d_X_stop, 0));
 
     /* Fra i due cudaEventRecord non deve esserci NIENTE che faccia lavorare
      * l'host: solo il lancio, che e' asincrono, e la cudaGetLastError che ne
      * legge l'esito. Il piano di tiling e' gia' pronto nel contesto. */
-    CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_start, 0));
+    CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_kernel_start, 0));
     if (m_loc > 0 && k > 0) {
         launch_smem_kernel(&local_gemm_context->plan, m_loc, n_loc, k, local_gemm_context->dA_loc, local_gemm_context->lda, local_gemm_context->dX_loc, ldx, local_gemm_context->dY_loc_part, ldy);
         CUDA_CHECK(cudaGetLastError());
     }
-    CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_stop, 0));
+    CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_kernel_stop, 0));
 
+    /* D2H di Y, l'altra copia esclusa dal tempo ufficiale. L'event di
+     * partenza viene accodato dopo il kernel, quindi fra i due record
+     * resta la sola copia e non l'attesa del calcolo. */
+    CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_d2h_Y_start, 0));
     if (m_loc > 0 && k > 0)
         CUDA_CHECK(cudaMemcpy(Y, local_gemm_context->dY_loc_part, (size_t)m_loc * (size_t)ldy * sizeof(scalar_t), cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_d2h_Y_stop, 0));
 
-    CUDA_CHECK(cudaEventSynchronize(local_gemm_context->ev_stop));
-    CUDA_CHECK(cudaEventElapsedTime(&ms, local_gemm_context->ev_start, local_gemm_context->ev_stop));
+    /* L'ultimo event accodato e' quello della D2H: aspettare lui vuol dire
+     * aspettare tutto il lavoro di questa invocazione. */
+    CUDA_CHECK(cudaEventSynchronize(local_gemm_context->ev_d2h_Y_stop));
+
+    CUDA_CHECK(cudaEventElapsedTime(&ms, local_gemm_context->ev_kernel_start, local_gemm_context->ev_kernel_stop));
     local_gemm_context->t_last = (double)ms * 1.0e-3;
+
+    /* Le due voci da discutere a parte. Insieme a t_last e a cio' che
+     * avanza (overhead del runtime) ricostruiscono il tempo dell'intera
+     * invocazione misurato dal chiamante. */
+    CUDA_CHECK(cudaEventElapsedTime(&ms, local_gemm_context->ev_h2d_X_start, local_gemm_context->ev_h2d_X_stop));
+    local_gemm_context->t_last_h2d_X = (double)ms * 1.0e-3;
+
+    CUDA_CHECK(cudaEventElapsedTime(&ms, local_gemm_context->ev_d2h_Y_start, local_gemm_context->ev_d2h_Y_stop));
+    local_gemm_context->t_last_d2h_Y = (double)ms * 1.0e-3;
 }
 
 void local_gemm_destroy(local_gemm_t *local_gemm_context) {
@@ -671,8 +747,12 @@ void local_gemm_destroy(local_gemm_t *local_gemm_context) {
     if (local_gemm_context->dX_loc != NULL) cudaFree(local_gemm_context->dX_loc);
     if (local_gemm_context->dY_loc_part != NULL) cudaFree(local_gemm_context->dY_loc_part);
 
-    cudaEventDestroy(local_gemm_context->ev_start);
-    cudaEventDestroy(local_gemm_context->ev_stop);
+    cudaEventDestroy(local_gemm_context->ev_kernel_start);
+    cudaEventDestroy(local_gemm_context->ev_kernel_stop);
+    cudaEventDestroy(local_gemm_context->ev_h2d_X_start);
+    cudaEventDestroy(local_gemm_context->ev_h2d_X_stop);
+    cudaEventDestroy(local_gemm_context->ev_d2h_Y_start);
+    cudaEventDestroy(local_gemm_context->ev_d2h_Y_stop);
 
     xfree(local_gemm_context);
 }
@@ -685,21 +765,55 @@ double local_gemm_setup_seconds(const local_gemm_t *local_gemm_context) {
     return (local_gemm_context != NULL) ? local_gemm_context->t_setup : 0.0;
 }
 
+/* ---------------------------------------------------------------------------
+ * Tempi esclusi dalla misura ufficiale, misurati per essere discussi a parte
+ * ------------------------------------------------------------------------- */
+double local_gemm_last_h2d_X_seconds(const local_gemm_t *local_gemm_context)
+{
+    return (local_gemm_context != NULL) ? local_gemm_context->t_last_h2d_X : -1.0;
+}
+
+double local_gemm_last_d2h_Y_seconds(const local_gemm_t *local_gemm_context)
+{
+    return (local_gemm_context != NULL) ? local_gemm_context->t_last_d2h_Y : -1.0;
+}
+
+size_t local_gemm_bytes_h2d_A(const local_gemm_t *local_gemm_context)
+{
+    return (local_gemm_context != NULL) ? local_gemm_context->bytes_h2d_A : 0;
+}
+
+size_t local_gemm_bytes_h2d_X_per_call(const local_gemm_t *local_gemm_context)
+{
+    return (local_gemm_context != NULL) ? local_gemm_context->bytes_h2d_X_per_call : 0;
+}
+
+size_t local_gemm_bytes_d2h_Y_per_call(const local_gemm_t *local_gemm_context)
+{
+    return (local_gemm_context != NULL) ? local_gemm_context->bytes_d2h_Y_per_call : 0;
+}
+
+double local_gemm_setup_device_init_seconds(const local_gemm_t *local_gemm_context)
+{
+    return (local_gemm_context != NULL) ? local_gemm_context->t_setup_device_init : 0.0;
+}
+
+double local_gemm_setup_device_alloc_seconds(const local_gemm_t *local_gemm_context)
+{
+    return (local_gemm_context != NULL) ? local_gemm_context->t_setup_device_alloc : 0.0;
+}
+
+double local_gemm_setup_h2d_A_seconds(const local_gemm_t *local_gemm_context)
+{
+    return (local_gemm_context != NULL) ? local_gemm_context->t_setup_h2d_A : 0.0;
+}
+
 int local_gemm_blocks_per_sm(const local_gemm_t *local_gemm_context) {
     return (local_gemm_context != NULL) ? local_gemm_context->plan.blocks_per_sm : -1;
 }
 
 int local_gemm_x_rows_per_tile(const local_gemm_t *local_gemm_context) {
     return (local_gemm_context != NULL) ? local_gemm_context->plan.x_rows_per_tile : -1;
-}
-
-/* I thread di CPU non sono un concetto di questo backend: il parallelismo qui
- * e' quello della GPU, gia' descritto dalle due funzioni sopra. Sentinella
- * negativa, come per tutto cio' che il backend non ha. */
-int local_gemm_threads(const local_gemm_t *local_gemm_context)
-{
-    (void)local_gemm_context;
-    return -1;
 }
 
 /* Il nome porta padding, dimensione del blocco, granularita' e budget quando non
