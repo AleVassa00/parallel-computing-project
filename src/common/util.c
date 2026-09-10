@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define SCPA_ALIGN 64
+#define ALIGN 64
 
 void *xmalloc(size_t bytes)
 {
@@ -24,8 +24,8 @@ void *xmalloc(size_t bytes)
     if (bytes == 0) bytes = 1;
 
     /* aligned_alloc esige una dimensione multipla dell'allineamento */
-    bytes = (bytes + SCPA_ALIGN - 1) / SCPA_ALIGN * SCPA_ALIGN;
-    p = aligned_alloc(SCPA_ALIGN, bytes);
+    bytes = (bytes + ALIGN - 1) / ALIGN * ALIGN;
+    p = aligned_alloc(ALIGN, bytes);
     if (p == NULL)
         die("out of memory: cannot allocate %zu bytes", bytes);
     return p;

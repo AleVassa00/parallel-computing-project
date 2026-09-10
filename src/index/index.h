@@ -1,5 +1,5 @@
-#ifndef SCPA_INDEX_H
-#define SCPA_INDEX_H
+#ifndef INDEX_H
+#define INDEX_H
 
 /* Partizionamento a blocchi di n indici globali fra p parti.
  *
@@ -21,4 +21,4 @@ int block_start(int n, int p, int i);
 /* Quale parte possiede l'indice globale g (0 <= g < n). */
 int block_owner(int n, int p, int g);
 
-#endif /* SCPA_INDEX_H */
+#endif /* INDEX_H */

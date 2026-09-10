@@ -1,5 +1,5 @@
-#ifndef SCPA_DISTRIB_H
-#define SCPA_DISTRIB_H
+#ifndef DISTRIB_H
+#define DISTRIB_H
 
 #include "common/scalar.h"
 #include "mpi/grid.h"
@@ -63,4 +63,4 @@ void distribute_global_X(const grid_t *g, const layout_t *l,
  * di Y, contigui perche' Y e' row-major con k contiguo. */
 void layout_y_counts(const layout_t *l, const grid_t *g, int *counts, int *displs);
 
-#endif /* SCPA_DISTRIB_H */
+#endif /* DISTRIB_H */

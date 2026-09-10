@@ -34,16 +34,15 @@
  * CORRETTEZZA e non solo di efficienza: WARPS_PER_BLOCK determina quante righe
  * di Y elabora un blocco, e la riduzione finale e' un __shfl_down_sync interno
  * al warp. Un blocco non multiplo di 32 spezzerebbe un warp fra due righe.
- * Il valore si sostituisce dal Makefile con BLOCK=<n> (SCPA_BLOCK_THREADS). */
-#ifndef SCPA_BLOCK_THREADS
-#define SCPA_BLOCK_THREADS 256
+ * Il valore si sostituisce dal Makefile con BLOCK=<n> (BLOCK_THREADS). */
+#ifndef BLOCK_THREADS
+#define BLOCK_THREADS 256
 #endif
 
-#if SCPA_BLOCK_THREADS < 32 || SCPA_BLOCK_THREADS > 1024 || (SCPA_BLOCK_THREADS % 32) != 0
-#error "SCPA_BLOCK_THREADS deve essere un multiplo di 32 compreso fra 32 e 1024"
+#if BLOCK_THREADS < 32 || BLOCK_THREADS > 1024 || (BLOCK_THREADS % 32) != 0
+#error "BLOCK_THREADS deve essere un multiplo di 32 compreso fra 32 e 1024"
 #endif
 
-#define BLOCK_THREADS SCPA_BLOCK_THREADS
 #define WARPS_PER_BLOCK (BLOCK_THREADS / WARP_SIZE)
 #define RUNTIME_TILE 4
 /* Il server di dipartimento su cui la consegna richiede di misurare ha una
@@ -91,7 +90,7 @@ static __global__ void warp_kernel_fixed(int m_loc, int n_loc, const scalar_t *_
         const scalar_t a = arow[j];
 #pragma unroll
         for (c = 0; c < K; ++c)
-            acc[c] += a * X_loc[SCPA_X_COLUMN_MAJOR
+            acc[c] += a * X_loc[X_COLUMN_MAJOR
                 ? (size_t)c * (size_t)n_loc + j
                 : (size_t)j * (size_t)ldx + c];
     }
@@ -155,7 +154,7 @@ static __global__ void warp_kernel_runtime(int m_loc, int n_loc, int k,
 #pragma unroll
             for (q = 0; q < RUNTIME_TILE; ++q)
                 if (c0 + q < k)
-                    acc[q] += a * X[SCPA_X_COLUMN_MAJOR
+                    acc[q] += a * X[X_COLUMN_MAJOR
                         ? (size_t)(c0 + q) * (size_t)n_loc + j
                         : (size_t)j * (size_t)ldx + c0 + q];
         }
@@ -249,7 +248,7 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
     if (ldx < k || ldy < k)
         die("local_gemm_create: ldx %d and ldy %d must both be at least k=%d",
             ldx, ldy, k);
-    if (SCPA_X_COLUMN_MAJOR && ldx != k)
+    if (X_COLUMN_MAJOR && ldx != k)
         die("cuda_warp: column-major X must be compact (ldx=%d, k=%d)", ldx, k);
     if (n_loc > 0 && m_loc > 0 && A_loc == NULL)
         die("local_gemm_create: A is NULL for a non-empty %dx%d block", m_loc, n_loc);
@@ -492,22 +491,22 @@ int local_gemm_x_rows_per_tile(const local_gemm_t *local_gemm_context)
 
 /* Il nome porta la dimensione del blocco quando non e' quella di default: nel
  * CSV le righe di uno sweep su BLOCK devono restare distinguibili fra loro. */
-#define SCPA_STR_(x) #x
-#define SCPA_STR(x)  SCPA_STR_(x)
+#define STR_(x) #x
+#define STR(x)  STR_(x)
 
-#if SCPA_X_COLUMN_MAJOR
-#define SCPA_X_SUFFIX "(xcol)"
+#if X_COLUMN_MAJOR
+#define X_SUFFIX "(xcol)"
 #else
-#define SCPA_X_SUFFIX ""
+#define X_SUFFIX ""
 #endif
 
-#if SCPA_BLOCK_THREADS == 256
-#define SCPA_BLK_SUFFIX ""
+#if BLOCK_THREADS == 256
+#define BLK_SUFFIX ""
 #else
-#define SCPA_BLK_SUFFIX "(blk" SCPA_STR(SCPA_BLOCK_THREADS) ")"
+#define BLK_SUFFIX "(blk" STR(BLOCK_THREADS) ")"
 #endif
 
 const char *kernel_name(void)
 {
-    return "cuda_warp" SCPA_BLK_SUFFIX SCPA_X_SUFFIX;
+    return "cuda_warp" BLK_SUFFIX X_SUFFIX;
 }

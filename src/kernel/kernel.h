@@ -1,5 +1,5 @@
-#ifndef SCPA_KERNEL_H
-#define SCPA_KERNEL_H
+#ifndef KERNEL_H
+#define KERNEL_H
 
 #include <stddef.h>
 
@@ -7,13 +7,13 @@
 
 /* Scelta di build condivisa da driver e backend. Il Makefile permette column
  * soltanto per cuda_warp. X resta n x k: cambia solo l'ordine in memoria. */
-#ifndef SCPA_X_COLUMN_MAJOR
-#define SCPA_X_COLUMN_MAJOR 0
+#ifndef X_COLUMN_MAJOR
+#define X_COLUMN_MAJOR 0
 #endif
-#if SCPA_X_COLUMN_MAJOR
-#define SCPA_X_LAYOUT_NAME "column"
+#if X_COLUMN_MAJOR
+#define X_LAYOUT_NAME "column"
 #else
-#define SCPA_X_LAYOUT_NAME "row"
+#define X_LAYOUT_NAME "row"
 #endif
 
 /* Interfaccia unica del kernel locale, indipendente dal backend.
@@ -231,4 +231,4 @@ const char *kernel_name(void);
 }
 #endif
 
-#endif /* SCPA_KERNEL_H */
+#endif /* KERNEL_H */

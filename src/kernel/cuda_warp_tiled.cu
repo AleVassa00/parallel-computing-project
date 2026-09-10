@@ -20,22 +20,20 @@
 
 #define WARP_SIZE 32
 
-#ifndef SCPA_BLOCK_THREADS
-#define SCPA_BLOCK_THREADS 256
+#ifndef BLOCK_THREADS
+#define BLOCK_THREADS 256
 #endif
-#if SCPA_BLOCK_THREADS < 32 || SCPA_BLOCK_THREADS > 1024 || (SCPA_BLOCK_THREADS % 32) != 0
-#error "SCPA_BLOCK_THREADS deve essere un multiplo di 32 compreso fra 32 e 1024"
+#if BLOCK_THREADS < 32 || BLOCK_THREADS > 1024 || (BLOCK_THREADS % 32) != 0
+#error "BLOCK_THREADS deve essere un multiplo di 32 compreso fra 32 e 1024"
 #endif
-#define BLOCK_THREADS SCPA_BLOCK_THREADS
 #define WARPS_PER_BLOCK (BLOCK_THREADS / WARP_SIZE)
 
-#ifndef SCPA_WARP_COL_TILE
-#define SCPA_WARP_COL_TILE 8
+#ifndef WARP_COL_TILE
+#define WARP_COL_TILE 8
 #endif
-#if SCPA_WARP_COL_TILE <= 0
-#error "SCPA_WARP_COL_TILE deve essere positivo"
+#if WARP_COL_TILE <= 0
+#error "WARP_COL_TILE deve essere positivo"
 #endif
-#define WARP_COL_TILE SCPA_WARP_COL_TILE
 
 /* Stesso device e lifecycle di cuda_warp; i rank sul nodo condividono GPU 0. */
 #define CUDA_DEVICE_ID 0
@@ -420,16 +418,16 @@ int local_gemm_x_rows_per_tile(const local_gemm_t *local_gemm_context)
 
 /* Il nome porta la dimensione del blocco quando non e' quella di default: nel
  * CSV le righe di uno sweep su BLOCK devono restare distinguibili fra loro. */
-#define SCPA_STR_(x) #x
-#define SCPA_STR(x)  SCPA_STR_(x)
+#define STR_(x) #x
+#define STR(x)  STR_(x)
 
-#if SCPA_BLOCK_THREADS == 256
-#define SCPA_BLK_SUFFIX ""
+#if BLOCK_THREADS == 256
+#define BLK_SUFFIX ""
 #else
-#define SCPA_BLK_SUFFIX "(blk" SCPA_STR(SCPA_BLOCK_THREADS) ")"
+#define BLK_SUFFIX "(blk" STR(BLOCK_THREADS) ")"
 #endif
 
 const char *kernel_name(void)
 {
-    return "cuda_warp_tiled(tile" SCPA_STR(SCPA_WARP_COL_TILE) ")" SCPA_BLK_SUFFIX;
+    return "cuda_warp_tiled(tile" STR(WARP_COL_TILE) ")" BLK_SUFFIX;
 }

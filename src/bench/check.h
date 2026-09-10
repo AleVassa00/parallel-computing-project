@@ -1,5 +1,5 @@
-#ifndef SCPA_CHECK_H
-#define SCPA_CHECK_H
+#ifndef CHECK_H
+#define CHECK_H
 
 #include <stdint.h>
 
@@ -25,4 +25,4 @@
 double check_against_serial(const grid_t *g, const layout_t *l,
                             const scalar_t *Y_loc, uint64_t seed);
 
-#endif /* SCPA_CHECK_H */
+#endif /* CHECK_H */

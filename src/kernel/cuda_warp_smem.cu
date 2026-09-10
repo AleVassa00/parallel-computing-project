@@ -117,16 +117,15 @@
  * COOPERATIVO del tile di X in shared memory (il passo del ciclo di load), ma
  * non la sua DIMENSIONE, che dipende solo da x_rows_per_tile e k: cambiare BLOCK non altera
  * quindi il budget di shared memory ne' il risultato.
- * Il valore si sostituisce dal Makefile con BLOCK=<n> (SCPA_BLOCK_THREADS). */
-#ifndef SCPA_BLOCK_THREADS
-#define SCPA_BLOCK_THREADS 256
+ * Il valore si sostituisce dal Makefile con BLOCK=<n> (BLOCK_THREADS). */
+#ifndef BLOCK_THREADS
+#define BLOCK_THREADS 256
 #endif
 
-#if SCPA_BLOCK_THREADS < 32 || SCPA_BLOCK_THREADS > 1024 || (SCPA_BLOCK_THREADS % 32) != 0
-#error "SCPA_BLOCK_THREADS deve essere un multiplo di 32 compreso fra 32 e 1024"
+#if BLOCK_THREADS < 32 || BLOCK_THREADS > 1024 || (BLOCK_THREADS % 32) != 0
+#error "BLOCK_THREADS deve essere un multiplo di 32 compreso fra 32 e 1024"
 #endif
 
-#define BLOCK_THREADS SCPA_BLOCK_THREADS
 
 #define WARPS_PER_BLOCK (BLOCK_THREADS / WARP_SIZE)
 
@@ -150,11 +149,11 @@
 /* Scalari di padding aggiunti a ogni riga del tile di X in shared memory.
  * 1 e' il valore che rompe il conflitto a 32 vie su k=32; 0 e' il termine di
  * paragone da misurare. Si imposta dal Makefile con SMEM_PAD=<n>. */
-#ifndef SCPA_SMEM_PAD
-#define SCPA_SMEM_PAD 1
+#ifndef SMEM_PAD
+#define SMEM_PAD 1
 #endif
-#if SCPA_SMEM_PAD < 0
-#error "SCPA_SMEM_PAD deve essere >= 0"
+#if SMEM_PAD < 0
+#error "SMEM_PAD deve essere >= 0"
 #endif
 
 /* Limite architetturale della shared memory dinamica per blocco senza opt-in
@@ -179,11 +178,11 @@
  * Costo e beneficio vanno quindi MISURATI, non assunti: da qui il parametro.
  * Il default resta 32, cosi' il comportamento non cambia finche' non si chiede
  * esplicitamente altro. Si imposta dal Makefile con TILE_GRANULARITY=<n>. */
-#ifndef SCPA_TILE_GRANULARITY
-#define SCPA_TILE_GRANULARITY 32
+#ifndef TILE_GRANULARITY
+#define TILE_GRANULARITY 32
 #endif
-#if SCPA_TILE_GRANULARITY < 1
-#error "SCPA_TILE_GRANULARITY deve essere >= 1"
+#if TILE_GRANULARITY < 1
+#error "TILE_GRANULARITY deve essere >= 1"
 #endif
 
 /* ---------------------------------------------------------------------------
@@ -196,7 +195,7 @@ static __global__ void smem_kernel_fixed(int m_loc, int n_loc, int x_rows_per_ti
      * launch_smem_kernel), il tipo lo fissa questa dichiarazione. */
     extern __shared__ scalar_t X_tile[];
 
-    const int tile_row_stride = K + SCPA_SMEM_PAD;
+    const int tile_row_stride = K + SMEM_PAD;
 
     const int lane = threadIdx.x & (WARP_SIZE - 1); // posizione nel warp -> 0...31 - equivale a prendere il resto della divisione per 32
     const long long row = (long long)blockIdx.x * WARPS_PER_BLOCK + (threadIdx.x >> 5); // posizione del warp all'interno del blocco
@@ -296,7 +295,7 @@ static __global__ void smem_kernel_runtime(int m_loc, int n_loc, int k, int x_ro
      * launch_smem_kernel), il tipo lo fissa questa dichiarazione. */
     extern __shared__ scalar_t X_tile[];
 
-    const int tile_row_stride = RUNTIME_TILE + SCPA_SMEM_PAD;
+    const int tile_row_stride = RUNTIME_TILE + SMEM_PAD;
     const int lane = threadIdx.x & (WARP_SIZE - 1);
     const long long row = (long long)blockIdx.x * WARPS_PER_BLOCK
                           + (threadIdx.x >> 5);
@@ -378,10 +377,10 @@ typedef struct {
     int    blocks_per_sm;   /* esposto nel CSV: senza, le curve non si spiegano */
 } tile_plan_t;
 
-/* Serve solo al budget derivato: con SCPA_SMEM_BUDGET_BYTES definito la
+/* Serve solo al budget derivato: con SMEM_BUDGET_BYTES definito la
  * funzione non verrebbe chiamata da nessuno e -Wunused-function la segnalerebbe
  * a ogni build dello sweep. */
-#ifndef SCPA_SMEM_BUDGET_BYTES
+#ifndef SMEM_BUDGET_BYTES
 static int shared_per_sm(void) {
     static int cached = -1;
     if (cached < 0) {
@@ -408,7 +407,7 @@ static int round_up_g(int v, int g)   { return ((v + g - 1) / g) * g; }
  * proteggere un'occupancy gia' persa altrove. */
 static tile_plan_t plan_tile(const void *kernel, int tile_row_stride, int n_loc) {
 
-    const int g         = SCPA_TILE_GRANULARITY;
+    const int g         = TILE_GRANULARITY;
     const int row_bytes = tile_row_stride * (int)sizeof(scalar_t);
     int target, budget, rows, achieved = -1;
     tile_plan_t plan;
@@ -420,8 +419,8 @@ static tile_plan_t plan_tile(const void *kernel, int tile_row_stride, int n_loc)
         target = 1;
 
     /* 2. Fetta di shared memory che spetta a un blocco. */
-#ifdef SCPA_SMEM_BUDGET_BYTES
-    budget = SCPA_SMEM_BUDGET_BYTES;   /* forzato dal Makefile, per lo sweep */
+#ifdef SMEM_BUDGET_BYTES
+    budget = SMEM_BUDGET_BYTES;   /* forzato dal Makefile, per lo sweep */
 #else
     budget = shared_per_sm() / target; /* derivato dall'obiettivo di occupancy */
 #endif
@@ -457,7 +456,7 @@ static tile_plan_t plan_tile(const void *kernel, int tile_row_stride, int n_loc)
         die("cuda_warp_smem: il tile richiede %zu byte di shared memory per "
             "blocco, oltre il limite di %d (righe per tile=%d, stride=%d, pad=%d): "
             "abbassare SMEM_BUDGET_BYTES",
-            plan.smem_bytes, SMEM_MAX_BYTES, rows, tile_row_stride, SCPA_SMEM_PAD);
+            plan.smem_bytes, SMEM_MAX_BYTES, rows, tile_row_stride, SMEM_PAD);
 
     plan.x_rows_per_tile = rows;
     plan.blocks_per_sm   = achieved;
@@ -470,7 +469,7 @@ static tile_plan_t plan_tile(const void *kernel, int tile_row_stride, int n_loc)
 template<int K>
 static tile_plan_t plan_fixed(int n_loc) {
     return plan_tile((const void *)smem_kernel_fixed<K>,
-                     K + SCPA_SMEM_PAD, n_loc);
+                     K + SMEM_PAD, n_loc);
 }
 
 static tile_plan_t plan_for_k(int k, int n_loc) {
@@ -481,7 +480,7 @@ static tile_plan_t plan_for_k(int k, int n_loc) {
     case 20: return plan_fixed<20>(n_loc);
     case 32: return plan_fixed<32>(n_loc);
     default: return plan_tile((const void *)smem_kernel_runtime,
-                              RUNTIME_TILE + SCPA_SMEM_PAD, n_loc);
+                              RUNTIME_TILE + SMEM_PAD, n_loc);
     }
 }
 
@@ -824,35 +823,35 @@ int local_gemm_x_rows_per_tile(const local_gemm_t *local_gemm_context) {
  * cosi' etichettate restano pero' distinguibili da quelle raccolte prima di
  * questa modifica grazie alle colonne x_rows_per_tile e blocks_per_sm, che
  * prima non esistevano. */
-#define SCPA_STR_(x) #x
-#define SCPA_STR(x)  SCPA_STR_(x)
+#define STR_(x) #x
+#define STR(x)  STR_(x)
 
-#if SCPA_SMEM_PAD == 1
-#define SCPA_PAD_SUFFIX ""
+#if SMEM_PAD == 1
+#define PAD_SUFFIX ""
 #else
-#define SCPA_PAD_SUFFIX "(pad" SCPA_STR(SCPA_SMEM_PAD) ")"
+#define PAD_SUFFIX "(pad" STR(SMEM_PAD) ")"
 #endif
 
-#if SCPA_BLOCK_THREADS == 256
-#define SCPA_BLK_SUFFIX ""
+#if BLOCK_THREADS == 256
+#define BLK_SUFFIX ""
 #else
-#define SCPA_BLK_SUFFIX "(blk" SCPA_STR(SCPA_BLOCK_THREADS) ")"
+#define BLK_SUFFIX "(blk" STR(BLOCK_THREADS) ")"
 #endif
 
-#if SCPA_TILE_GRANULARITY == 32
-#define SCPA_GRAN_SUFFIX ""
+#if TILE_GRANULARITY == 32
+#define GRAN_SUFFIX ""
 #else
-#define SCPA_GRAN_SUFFIX "(g" SCPA_STR(SCPA_TILE_GRANULARITY) ")"
+#define GRAN_SUFFIX "(g" STR(TILE_GRANULARITY) ")"
 #endif
 
-#ifdef SCPA_SMEM_BUDGET_BYTES
-#define SCPA_BUD_SUFFIX "(bud" SCPA_STR(SCPA_SMEM_BUDGET_BYTES) ")"
+#ifdef SMEM_BUDGET_BYTES
+#define BUD_SUFFIX "(bud" STR(SMEM_BUDGET_BYTES) ")"
 #else
-#define SCPA_BUD_SUFFIX ""
+#define BUD_SUFFIX ""
 #endif
 
 const char *kernel_name(void)
 {
-    return "cuda_warp_smem" SCPA_PAD_SUFFIX SCPA_BLK_SUFFIX
-           SCPA_GRAN_SUFFIX SCPA_BUD_SUFFIX;
+    return "cuda_warp_smem" PAD_SUFFIX BLK_SUFFIX
+           GRAN_SUFFIX BUD_SUFFIX;
 }

@@ -99,7 +99,7 @@ static void prepare_x_layout(const grid_t *grid, const layout_t *layout,
                              scalar_t **X_loc, double *elapsed)
 {
     *elapsed = 0.0;
-    if (SCPA_X_COLUMN_MAJOR && grid->my_row == 0 && layout->n_loc > 0) {
+    if (X_COLUMN_MAJOR && grid->my_row == 0 && layout->n_loc > 0) {
         const double start = now_seconds();
         scalar_t *column = xmalloc((size_t)layout->n_loc * (size_t)layout->k
                                    * sizeof *column);
@@ -129,7 +129,7 @@ static void usage(const char *prog)
     printf("                    local (default), global\n");
     printf("  --x-mode <mode> generate X slices locally or distribute global X\n");
     printf("                    local (default), global\n");
-    printf("  X memory layout: %s (build option X_LAYOUT=row|column)\n", SCPA_X_LAYOUT_NAME);
+    printf("  X memory layout: %s (build option X_LAYOUT=row|column)\n", X_LAYOUT_NAME);
     printf("  --check         validate against the serial reference\n");
     printf("  --csv           print one CSV row instead of the report\n");
     printf("  --csv-header    print the CSV header and exit\n");
@@ -421,7 +421,7 @@ static void append_raw_csv(const char *path,
                 non_kernel_local_times[rep],
                 rep_gflops, rep_gflops_compute, rep_gflops_kernel,
                 h2d_X_transfer_times[rep], d2h_Y_transfer_times[rep],
-                launch_overhead_times[rep], SCPA_X_LAYOUT_NAME);
+                launch_overhead_times[rep], X_LAYOUT_NAME);
     }
 
     if (fclose(fp) != 0)
@@ -880,13 +880,13 @@ int main(int argc, char **argv)
                    prep_alloc_local_buffers_time, prep_gen_A_time,
                    prep_distrib_A_time, prep_gen_X_time, prep_distrib_X_time,
                    prep_total_time, io_csv_raw_write_time,
-                   SCPA_X_LAYOUT_NAME, prep_convert_X_time);
+                   X_LAYOUT_NAME, prep_convert_X_time);
         } else {
             double bytes_A = (double)options.M * options.N * sizeof(scalar_t);
             printf("matmul_mpi  M=%d N=%d k=%d  grid=%dx%d (P=%d)  %s  kernel=%s  A=%s X=%s X_layout=%s\n",
                    options.M, options.N, options.k, grid.pr, grid.pc, grid.nprocs, SCALAR_NAME,
                    kernel_name(), a_mode_name(options.a_mode),
-                   x_mode_name(options.x_mode), SCPA_X_LAYOUT_NAME);
+                   x_mode_name(options.x_mode), X_LAYOUT_NAME);
             printf("  local block  A %dx%d   X %dx%d   Y %dx%d      A total %.1f MiB\n",
                    layout.m_loc, layout.n_loc, layout.n_loc, layout.k, layout.m_loc, layout.k,
                    bytes_A / 1048576.0);
@@ -954,7 +954,7 @@ int main(int argc, char **argv)
             if (options.x_mode == X_MODE_GLOBAL)
                 printf("    distribuzione di X    %.3f ms   (MPI_Scatterv)\n",
                        prep_distrib_X_time * 1e3);
-            if (SCPA_X_COLUMN_MAJOR)
+            if (X_COLUMN_MAJOR)
                 printf("    conversione di X      %.3f ms   (row -> column, una volta)\n",
                        prep_convert_X_time * 1e3);
             printf("    setup del backend     %.3f ms\n", setup_time * 1e3);

@@ -1,5 +1,5 @@
-#ifndef SCPA_GRID_H
-#define SCPA_GRID_H
+#ifndef GRID_H
+#define GRID_H
 
 #include <mpi.h>
 
@@ -37,4 +37,4 @@ void grid_free(grid_t *g);
  * Usata come default quando l'utente non impone la forma della griglia. */
 void grid_default_shape(int p, int *pr, int *pc);
 
-#endif /* SCPA_GRID_H */
+#endif /* GRID_H */

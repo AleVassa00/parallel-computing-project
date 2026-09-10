@@ -1,5 +1,5 @@
-#ifndef SCPA_MATMUL_MPI_H
-#define SCPA_MATMUL_MPI_H
+#ifndef MATMUL_MPI_H
+#define MATMUL_MPI_H
 
 #include "common/scalar.h"
 #include "kernel/kernel.h"
@@ -64,4 +64,4 @@ void mpi_matmul(const grid_t *grid, const layout_t *layout,
                 scalar_t *Y_row_col0,
                 matmul_time_t *times_struct_rep);
 
-#endif /* SCPA_MATMUL_MPI_H */
+#endif /* MATMUL_MPI_H */

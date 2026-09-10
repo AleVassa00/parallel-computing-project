@@ -1,5 +1,5 @@
-#ifndef SCPA_SCALAR_H
-#define SCPA_SCALAR_H
+#ifndef SCALAR_H
+#define SCALAR_H
 
 #include <float.h>
 #include <math.h>
@@ -78,4 +78,4 @@ static inline double scalar_check_tol(int n)
     return SCALAR_CHECK_SAFETY * SCALAR_EPS * sqrt(terms);
 }
 
-#endif /* SCPA_SCALAR_H */
+#endif /* SCALAR_H */

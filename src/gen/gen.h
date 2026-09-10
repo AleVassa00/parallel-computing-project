@@ -1,5 +1,5 @@
-#ifndef SCPA_GEN_H
-#define SCPA_GEN_H
+#ifndef GEN_H
+#define GEN_H
 
 #include <stdint.h>
 
@@ -42,4 +42,4 @@ void gen_block_A(scalar_t *A, int lda, int m, int n,
 void gen_block_X(scalar_t *X, int ldx, int n, int k,
                  int row0, uint64_t seed);
 
-#endif /* SCPA_GEN_H */
+#endif /* GEN_H */

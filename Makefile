@@ -59,7 +59,7 @@ ifeq ($(X_LAYOUT),column)
 ifneq ($(KERNEL),cuda_warp)
 $(error X_LAYOUT=column e' supportato soltanto da cuda_warp)
 endif
-X_LAYOUT_DEF := -DSCPA_X_COLUMN_MAJOR=1
+X_LAYOUT_DEF := -DX_COLUMN_MAJOR=1
 endif
 
 # Scalari di padding aggiunti a ogni riga del tile di X in shared memory dal
@@ -223,16 +223,16 @@ ifeq ($(KERNEL_IS_CUDA),1)
 # acceso costa solo qualche riga a schermo e toglie la scusa di non guardare.
 NVCCFLAGS := -O3 -std=c++14 -arch=$(NVCC_ARCH) -Isrc $(PRECDEF) -lineinfo \
 	$(X_LAYOUT_DEF) \
-	-DSCPA_SMEM_PAD=$(SMEM_PAD) -DSCPA_BLOCK_THREADS=$(BLOCK) \
+	-DSMEM_PAD=$(SMEM_PAD) -DBLOCK_THREADS=$(BLOCK) \
 	-Xptxas -v \
 	-Xcompiler -Wall -Xcompiler -Wextra $(EXTRA_NVCCFLAGS)
 ifeq ($(KERNEL),cuda_warp_tiled)
-NVCCFLAGS += -DSCPA_WARP_COL_TILE=$(WARP_COL_TILE)
+NVCCFLAGS += -DWARP_COL_TILE=$(WARP_COL_TILE)
 endif
 ifeq ($(KERNEL),cuda_warp_smem)
-NVCCFLAGS += -DSCPA_TILE_GRANULARITY=$(TILE_GRANULARITY)
+NVCCFLAGS += -DTILE_GRANULARITY=$(TILE_GRANULARITY)
 ifneq ($(SMEM_BUDGET_BYTES),)
-NVCCFLAGS += -DSCPA_SMEM_BUDGET_BYTES=$(SMEM_BUDGET_BYTES)
+NVCCFLAGS += -DSMEM_BUDGET_BYTES=$(SMEM_BUDGET_BYTES)
 endif
 endif
 ifneq ($(ARCHFLAGS),)

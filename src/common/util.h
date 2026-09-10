@@ -1,5 +1,5 @@
-#ifndef SCPA_UTIL_H
-#define SCPA_UTIL_H
+#ifndef UTIL_H
+#define UTIL_H
 
 #include <stddef.h>
 
@@ -26,18 +26,18 @@ double now_seconds(void);
  * si vedrebbe fino al momento peggiore, cioe' quando qualcosa e' gia' andato
  * storto e questo e' l'unico messaggio disponibile. */
 #if defined(__GNUC__)
-#define SCPA_PRINTF_FMT(fmt_idx, arg_idx) \
+#define PRINTF_FMT(fmt_idx, arg_idx) \
     __attribute__((format(printf, fmt_idx, arg_idx)))
 #else
-#define SCPA_PRINTF_FMT(fmt_idx, arg_idx)
+#define PRINTF_FMT(fmt_idx, arg_idx)
 #endif
 
 /* Errore fatale: usa exit prima di MPI_Init/dopo MPI_Finalize e MPI_Abort
  * durante un job MPI, evitando di lasciare rank bloccati nelle collettive. */
-void die(const char *fmt, ...) SCPA_PRINTF_FMT(1, 2);
+void die(const char *fmt, ...) PRINTF_FMT(1, 2);
 
 #if defined(__cplusplus)
 }
 #endif
 
-#endif /* SCPA_UTIL_H */
+#endif /* UTIL_H */

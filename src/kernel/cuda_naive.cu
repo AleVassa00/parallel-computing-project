@@ -76,17 +76,16 @@
  * Qui i thread non cooperano (niente shared, niente __syncthreads), quindi la
  * dimensione del blocco non cambia il risultato: cambia solo come lo scheduler
  * riempie gli SM. Il valore si sostituisce dal Makefile con BLOCK=<n>, che
- * definisce SCPA_BLOCK_THREADS, cosi' la sensibilita' del kernel a questo
+ * definisce BLOCK_THREADS, cosi' la sensibilita' del kernel a questo
  * parametro si MISURA invece di darla per buona. Ogni valore produce un binario
  * con nome proprio e un kernel_name() distinto: le righe di uno sweep restano
  * distinguibili nel CSV. */
-#ifndef SCPA_BLOCK_THREADS
-#define SCPA_BLOCK_THREADS 256
+#ifndef BLOCK_THREADS
+#define BLOCK_THREADS 256
 #endif
-#if SCPA_BLOCK_THREADS < 32 || SCPA_BLOCK_THREADS > 1024 || (SCPA_BLOCK_THREADS % 32) != 0
-#error "SCPA_BLOCK_THREADS deve essere un multiplo di 32 compreso fra 32 e 1024"
+#if BLOCK_THREADS < 32 || BLOCK_THREADS > 1024 || (BLOCK_THREADS % 32) != 0
+#error "BLOCK_THREADS deve essere un multiplo di 32 compreso fra 32 e 1024"
 #endif
-#define BLOCK_THREADS SCPA_BLOCK_THREADS
 
 /* Il server di dipartimento su cui la consegna richiede di misurare ha una
  * sola GPU: non c'e' nessun device da scegliere, e una logica di selezione
@@ -472,16 +471,16 @@ int local_gemm_x_rows_per_tile(const local_gemm_t *local_gemm_context)
 
 /* Il nome porta la dimensione del blocco quando non e' quella di default: nel
  * CSV le righe di uno sweep su BLOCK devono restare distinguibili fra loro. */
-#define SCPA_STR_(x) #x
-#define SCPA_STR(x)  SCPA_STR_(x)
+#define STR_(x) #x
+#define STR(x)  STR_(x)
 
-#if SCPA_BLOCK_THREADS == 256
-#define SCPA_BLK_SUFFIX ""
+#if BLOCK_THREADS == 256
+#define BLK_SUFFIX ""
 #else
-#define SCPA_BLK_SUFFIX "(blk" SCPA_STR(SCPA_BLOCK_THREADS) ")"
+#define BLK_SUFFIX "(blk" STR(BLOCK_THREADS) ")"
 #endif
 
 const char *kernel_name(void)
 {
-    return "cuda_naive" SCPA_BLK_SUFFIX;
+    return "cuda_naive" BLK_SUFFIX;
 }
