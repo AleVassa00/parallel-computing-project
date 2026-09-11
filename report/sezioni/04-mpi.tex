@@ -12,7 +12,7 @@ fattorizzazione più quadrata di $P$ (se $P$ \`e primo, $1 \times P$).
 
 \medskip
 
-\noindent Tramite \code{MPI\_Cart\_sub} si ricavano due sotto-comunicatori:
+Tramite \code{MPI\_Cart\_sub} si ricavano due sotto-comunicatori:
 
 \begin{itemize}
   \item \code{row\_comm}, che raccoglie i processi di una stessa \emph{riga} della griglia;
@@ -49,14 +49,14 @@ cronometrato.
 \label{fig:griglia}
 \end{figure}
 
-\noindent Il codice fa affidamento su una proprietà dei sotto-comunicatori: in un
+Il codice fa affidamento su una proprietà dei sotto-comunicatori: in un
 comunicatore con una sola dimensione residua i rank sono ordinati per coordinata
 crescente. Ciò significa che il rank $0$ di \code{col\_comm} è il processo di riga $0$
 (il \emph{responsabile} del broadcast di $X$) e il rank $0$ di \code{row\_comm} è il processo di
 colonna $0$ (il \emph{responsabile} della reduce di $Y$).
 
 \medskip
-\noindent La proprietà viene comunque verificata in
+La proprietà viene comunque verificata in
 \code{grid\_create} confrontando i rank con le coordinate cartesiane: dopo
 \code{reorder = 1} i rank possono differire da quelli di
 \code{MPI\_COMM\_WORLD}, e appoggiarsi a un'ipotesi non controllata darebbe
@@ -80,7 +80,7 @@ La funzione inversa $\mathrm{owner}(n,p,g)$ restituisce la parte che possiede
 l'indice globale $g$ senza scorrere le parti. Le tre funzioni sono in
 \file{src/index/index.c} e sono indipendenti da MPI.
 
-\noindent Lo sbilanciamento massimo introdotto è di un elemento per dimensione, cioè al
+Lo sbilanciamento massimo introdotto è di un elemento per dimensione, cioè al
 più una riga e una colonna di differenza fra due blocchi locali.
 \color{black}
 
@@ -99,9 +99,7 @@ sola:
 con $\mloc = \mathrm{size}(M, \Prow, \text{my\_row})$ e
 $\nloc = \mathrm{size}(N, \Pcol, \text{my\_col})$.
 
-\medskip
-
-\noindent Il multivettore non viene mai tagliato lungo $k$. Due ragioni:
+Il multivettore non viene mai tagliato lungo $k$. Due ragioni:
 
 \begin{itemize}
   \item $k$ è piccolo, e frammentarlo produrrebbe messaggi dominati dalla latenza invece che dalla banda;
@@ -129,7 +127,7 @@ il codice lo impone con un controllo esplicito in \code{mpi\_matmul}.
 
 \medskip
 
-\noindent La ragione è che $X$ e $Y$ attraversano una collettiva: \code{MPI\_Bcast} e
+La ragione è che $X$ e $Y$ attraversano una collettiva: \code{MPI\_Bcast} e
 \code{MPI\_Reduce} usano conteggi contigui ($\nloc \cdot k$ e $\mloc \cdot k$
 elementi): descrivere uno stride richiederebbe di costruire un
 \code{MPI\_Type\_vector}, committarlo e liberarlo \emph{a ogni invocazione},
@@ -138,7 +136,7 @@ ciò che la misura non deve contenere.
 
 \medskip
 
-\noindent Al contrario $A$ non attraversa nessuna
+Al contrario $A$ non attraversa nessuna
 collettiva: il suo padding resta un fatto locale al kernel e può quindi essere
 studiato.
 \color{red}
@@ -183,7 +181,7 @@ della riga $0$ generano direttamente le proprie righe di $X$. Il successivo broa
 
 \medskip
 
-\noindent Generazione e distribuzione iniziale fanno parte del \textbf{preprocessing},
+Generazione e distribuzione iniziale fanno parte del \textbf{preprocessing},
 perciò sono escluse dai tempi ufficiali.
 La modalità \code{global} rappresenta uno scenario in cui l'input è inizialmente centralizzato.
 
@@ -213,11 +211,11 @@ MPI_Reduce(Y_loc_part, Y_row_col0, m_loc*k, SCALAR_MPI_TYPE,
         della stessa banda di righe vivono sui processi di una stessa riga della
         griglia: sommandoli tra loro si ottiene $Y$.
         
-        \noindent Il \code{count} \`e $\mloc \cdot k$
+        Il \code{count} \`e $\mloc \cdot k$
         (e non $1$) dato che la riduzione agisce lungo la dimensione dei processi e
         preserva la posizione, producendo dunque $\mloc \cdot k$ somme indipendenti.
         
-        \noindent Il root è il processo di colonna $0$, che è già il \emph{responsabile} designato
+        Il root è il processo di colonna $0$, che è già il \emph{responsabile} designato
         di quella porzione di $Y$: nessuna ridistribuzione finale è necessaria.
 \end{enumerate}
 

@@ -10,7 +10,7 @@ Il nucleo calcola, per ogni riga $i$ di $Y$ e ogni colonna $c$ del multivettore,
   \label{eq:definizione}
 \end{equation}
 
-\noindent Ogni elemento di $Y$ richiede $N$ moltiplicazioni e $(N-1)$ addizioni. Il conteggio
+Ogni elemento di $Y$ richiede $N$ moltiplicazioni e $(N-1)$ addizioni. Il conteggio
 convenzionale, e quello imposto dalla traccia, è di $2$ FLOP per termine:
 \begin{equation}
   \mathrm{FLOP}(M,N,k) = 2\,M\,N\,k ,
@@ -24,7 +24,7 @@ conseguenze rilevanti, ed è trattata in maniera dettagliata in \cref{sec:metric
 
 \medskip
 
-\noindent Ogni matrice ha una propria \emph{leading dimension} \texttt{ld$^*$} esplicita
+Ogni matrice ha una propria \emph{leading dimension} \texttt{ld$^*$} esplicita
 ($\code{lda}$ per la matrice $A$, $\code{ldx}$ per la matrice $X$, $\code{ldy}$ per la matrice $Y$):
 la riga $i$ di una data matrice comincia all'offset $i \cdot \code{ld}$: questo permette a un blocco
 locale di non essere contiguo fra righe, proprietà che serve sia alla
@@ -67,7 +67,7 @@ for i:
 \end{minipage}
 \end{center}
 
-\noindent Ogni schema ha le proprie caratteristiche e vantaggi.
+Ogni schema ha le proprie caratteristiche e vantaggi.
 Lo schema~B è la trascrizione letterale della definizione, e corrisponde esattamente
 all'implementazione di $k$ prodotti matrice-vettore indipendenti:
 la riga $i$ di $A$ viene riletta una volta per ciascuna colonna $c$, cioè $k$ volte.
@@ -92,7 +92,7 @@ dello scalare, che varia a seconda della precisione, l'intensità aritmetica dei
   \label{eq:intensita}
 \end{equation}
 
-\noindent In doppia precisione FP64 ($s = 8$) questo significa che si ha
+In doppia precisione FP64 ($s = 8$) questo significa che si ha
 $\Ai_{\text{A}} = k/4$
 $\si{\flop\per\byte}$ contro $\Ai_{\text{B}} = 1/4$
 $\si{\flop\per\byte}$: lo schema~A guadagna esattamente un fattore $k$, e per
@@ -103,7 +103,7 @@ cui, almeno sulla GPU in FP64, il limite pu\`o diventare il calcolo
 
 \medskip
 
-\noindent Vale la pena osservare che $\Ai_{\text{A}} = 2k/s$ è il \emph{massimo}
+Vale la pena osservare che $\Ai_{\text{A}} = 2k/s$ è il \emph{massimo}
 ottenibile leggendo $A$ una volta sola: nessuna riorganizzazione ulteriore pu\`o
 migliorarlo, perch\'e $MN$ elementi di $A$ vanno comunque letti almeno una volta
 e i FLOP sono fissati. Perciò il resto del lavoro di ottimizzazione, sia su CPU sia su
@@ -113,7 +113,7 @@ suo limite.
 
 \medskip
 
-\noindent Un'ultima proprietà dello schema~A che conta sull'hardware reale: entrambi gli
+Un'ultima proprietà dello schema~A che conta sull'hardware reale: entrambi gli
 stream di lettura sono a passo unitario. La riga di $A$ \`e contigua per
 costruzione, e la riga di $X$ lo \`e perch\'e $X$ \`e row-major con le $k$ colonne
 adiacenti. Nessuno dei due accessi ha stride, quindi i prefetcher hardware
@@ -131,7 +131,7 @@ esattamente lo stesso codice sorgente, che \`e la sola condizione in cui il
 confronto misura la precisione e non due implementazioni diverse. Anche il tipo
 MPI segue lo scalare, tramite la macro \code{SCALAR\_MPI\_TYPE}.
 
-\noindent La scelta della precisione non è neutra rispetto al modello roofline
+La scelta della precisione non è neutra rispetto al modello roofline
 (\cref{cap:roofline}): dimezzando $s$ raddoppia l'intensità aritmetica della equazione
 \ref{eq:intensita}, ma su una GPU consumer o professionale di classe Turing il
 picco FP32 è $32$ volte il picco FP64. I due effetti vanno nella stessa
@@ -145,7 +145,7 @@ memory-bound: la discussione quantitativa \`e in \cref{sec:roofline-gpu}.
 Le matrici di test sono generate, non lette da file. La traccia lo consente
 esplicitamente e chiede in cambio che la generazione sia \emph{ripetibile}.
 
-\noindent Il generatore è \code{splitmix64}, un mixer a 64 bit \textbf{senza stato}:
+Il generatore è \code{splitmix64}, un mixer a 64 bit \textbf{senza stato}:
 \begin{equation}
   A[i][j] \;=\; g\bigl(\text{seed},\ \Sigma_A,\ i \cdot N + j \bigr),
   \qquad
@@ -170,7 +170,7 @@ Le conseguenze sono diverse, e sono tutte usate dal progetto:
         porzione che gli serve, senza ricevere dati dagli altri processi.
 \end{enumerate}
 
-\noindent I valori sono distribuiti in $[-1, 1)$ a media nulla. Anche questa non \`e una
+I valori sono distribuiti in $[-1, 1)$ a media nulla. Anche questa non \`e una
 scelta estetica: la tolleranza della validazione (\cref{sec:tolleranza})
 poggia sull'ipotesi che gli errori di arrotondamento della riduzione abbiano
 segno indipendente, ipotesi che vale per dati a media nulla e non varrebbe per

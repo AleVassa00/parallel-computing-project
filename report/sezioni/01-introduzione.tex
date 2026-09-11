@@ -19,7 +19,7 @@ dalla traccia, $k \in \{3, 6, 8, 20, 32\}$.
 
 \medskip
 
-\noindent La parallelizzazione è ibrida a due livelli. MPI costituisce il livello
+La parallelizzazione è ibrida a due livelli. MPI costituisce il livello
 esterno, responsabile della distribuzione dei dati su una griglia di processi
 bidimensionale e della comunicazione fra processi; la parallelizzazione interna
 al singolo processo è affidata a CUDA, l'opzione scelta fra le due ammesse
@@ -45,7 +45,7 @@ riga e di colonna usati dalle collettive (\cref{sec:griglia}). $A$ è
 distribuita a blocchi lungo entrambe le dimensioni: il processo di coordinate
 $(i,j)$ detiene un blocco di $\mloc \times \nloc$ elementi.
 
-\noindent Coerentemente con quanto consentito dalla traccia, i multivettori non sono
+Coerentemente con quanto consentito dalla traccia, i multivettori non sono
 distribuiti sull'intera griglia: $X$ risiede sulla sola riga~0 di processi e
 viene propagata lungo ogni colonna con un \code{MPI\_Bcast}. I contributi
 parziali di $Y$ vengono sommati lungo ogni riga della griglia con un
@@ -85,14 +85,14 @@ con il quale confrontare le performance dei vari kernel CUDA.
 
 \medskip
 
-\noindent Sul lato CPU, troviamo tre proposte: \kernelname{scheme\_a} è l'implementazione
+Sul lato CPU, troviamo tre proposte: \kernelname{scheme\_a} è l'implementazione
 di base, con due ottimizzazioni di cache
 \kernelname{scheme\_a\_jblock} e \kernelname{scheme\_a\_jblock\_rb}
 (\cref{cap:kernel-cpu}).
 
 \medskip
 
-\noindent Tutto il codice usa un unico tipo \code{scalar\_t}, pari a \code{double} per default e
+Tutto il codice usa un unico tipo \code{scalar\_t}, pari a \code{double} per default e
 \code{float} con \code{PREC=float}: il confronto fra le due precisioni è un
 flag di compilazione sullo stesso sorgente (\cref{sec:precisione}), il modello
 roofline ne prevede l'effetto (\cref{cap:roofline}).
@@ -110,7 +110,7 @@ e discusse a parte.
 
 \medskip 
 
-\noindent La correttezza è stata verificata con \code{--check} contro
+La correttezza è stata verificata con \code{--check} contro
 un'implementazione seriale minimale usata come oracolo
 (\cref{cap:validazione}): il rank~0 raccoglie $Y$ distribuita, ricostruisce
 $A$ e $X$ dal generatore, e confronta in norma $L_2$ relativa con una
@@ -125,7 +125,7 @@ nodi di calcolo attraverso lo scheduler e non dal frontend
 
 \medskip
 
-\noindent La metrica ufficiale è quella imposta dalla
+La metrica ufficiale è quella imposta dalla
 traccia, $\mathrm{FLOPS} =2MNk/T$ con $T$ tempo medio per invocazione su esecuzioni ripetute.
 I tempi dei kernel sono rilevati con \code{cudaEvent}, e la fase locale su GPU
 è scomposta per intero in tempo \emph{host-to-device} (H2D) di $X$, tempo di kernel,
@@ -134,7 +134,7 @@ runtime (\cref{sec:tempi-esclusi}).
 
 \medskip
 
-\noindent Le campagne sono descritte da file
+Le campagne sono descritte da file
 \code{.conf} e lanciate da un unico runner (\cref{sec:campagne}). Un aspetto
 dell'ambiente va enunciato prima dei numeri: senza MPS, più rank MPI sulla
 stessa GPU si alternano sulla scheda, per cui con $P>1$ il tempo di kernel è
