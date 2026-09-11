@@ -7,6 +7,10 @@
 #   make PREC=float ricompila in singola precisione
 #   make KERNEL=..  seleziona l'implementazione di local_gemm (.c oppure .cu)
 #   make FORCE_GENERIC_K=1  forza il fallback generico di scheme_a
+#   make KERNEL=scheme_a_jblock     schema A con X mattonellata in cache
+#   make KERNEL=scheme_a_jblock_rb  come sopra + register blocking sulle righe
+#   make KERNEL=scheme_a_jblock JBLOCK_BYTES=<n>  byte di X per tile (default 65536)
+#   make KERNEL=scheme_a_jblock_rb RB_ROWS=<1|2|4> forza le righe per blocco
 #   make KERNEL=cuda_warp  backend CUDA warp-per-row con dispatch su k
 #   make KERNEL=cuda_warp X_LAYOUT=column  X compatta per colonne (default row)
 #   make KERNEL=cuda_warp_smem  come sopra, ma con il tile di X in shared
@@ -93,6 +97,26 @@ endif
 endif
 endif
 
+# Tile di X in cache dei backend scheme_a_jblock*: byte per tile. Il default
+# sta nella L2 di qualunque core; e' il punto di partenza dello sweep.
+# RB_ROWS forza le righe di A per blocco di scheme_a_jblock_rb; vuoto = scelto
+# a compile-time dal register file dell'architettura (vedi il sorgente).
+JBLOCK_BYTES ?= 65536
+RB_ROWS      ?=
+JBLOCK_KERNELS := scheme_a_jblock scheme_a_jblock_rb
+ifneq ($(filter $(KERNEL),$(JBLOCK_KERNELS)),)
+ifeq ($(shell printf '%s\n' '$(JBLOCK_BYTES)' | grep -E '^[1-9][0-9]*$$'),)
+$(error JBLOCK_BYTES deve essere un intero positivo)
+endif
+endif
+ifeq ($(KERNEL),scheme_a_jblock_rb)
+ifneq ($(RB_ROWS),)
+ifeq ($(filter $(RB_ROWS),1 2 4),)
+$(error RB_ROWS deve valere 1, 2 oppure 4, oppure vuoto per derivarlo)
+endif
+endif
+endif
+
 ifeq ($(KERNEL),cuda_warp_tiled)
 WARP_COL_TILE   ?= 8
 ifeq ($(shell printf '%s\n' '$(WARP_COL_TILE)' | grep -E '^[1-9][0-9]*$$'),)
@@ -117,7 +141,12 @@ ARCHFLAGS := $(shell \
     $(CC) -march=native -E -x c /dev/null >/dev/null 2>&1 && echo -march=native || \
     ($(CC) -mcpu=native -E -x c /dev/null >/dev/null 2>&1 && echo -mcpu=native))
 
-CFLAGS := -std=c11 -O3 $(ARCHFLAGS) -Wall -Wextra -Wpedantic -Isrc -MMD -MP \
+# -ffp-contract=fast: con -std=c11 (ISO stretto) gcc disabilita la fusione di
+# a*x+acc in una FMA e il kernel esegue mul e add separate, meta' dei FLOP
+# per istruzione. Il flag ripristina il default di -std=gnu11 senza rinunciare
+# alla pedanteria del resto.
+CFLAGS := -std=c11 -O3 $(ARCHFLAGS) -ffp-contract=fast \
+	-Wall -Wextra -Wpedantic -Isrc -MMD -MP \
 	$(EXTRA_CFLAGS)
 
 # Suffisso che identifica la configurazione. Vuoto per quella di riferimento,
@@ -161,6 +190,16 @@ endif
 ifeq ($(X_LAYOUT),column)
 CONFIG := $(CONFIG)-xcol
 endif
+ifneq ($(filter $(KERNEL),$(JBLOCK_KERNELS)),)
+ifneq ($(JBLOCK_BYTES),65536)
+CONFIG := $(CONFIG)-jb$(JBLOCK_BYTES)
+endif
+endif
+ifeq ($(KERNEL),scheme_a_jblock_rb)
+ifneq ($(RB_ROWS),)
+CONFIG := $(CONFIG)-rb$(RB_ROWS)
+endif
+endif
 LDLIBS := -lm
 
 # Su nodo singolo la comunicazione deve passare da memoria condivisa. Su
@@ -182,6 +221,13 @@ endif
 
 ifneq ($(TEST_A_PADDING),0)
 CFLAGS += -DTEST_A_PADDING=$(TEST_A_PADDING)
+endif
+
+ifneq ($(filter $(KERNEL),$(JBLOCK_KERNELS)),)
+CFLAGS += -DJBLOCK_BYTES=$(JBLOCK_BYTES)
+ifneq ($(RB_ROWS),)
+CFLAGS += -DRB_ROWS=$(RB_ROWS)
+endif
 endif
 
 # Tutto il progetto tranne il kernel: questi file sono C e non cambiano mai.

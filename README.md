@@ -22,6 +22,10 @@ make check-cxx      # kernel.h e util.h restano utilizzabili da nvcc
 make PREC=float check # stessa matrice di validazione in singola precisione
 make check-padding  # --a-mode global con lda = n_loc + 8
 make KERNEL=<nome>  # seleziona src/kernel/<nome>.c oppure .cu come local_gemm
+make KERNEL=scheme_a_jblock check     # schema A con X mattonellata in cache
+make KERNEL=scheme_a_jblock_rb check  # + register blocking sulle righe di A
+make KERNEL=scheme_a_jblock JBLOCK_BYTES=32768   # byte di X per tile (default 65536)
+make KERNEL=scheme_a_jblock_rb RB_ROWS=2         # forza le righe per blocco (1, 2, 4)
 make KERNEL=cuda_naive check   # backend CUDA (richiede nvcc: solo sul server)
 make KERNEL=cuda_warp check    # warp-per-row, template sui cinque k richiesti
 make KERNEL=cuda_warp_smem check          # tile di X in shared memory
@@ -40,6 +44,8 @@ aggiunge un suffisso:
 | `make PREC=float` | `bin/matmul_mpi-float` |
 | `make FORCE_GENERIC_K=1` | `bin/matmul_mpi-generic` |
 | `make TEST_A_PADDING=8` | `bin/matmul_mpi-pad8` |
+| `make KERNEL=scheme_a_jblock` | `bin/matmul_mpi-scheme_a_jblock` |
+| `make KERNEL=scheme_a_jblock_rb JBLOCK_BYTES=32768 RB_ROWS=2` | `bin/matmul_mpi-scheme_a_jblock_rb-jb32768-rb2` |
 | `make KERNEL=cuda_naive` | `bin/matmul_mpi-cuda_naive` |
 | `make KERNEL=cuda_warp` | `bin/matmul_mpi-cuda_warp` |
 | `make KERNEL=cuda_warp_smem` | `bin/matmul_mpi-cuda_warp_smem` |
@@ -324,7 +330,24 @@ Il CSV per ripetizione (`--csv-raw-file`) riporta le stesse voci non aggregate:
 `t_h2d_X_s`, `t_d2h_Y_s` e `t_launch_overhead_s`.
 
 `scheme_a` specializza in C portabile `k=3,6,8,20,32` e usa il kernel generico
-per ogni altro valore. Per un microbenchmark sullo stesso problema:
+per ogni altro valore. `scheme_a_jblock` e `scheme_a_jblock_rb` sono lo stesso
+schema con due ottimizzazioni di cache e di pipeline, ciascuna diretta a un
+regime diverso di `scheme_a`:
+
+- **j-blocking** (`scheme_a_jblock`): `scheme_a` legge A una volta sola ma
+  scorre tutta X per ogni riga di A; quando `n_loc*k*8` byte superano la L2, X
+  viene ristreamata dalla L3 `m_loc` volte e il kernel si ferma sulla banda della
+  L3 (nella campagna C3 e' il crollo fra k=8 e k=20). Il j-blocking applica un
+  tile di X di `JBLOCK_BYTES` a tutte le righe di A prima di passare al tile
+  successivo: e' la stessa idea del tile in shared memory di `cuda_warp_smem`,
+  su una gerarchia diversa. Il prezzo e' rileggere Y a ogni tile, `2k/BJ`
+  rispetto ad A. `x_rows_per_tile` nel CSV riporta le righe di X per tile.
+- **register blocking** (`scheme_a_jblock_rb`): ai k piccoli ogni accumulatore
+  e' una catena seriale di FMA e le catene indipendenti sono solo `k/W`; il
+  kernel lavora su RB righe di A per volta, moltiplicando le catene per RB e
+  riusando ogni load di X RB volte dai registri. RB e' scelto a compile-time
+  per ogni k dal register file dell'architettura (AVX2 double: 4 righe fino a
+  k=8, 2 a k=20, 1 a k=32; AVX-512: 4 righe per tutti); `RB_ROWS` lo forza. Per un microbenchmark sullo stesso problema:
 
 ```bash
 make FORCE_GENERIC_K=1        # i due binari coesistono, non serve ricompilare
