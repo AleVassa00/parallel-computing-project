@@ -10,9 +10,23 @@
  */
 
 #include <cuda_runtime.h>
+#include <limits.h>
+#include <stdint.h>
 
 #include "kernel/kernel.h"
 #include "common/util.h"
+
+/* X_PAD riguarda solo il buffer device. Il chiamante continua a fornire X
+ * con stride host ldx; cudaMemcpy2D copia solo k elementi utili per riga. */
+#ifndef X_PAD
+#define X_PAD 0
+#endif
+#if X_PAD < 0 || X_PAD > INT_MAX
+#error "X_PAD deve essere compreso fra 0 e INT_MAX"
+#endif
+#if X_PAD > 0 && X_COLUMN_MAJOR
+#error "X_PAD>0 richiede X_LAYOUT=row"
+#endif
 
 #define CUDA_CHECK(call)                                                      \
     do {                                                                      \
@@ -205,6 +219,7 @@ static void launch_warp_kernel(int m_loc, int n_loc, int k, const scalar_t *A_lo
 struct local_gemm_context {
     int m_loc, n_loc, k;
     int lda, ldx, ldy;
+    int ldx_device;       /* k+X_PAD se padded; altrimenti lo stride host */
     scalar_t *dA_loc, *dX_loc, *dY_loc_part;
     /* Tre coppie di event, non una: la consegna esclude dal tempo ufficiale i
      * trasferimenti da e verso la scheda ma consente di misurarli a parte, e
@@ -250,6 +265,11 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
             ldx, ldy, k);
     if (X_COLUMN_MAJOR && ldx != k)
         die("cuda_warp: column-major X must be compact (ldx=%d, k=%d)", ldx, k);
+    if (k > INT_MAX - X_PAD)
+        die("cuda_warp: k=%d plus X_PAD=%d exceeds the device stride range", k, X_PAD);
+    const int ldx_device = X_PAD > 0 ? k + X_PAD : ldx;
+    if (ldx_device > 0 && (size_t)n_loc > SIZE_MAX / sizeof(scalar_t) / (size_t)ldx_device)
+        die("cuda_warp: device X allocation size overflows size_t");
     if (n_loc > 0 && m_loc > 0 && A_loc == NULL)
         die("local_gemm_create: A is NULL for a non-empty %dx%d block", m_loc, n_loc);
 
@@ -259,6 +279,7 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
     local_gemm_context->k = k;
     local_gemm_context->lda = lda;
     local_gemm_context->ldx = ldx;
+    local_gemm_context->ldx_device = ldx_device;
     local_gemm_context->ldy = ldy;
     local_gemm_context->dA_loc = NULL;
     local_gemm_context->dX_loc = NULL;
@@ -276,7 +297,7 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
     local_gemm_context->t_setup_device_init = now_seconds() - t_device_init_start;
 
     bytes_A = (size_t)m_loc * (size_t)lda * sizeof(scalar_t);
-    bytes_X = (size_t)n_loc * (size_t)ldx * sizeof(scalar_t);
+    bytes_X = (size_t)n_loc * (size_t)ldx_device * sizeof(scalar_t);
     bytes_Y = (size_t)m_loc * (size_t)ldy * sizeof(scalar_t);
     need = bytes_A + bytes_X + bytes_Y;
 
@@ -310,7 +331,7 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
             "%.2f GiB (A %dx%d, X %dx%d, Y %dx%d in %s), but only %.2f GiB "
             "of %.2f GiB were free: use more MPI processes or a smaller M/N",
             kernel_name(), CUDA_DEVICE_ID, (double)need / BYTES_PER_GIB,
-            m_loc, lda, n_loc, ldx, m_loc, ldy, SCALAR_NAME,
+            m_loc, lda, n_loc, ldx_device, m_loc, ldy, SCALAR_NAME,
             (double)free_b / BYTES_PER_GIB, (double)total_b / BYTES_PER_GIB);
     }
     CUDA_CHECK(err);
@@ -337,7 +358,8 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
      * banda e confrontabili con il picco del PCIe. */
     local_gemm_context->bytes_h2d_A = (bytes_A > 0) ? bytes_A : 0;
     local_gemm_context->bytes_h2d_X_per_call =
-        (n_loc > 0 && k > 0) ? (size_t)n_loc * (size_t)ldx * sizeof(scalar_t) : 0;
+        (n_loc > 0 && k > 0)
+          ? (size_t)n_loc * (size_t)(X_PAD > 0 ? k : ldx) * sizeof(scalar_t) : 0;
     local_gemm_context->bytes_d2h_Y_per_call =
         (m_loc > 0 && k > 0) ? (size_t)m_loc * (size_t)ldy * sizeof(scalar_t) : 0;
 
@@ -371,13 +393,25 @@ void local_gemm(local_gemm_t *local_gemm_context, const scalar_t *RESTRICT X_loc
      * quando non c'e' niente da copiare: cosi' il tempo e' definito
      * (circa zero) invece che indefinito. */
     CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_h2d_X_start, 0));
-    if (n_loc > 0 && k > 0)
+    if (n_loc > 0 && k > 0) {
+#if X_PAD > 0
+        /* Il pitch device e' esattamente k+X_PAD, non quello eventualmente
+         * arrotondato da cudaMallocPitch. I buchi non sono letti dal kernel
+         * e non attraversano il bus; nessun packing host o kernel aggiuntivo. */
+        CUDA_CHECK(cudaMemcpy2D(local_gemm_context->dX_loc,
+                                (size_t)local_gemm_context->ldx_device * sizeof(scalar_t),
+                                X_loc, (size_t)ldx * sizeof(scalar_t),
+                                (size_t)k * sizeof(scalar_t), (size_t)n_loc,
+                                cudaMemcpyHostToDevice));
+#else
         CUDA_CHECK(cudaMemcpy(local_gemm_context->dX_loc, X_loc, (size_t)n_loc * (size_t)ldx * sizeof(scalar_t), cudaMemcpyHostToDevice));
+#endif
+    }
     CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_h2d_X_stop, 0));
 
     CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_kernel_start, 0));
     if (m_loc > 0 && k > 0) {
-        launch_warp_kernel(m_loc, n_loc, k, local_gemm_context->dA_loc, local_gemm_context->lda, local_gemm_context->dX_loc, ldx, local_gemm_context->dY_loc_part, ldy);
+        launch_warp_kernel(m_loc, n_loc, k, local_gemm_context->dA_loc, local_gemm_context->lda, local_gemm_context->dX_loc, local_gemm_context->ldx_device, local_gemm_context->dY_loc_part, ldy);
         CUDA_CHECK(cudaGetLastError());
     }
     CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_kernel_stop, 0));
@@ -494,6 +528,12 @@ int local_gemm_x_rows_per_tile(const local_gemm_t *local_gemm_context)
 #define STR_(x) #x
 #define STR(x)  STR_(x)
 
+#if X_PAD > 0
+#define XPAD_SUFFIX "(xpad" STR(X_PAD) ")"
+#else
+#define XPAD_SUFFIX ""
+#endif
+
 #if X_COLUMN_MAJOR
 #define X_SUFFIX "(xcol)"
 #else
@@ -508,5 +548,5 @@ int local_gemm_x_rows_per_tile(const local_gemm_t *local_gemm_context)
 
 const char *kernel_name(void)
 {
-    return "cuda_warp" BLK_SUFFIX X_SUFFIX;
+    return "cuda_warp" BLK_SUFFIX X_SUFFIX XPAD_SUFFIX;
 }
