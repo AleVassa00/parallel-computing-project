@@ -6,10 +6,12 @@ Applicazioni, A.A. 2025/2026.
 ## Compilazione
 
 ```bash
-make            # -> main.pdf  (latexmk -pdf)
-make watch      # ricompila a ogni salvataggio
-make clean      # rimuove gli ausiliari
+./compila.sh            # -> main.pdf
+./compila.sh watch      # ricompila a ogni salvataggio
+./compila.sh clean      # rimuove gli ausiliari
 ```
+
+oppure direttamente `latexmk -pdf main.tex`.
 
 Pacchetti richiesti: tutti in una TeX Live / MacTeX standard
 (babel-italiano, geometry, booktabs, siunitx, pgfplots, tcolorbox, listings,
@@ -19,6 +21,7 @@ hyperref, cleveref, microtype).
 
 ```
 main.tex            documento principale, elenca i capitoli
+compila.sh          wrapper su latexmk
 preambolo.tex       pacchetti, stile, macro (\dato, \TODO, daverificare, ipotesi)
 sezioni/            un file per capitolo
 figure/             figure esterne (per ora vuota: i grafici sono in pgfplots)

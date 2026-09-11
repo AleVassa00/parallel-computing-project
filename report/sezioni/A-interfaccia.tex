@@ -36,6 +36,11 @@
 Le quattro combinazioni di \code{--a-mode} e \code{--x-mode} sono tutte valide e,
 a parit\`a di seed, producono gli stessi elementi globali.
 
+\code{--help} stampa anche il layout di $X$ della build corrente
+(\code{X\_LAYOUT=row|column}): non \`e un'opzione di riga di comando, ma \`e la
+prima cosa da verificare quando due binari danno tempi diversi sullo stesso
+problema.
+
 \section{Colonne del CSV}
 
 L'intestazione \`e emessa dal binario stesso (\code{--csv-header}), quindi non pu\`o
@@ -65,12 +70,72 @@ di una campagna si possono concatenare senza rischio.
 \code{t\_setup\_s} & preprocessing del backend, fuori da tutte le metriche \\
 \code{gflops, gflops\_compute, gflops\_kernel} & le tre metriche di
   \cref{sec:metriche} \\
+\code{blocks\_per\_sm, x\_rows\_per\_tile} & piano di esecuzione scelto a runtime
+  dal backend; $-1$ dove il concetto non esiste (\cref{sec:piano-tile}) \\
 \code{rel\_err} & errore relativo contro l'oracolo, oppure $-1$ senza
   \code{--check} \\
+\midrule
+\multicolumn{2}{@{}p{0.94\linewidth}@{}}{\footnotesize\itshape da qui in poi:
+  voci ESCLUSE dalla metrica ufficiale (\cref{sec:tempi-esclusi}), in coda
+  cos\`i che le colonne storiche non si spostino}\\
+\midrule
+\code{t\_setup\_device\_init\_s}, \code{t\_setup\_device\_alloc\_s},
+  \code{t\_setup\_h2d\_A\_s}, \code{bw\_h2d\_A\_gbs}
+  & scomposizione del preprocessing del backend e banda della copia di $A$ \\
+\code{t\_h2d\_X\_*}, \code{bw\_h2d\_X\_gbs} & H2D di $X$ per invocazione \\
+\code{t\_d2h\_Y\_*}, \code{bw\_d2h\_Y\_gbs} & D2H di $Y$ per invocazione \\
+\code{t\_launch\_overhead\_*} & residuo della \cref{eq:scomposizione-locale} \\
+\code{t\_prep\_*} & le sei fasi del preprocessing del driver e il loro totale \\
+\code{t\_io\_csv\_raw\_s} & unico I/O del driver \\
+\code{x\_layout} & \code{row} o \code{column} (\cref{sec:x-layout}) \\
+\code{t\_prep\_convert\_X\_s} & costo della conversione di layout, $0$ in
+  \code{row} \\
 \bottomrule
 \end{tabular}
 \caption{Struttura dell'intestazione CSV.}
 \end{table}
 
 Il CSV \emph{raw} ha un'altra intestazione --- una riga per repetition, senza
-statistiche --- e va unito separatamente da quello aggregato.
+statistiche, con \code{t\_h2d\_X\_s}, \code{t\_d2h\_Y\_s},
+\code{t\_launch\_overhead\_s} e \code{x\_layout} --- e va unito separatamente da
+quello aggregato. Il driver rifiuta di appendere a un file la cui intestazione
+non coincide con la propria: un CSV misto fra due build sarebbe ambiguo senza
+dare alcun errore.
+
+\section{Opzioni di build}
+
+Alcune scelte non sono opzioni di riga di comando ma di \emph{compilazione},
+perch\'e cambiano il codice generato: metterle a runtime introdurrebbe rami nel
+percorso caldo e renderebbe impossibile sapere, guardando un binario, che cosa
+stia misurando. Ognuna entra nel nome del binario e in \code{kernel\_name()}
+(\cref{tab:binari}).
+
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.24\linewidth}lp{0.5\linewidth}@{}}
+\toprule
+\textbf{Variabile} & \textbf{Default} & \textbf{Effetto} \\
+\midrule
+\code{KERNEL} & \code{scheme\_a} & implementazione di \code{local\_gemm};
+  \file{.cu} ha la precedenza su \file{.c} e attiva \code{nvcc} \\
+\code{PREC} & \code{double} & tipo scalare (\code{-DUSE\_FLOAT}) \\
+\code{FORCE\_GENERIC\_K} & \code{0} & disattiva le specializzazioni su $k$ di
+  \kernelname{scheme\_a} \\
+\code{TEST\_A\_PADDING} & \code{0} & impone $\code{lda} = \nloc + n$ \\
+\code{BLOCK} & \code{256} & thread per blocco dei backend CUDA \\
+\code{SMEM\_PAD} & \code{1} & scalari di padding per riga del tile
+  (\cref{sec:bank-conflict}) \\
+\code{TILE\_GRANULARITY} & \code{32} & arrotondamento delle righe per tile \\
+\code{SMEM\_BUDGET\_BYTES} & derivato & forza il budget di shared memory invece
+  di derivarlo dall'occupancy \\
+\code{WARP\_COL\_TILE} & \code{8} & colonne per warp in
+  \kernelname{cuda\_warp\_tiled} \\
+\code{X\_LAYOUT} & \code{row} & \code{column} rende $X$ compatta per colonne;
+  solo \kernelname{cuda\_warp} (\cref{sec:x-layout}) \\
+\code{NVCC\_ARCH} & \code{sm\_75} & architettura di destinazione \\
+\bottomrule
+\end{tabular}
+\caption{Variabili del \code{Makefile}.}
+\label{tab:opzioni-build}
+\end{table}

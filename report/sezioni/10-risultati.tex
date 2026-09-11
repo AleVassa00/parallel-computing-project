@@ -6,7 +6,7 @@
 \begin{table}[H]
 \centering
 \footnotesize
-\caption{Stato delle sei campagne al momento di questa versione della relazione.}
+\caption{Stato delle campagne al momento di questa versione della relazione.}
 \label{tab:stato-campagne}
 \begin{tabular}{@{}llll@{}}
 \toprule
@@ -19,15 +19,21 @@ C1 (taglia $\times$ rapporto) & \textcolor{todorosso}{da eseguire} & --- & \cref
 C6 (forma della griglia) & \textcolor{todorosso}{da eseguire} & --- & \cref{sec:ris-c6} \\
 C4 (strong scaling) & \textcolor{todorosso}{da eseguire} & --- & \cref{sec:ris-c4} \\
 C5 (weak scaling) & \textcolor{todorosso}{da eseguire} & --- & \cref{sec:ris-c5} \\
+C7.1 (precisione $\times$ $k$) & \textcolor{todorosso}{da eseguire} & --- & \cref{sec:ris-c7} \\
+C7.2 (risorse per precisione) & \textcolor{todorosso}{da eseguire} & --- & \cref{sec:ris-c7-2} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{daverificare}
-Tempo macchina stimato per completare la raccolta: circa \SI{45}{\minute},
-escluse le compilazioni, nell'ordine C3 (build generica) $\to$ C2 $\to$ C1
-$\to$ C6 $\to$ C4 $\to$ C5. Le sezioni che seguono sono gi\`a strutturate con le
+Tempo macchina stimato per completare la raccolta: circa un'ora, escluse le
+compilazioni, nell'ordine C3 (build generica) $\to$ C2 $\to$ C1 $\to$ C6 $\to$
+C4 $\to$ C5 $\to$ C7. Le sezioni che seguono sono gi\`a strutturate con le
 tabelle e le figure definitive: resta da sostituire i segnaposto con i numeri.
+
+Va inoltre popolata \cref{sec:ris-trasferimenti}: i tempi esclusi dalla metrica
+ufficiale non richiedono nessuna esecuzione aggiuntiva, perch\'e ogni campagna
+li scrive gi\`a in coda al proprio CSV.
 \end{daverificare}
 
 \section{C3 --- baseline di CPU}
@@ -486,6 +492,192 @@ stimare $\alpha$ e $\beta$ per interpolazione. Va ricordato nel commento che su
 una griglia 2D il weak scaling cambia anche il rapporto $M{:}N$
 (\cref{sec:modello-comunicazione}), quindi l'effetto misurato qui non \`e
 puramente quello di $P$.
+
+\section{C7.1 --- quanto rende la singola precisione}
+\label{sec:ris-c7}
+
+\begin{daverificare}
+Suite \file{experiments/c7\_1\_precision\_k.txt}: cinque backend GPU in coppie
+\code{double}/\code{float}, $M = N = \num{10000}$, $P = 1$, \code{BLOCK=256},
+\code{WARP\_COL\_TILE=8}. Colonna da leggere: \code{t\_kernel\_mean\_s}, e da
+essa lo speedup della \cref{eq:speedup-precisione}.
+\end{daverificare}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{C7.1: rapporto $S_{32/64} = t_{\text{kernel}}^{\text{fp64}} /
+t_{\text{kernel}}^{\text{fp32}}$ per backend e per $k$.}
+\label{tab:c7-speedup}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+\textbf{Backend} & $k=3$ & $k=6$ & $k=8$ & $k=20$ & $k=32$ \\
+\midrule
+\kernelname{cuda\_naive} & \dato & \dato & \dato & \dato & \dato \\
+\kernelname{cuda\_warp} & \dato & \dato & \dato & \dato & \dato \\
+\kernelname{cuda\_warp\_smem} & \dato & \dato & \dato & \dato & \dato \\
+\kernelname{cuda\_warp\_tiled} & \dato & \dato & \dato & \dato & \dato \\
+\kernelname{cublas} & \dato & \dato & \dato & \dato & \dato \\
+\midrule
+\emph{previsione roofline} & $\approx 2$ & \multicolumn{4}{c}{\emph{crescente con $k$, fino a $\sim 20\times$ a $k=32$}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\`E la verifica pi\`u diretta del modello di \cref{cap:roofline}, ed \`e
+falsificabile in modo netto. Il modello prevede che in FP64 il tetto sia il
+calcolo e non dipenda da $k$, mentre in FP32 sia la banda e cresca linearmente
+con $k$: il rapporto fra i due deve quindi \textbf{crescere con $k$}. Uno
+speedup piatto e vicino a $2$ --- il rapporto fra le dimensioni degli scalari,
+cio\`e ci\`o che si otterrebbe se entrambe le precisioni fossero memory-bound ---
+falsificherebbe la previsione, e andrebbe riportato come tale.
+
+\begin{figure}[H]
+\centering
+\figuradafare[0.8\linewidth]{$S_{32/64}$ in funzione di $k$, una curva per
+backend, con due linee orizzontali di riferimento: $S = 2$ (entrambe
+memory-bound) e la previsione del roofline. \`E il grafico che decide se il
+modello di \cref{cap:roofline} regge.}
+\caption{C7.1: guadagno della singola precisione al variare di $k$.}
+\label{fig:c7-speedup}
+\end{figure}
+
+Per \kernelname{cuda\_warp\_smem} vanno riportate anche le due colonne del
+piano, perch\'e cambiano con la precisione e sono met\`a della spiegazione:
+
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+& \multicolumn{2}{c}{\code{x\_rows\_per\_tile}} & \multicolumn{2}{c}{\code{blocks\_per\_sm}} \\
+$k$ & double & float & double & float \\
+\midrule
+3  & \dato & \dato & \dato & \dato \\
+8  & \dato & \dato & \dato & \dato \\
+20 & \dato & \dato & \dato & \dato \\
+32 & \dato & \dato & \dato & \dato \\
+\bottomrule
+\end{tabular}
+\caption{C7.1: piano di tiling scelto a runtime nelle due precisioni.
+\TODO{compilare}}
+\label{tab:c7-piano}
+\end{table}
+
+\section{C7.2 --- perch\'e: registri, spill e shared memory}
+\label{sec:ris-c7-2}
+
+\begin{daverificare}
+Suite \file{experiments/c7\_2\_precision\_resources.txt}: sei compilazioni con
+\code{-Xptxas -v}, nessun benchmark. Estrarre dal log completo
+\file{*\_ptxas\_*.txt} i casi $k \in \{3, 8, 20, 32\}$.
+\end{daverificare}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{C7.2: risorse per thread dichiarate da \code{ptxas} (registri a
+\SI{32}{\bit} in entrambe le precisioni).}
+\label{tab:c7-risorse}
+\begin{tabular}{@{}llrrrrr@{}}
+\toprule
+\textbf{Backend} & \textbf{Prec.} & $k$ & \textbf{reg./thread} & \textbf{stack} & \textbf{spill st./ld.} & \textbf{shared statica} \\
+\midrule
+\kernelname{cuda\_warp} & double & 32 & \dato & \dato & \dato & \dato \\
+\kernelname{cuda\_warp} & float & 32 & \dato & \dato & \dato & \dato \\
+\kernelname{cuda\_warp\_smem} & double & 32 & \dato & \dato & \dato & \dato \\
+\kernelname{cuda\_warp\_smem} & float & 32 & \dato & \dato & \dato & \dato \\
+\kernelname{cuda\_warp\_tiled} & double & 32 & \dato & \dato & \dato & \dato \\
+\kernelname{cuda\_warp\_tiled} & float & 32 & \dato & \dato & \dato & \dato \\
+\multicolumn{7}{@{}l}{\footnotesize\itshape ripetere per $k = 3, 8, 20$} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+L'attesa \`e leggibile in anticipo, ed \`e ci\`o che rende la tabella un
+esperimento e non un inventario: a $k = 32$ un accumulatore \code{double} occupa
+due registri a \SI{32}{\bit} e uno \code{float} uno solo, quindi il passaggio a
+FP32 dovrebbe dimezzare la pressione sui registri e, se a $k = 32$ in doppia
+precisione compare dello spill, farlo sparire. Se lo spill c'\`e, spiega
+\emph{da solo} una parte dello speedup di \cref{tab:c7-speedup} che il
+roofline non prevedeva --- ed \`e il motivo per cui le due met\`a della campagna
+vanno lette insieme.
+
+Due limiti da rispettare nella lettura, che la campagna stessa dichiara:
+\code{ptxas} riporta la shared memory \emph{statica} e non quella dinamica,
+quindi per \kernelname{cuda\_warp\_smem} il dato va ricostruito dal piano
+runtime di \cref{tab:c7-piano} come
+$\code{x\_rows\_per\_tile} \cdot (k+1) \cdot s$ byte; e
+\code{blocks\_per\_sm} \`e una capacit\`a teorica dichiarata dall'API
+dell'occupancy, non l'occupancy raggiunta, che richiederebbe un profilo con
+\code{ncu}.
+
+\section{Il costo dei dati: trasferimenti e preprocessing}
+\label{sec:ris-trasferimenti}
+
+\begin{daverificare}
+Nessuna esecuzione aggiuntiva: le colonne di \cref{tab:tempi-esclusi} sono
+gi\`a in coda al CSV di ogni campagna. Compilare le due tabelle seguenti
+estraendole dalle righe GPU di C2 (per la dipendenza da $k$) e di C1 (per la
+dipendenza dalla taglia).
+\end{daverificare}
+
+Questa sezione risponde a una domanda che la traccia permette di non mettere in
+$T$ ma non di ignorare: con $k \le 32$, quanto costa portare i dati sulla scheda
+rispetto a calcolarci sopra?
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Scomposizione della fase locale su GPU, secondo la
+\cref{eq:scomposizione-locale}. Percentuali di $t_{\text{local}}$.}
+\label{tab:ris-scomposizione}
+\begin{tabular}{@{}rrrrrr@{}}
+\toprule
+$k$ & $t_{\text{H2D }X}$ & $t_{\text{kernel}}$ & $t_{\text{D2H }Y}$ & $t_{\text{launch}}$ & $t_{\text{local}}$ [\si{\second}] \\
+\midrule
+3  & \dato & \dato & \dato & \dato & \dato \\
+8  & \dato & \dato & \dato & \dato & \dato \\
+32 & \dato & \dato & \dato & \dato & \dato \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Da discutere: i due trasferimenti per invocazione scalano con $\nloc k$ e
+$\mloc k$, mentre l'overhead del runtime non scala affatto --- quindi il loro
+peso relativo deve muoversi in direzioni opposte al crescere della taglia, ed \`e
+esattamente ci\`o che la scomposizione permette di verificare invece di
+asserire. Se a $k = 3$ i trasferimenti pesano quanto il kernel o pi\`u, quello
+\`e il risultato: dice che a $k$ piccolo il problema non \`e il calcolo, ed \`e
+l'argomento pi\`u forte per un MPI CUDA-aware (\cref{sec:lavori-futuri}).
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Preprocessing e banda dei trasferimenti, per una configurazione
+rappresentativa.}
+\label{tab:ris-prep}
+\begin{tabular}{@{}lrl@{}}
+\toprule
+\textbf{Voce} & \textbf{Valore} & \textbf{Nota} \\
+\midrule
+$t_{\text{setup}}^{\text{init}}$ & \dato & costo fisso, indipendente dalla taglia \\
+$t_{\text{setup}}^{\text{alloc}}$ & \dato & cresce con la taglia \\
+$t_{\text{setup}}^{\text{H2D }A}$ & \dato & il trasferimento tolto dal cammino misurato \\
+\code{bw\_h2d\_A\_gbs} & \dato & da confrontare con il picco del bus \\
+\code{bw\_h2d\_X\_gbs} / \code{bw\_d2h\_Y\_gbs} & \dato & messaggi piccoli: attesa banda molto inferiore \\
+$t_{\text{prep}}^{\text{gen }A}$ & \dato & generazione, esclusa da $T$ \\
+$t_{\text{prep}}^{\text{distrib }A}$ & \dato & $0$ con \code{--a-mode local} \\
+$t_{\text{prep}}^{\text{convert }X}$ & \dato & $0$ con \code{X\_LAYOUT=row} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Il confronto fra \code{bw\_h2d\_A\_gbs} e le due bande per invocazione \`e
+istruttivo di per s\'e: $A$ \`e un unico trasferimento da gigabyte e dovrebbe
+avvicinarsi al picco del bus, mentre $X$ e $Y$ sono messaggi da qualche decina
+o centinaio di kilobyte, dominati dalla latenza. \`E la stessa distinzione fra
+$\alpha$ e $\beta$ della \cref{eq:costo-comm}, su un altro collegamento.
 
 \section{Sintesi}
 

@@ -38,23 +38,55 @@ scalare o un kernel CUDA.
 \section{L'interfaccia unica del kernel locale}
 \label{sec:interfaccia}
 
-Ogni backend implementa tre funzioni e due canali di misura:
+Ogni backend implementa tre funzioni di esecuzione e un insieme di canali di
+misura e di introspezione:
 
 \begin{lstlisting}[language=C,caption={Interfaccia di \file{src/kernel/kernel.h}.}]
+/* esecuzione */
 local_gemm_t *local_gemm_create(int m, int n, int k,
                                 const scalar_t *A_loc,
                                 int lda, int ldx, int ldy);
-
 void local_gemm(local_gemm_t *ctx,
                 const scalar_t *RESTRICT X, int ldx,
                 scalar_t *RESTRICT Y, int ldy);
-
 void local_gemm_destroy(local_gemm_t *ctx);
 
+/* tempi della singola invocazione */
 double local_gemm_last_compute_seconds(const local_gemm_t *ctx);
+double local_gemm_last_h2d_X_seconds(const local_gemm_t *ctx);
+double local_gemm_last_d2h_Y_seconds(const local_gemm_t *ctx);
+
+/* byte trasferiti, per trasformare i tempi in banda */
+size_t local_gemm_bytes_h2d_A(const local_gemm_t *ctx);
+size_t local_gemm_bytes_h2d_X_per_call(const local_gemm_t *ctx);
+size_t local_gemm_bytes_d2h_Y_per_call(const local_gemm_t *ctx);
+
+/* preparazione, totale e scomposta */
 double local_gemm_setup_seconds(const local_gemm_t *ctx);
+double local_gemm_setup_device_init_seconds(const local_gemm_t *ctx);
+double local_gemm_setup_device_alloc_seconds(const local_gemm_t *ctx);
+double local_gemm_setup_h2d_A_seconds(const local_gemm_t *ctx);
+
+/* piano di esecuzione effettivamente scelto a runtime */
+int local_gemm_blocks_per_sm(const local_gemm_t *ctx);
+int local_gemm_x_rows_per_tile(const local_gemm_t *ctx);
+
 const char *kernel_name(void);
 \end{lstlisting}
+
+I canali oltre i primi tre sono la parte che ha richiesto pi\`u lavoro, e la
+ragione \`e in \cref{sec:metriche}: la traccia esclude dal tempo $T$ i
+trasferimenti da e verso la scheda e il preprocessing, ma consente
+esplicitamente di misurarli e discuterli a parte --- e per discuterli non basta
+il totale, servono le singole voci. Tutti seguono la stessa convenzione: un
+valore \textbf{negativo} (o $0$ per i byte) significa ``non applicabile a questo
+backend'', ed \`e ci\`o che rende una riga di CPU riconoscibile a colpo d'occhio
+in un CSV che contiene anche righe GPU.
+
+Le ultime due funzioni non sono metriche di prestazione ma la
+\emph{configurazione} scelta a runtime dal backend: senza di esse una campagna
+sul tiling mostrerebbe curve che salgono e scendono senza poter dire se sia
+cambiato il tile, l'occupancy, o entrambi (\cref{sec:piano-tile}).
 
 La scelta del backend \`e del \code{Makefile} (variabile \code{KERNEL}), non del
 codice: non esiste nessun \code{switch} a runtime fra implementazioni, e quindi
@@ -113,11 +145,14 @@ quindi senza \code{extern "C"} un backend \code{.cu} compilerebbe ma non
 linkerebbe.
 
 Entrambe le protezioni sono nell'header. La parte interessante \`e che la
-propriet\`a \`e \emph{verificata}: il target \code{make check-cxx} compila una
-sonda C++ che include \file{kernel.h} e \file{util.h}, cos\`i una regressione si
-manifesta come errore di build su qualunque macchina --- anche senza
-\code{nvcc} --- e non come un errore di link sul server il giorno della
-campagna.
+propriet\`a \`e \emph{verificata}, e in due modi: il target \code{make check-cxx}
+compila una sonda C++ che include \file{kernel.h} e \file{util.h}, e poi
+controlla con \code{nm} che ognuno dei simboli dell'interfaccia --- tutte e
+sedici le funzioni del listato precedente, pi\`u \code{xmalloc} e \code{die} ---
+compaia \emph{non decorato} fra gli indefiniti dell'oggetto prodotto. Un
+\code{extern "C"} dimenticato su una funzione aggiunta in seguito fallisce
+quindi qui, su qualunque macchina e anche senza \code{nvcc}, e non come errore
+di link sul server il giorno della campagna.
 
 \section{Il driver di misura}
 
@@ -127,7 +162,9 @@ le metriche. Fa, nell'ordine:
 \begin{enumerate}[nosep,left=0pt]
   \item parsing e validazione delle opzioni (\cref{app:cli});
   \item creazione della griglia cartesiana e calcolo del layout locale;
-  \item generazione o distribuzione di $A$ e $X$ (preprocessing);
+  \item generazione o distribuzione di $A$ e $X$, e conversione del layout di
+        $X$ se la build lo richiede --- ogni fase cronometrata separatamente
+        (\cref{sec:tempi-esclusi});
   \item \code{local\_gemm\_create} (preprocessing del backend);
   \item \code{--warmup} invocazioni non cronometrate;
   \item \code{--reps} invocazioni cronometrate, con i tempi delle tre fasi
@@ -166,11 +203,24 @@ proprio, come mostrato in \cref{tab:binari}. Non esiste un solo
 \code{make KERNEL=cuda\_warp} & \file{bin/matmul\_mpi-cuda\_warp} \\
 \code{make KERNEL=cuda\_warp\_smem} & \file{bin/matmul\_mpi-cuda\_warp\_smem} \\
 \code{make KERNEL=cuda\_warp\_smem SMEM\_PAD=0} & \file{bin/matmul\_mpi-cuda\_warp\_smem-smempad0} \\
-\code{make KERNEL=cuda\_warp\_tiled} & \file{bin/matmul\_mpi-cuda\_warp\_tiled} \\
+\code{make KERNEL=cuda\_warp\_smem TILE\_GRANULARITY=8} & \file{bin/matmul\_mpi-cuda\_warp\_smem-g8} \\
+\code{make KERNEL=cuda\_warp\_smem SMEM\_BUDGET\_BYTES=16384} & \file{bin/matmul\_mpi-cuda\_warp\_smem-bud16384} \\
+\code{make KERNEL=cuda\_warp\_tiled WARP\_COL\_TILE=4} & \file{bin/matmul\_mpi-cuda\_warp\_tiled-tile4} \\
+\code{make KERNEL=cuda\_warp X\_LAYOUT=column} & \file{bin/matmul\_mpi-cuda\_warp-xcol} \\
+\code{make BLOCK=512 KERNEL=cuda\_warp} & \file{bin/matmul\_mpi-cuda\_warp-blk512} \\
 \code{make KERNEL=cublas} & \file{bin/matmul\_mpi-cublas} \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+I parametri che entrano nel nome sono solo quelli che il backend selezionato
+legge davvero: \code{TILE\_GRANULARITY} e \code{SMEM\_BUDGET\_BYTES} compaiono
+soltanto con \kernelname{cuda\_warp\_smem}, \code{WARP\_COL\_TILE} soltanto con
+\kernelname{cuda\_warp\_tiled}. Altrimenti si otterrebbero binari con nomi
+diversi e contenuto identico, indistinguibili nel CSV perch\'e
+\code{kernel\_name()} non cambierebbe. Anche gli oggetti sono per
+configurazione (\file{obj/matmul\_mpi<config>/}), quindi cambiare precisione o
+backend non pu\`o riutilizzare per sbaglio una compilazione precedente.
 
 Il motivo \`e sperimentale, non organizzativo: una build non pu\`o sovrascriverne
 un'altra e far misurare in singola precisione una campagna che si credeva in

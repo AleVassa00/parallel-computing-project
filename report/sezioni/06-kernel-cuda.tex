@@ -33,13 +33,17 @@ perch\'e i loro tempi siano confrontabili:
 \begin{table}[H]
 \centering
 \footnotesize
-\begin{tabular}{@{}p{0.44\linewidth}p{0.26\linewidth}p{0.22\linewidth}@{}}
+\begin{tabular}{@{}p{0.42\linewidth}p{0.24\linewidth}p{0.26\linewidth}@{}}
 \toprule
-\textbf{Fase} & \textbf{Dove} & \textbf{Cronometrata?} \\
+\textbf{Fase} & \textbf{Dove} & \textbf{Cronometro} \\
 \midrule
-contesto CUDA, \code{cudaMalloc}, H2D di $A$ & \code{local\_gemm\_create} & no ($t_{\text{setup}}$) \\
-H2D di $X$, kernel, D2H di $Y$ & \code{local\_gemm} & s\`i ($t_{\text{local}}$) \\
-solo il kernel, misurato con \code{cudaEvent} & dentro \code{local\_gemm} & s\`i ($t_{\text{kernel}}$) \\
+creazione del contesto CUDA & \code{local\_gemm\_create} & no: $t_{\text{setup}}^{\text{init}}$ \\
+tutti i \code{cudaMalloc} in VRAM & \code{local\_gemm\_create} & no: $t_{\text{setup}}^{\text{alloc}}$ \\
+H2D di $A$, una volta sola & \code{local\_gemm\_create} & no: $t_{\text{setup}}^{\text{H2D }A}$ \\
+H2D di $X$, kernel, D2H di $Y$ & \code{local\_gemm} & s\`i: $t_{\text{local}}$ \\
+solo il kernel (\code{cudaEvent}) & dentro \code{local\_gemm} & s\`i: $t_{\text{kernel}}$ \\
+solo l'H2D di $X$ (\code{cudaEvent}) & dentro \code{local\_gemm} & a parte: $t_{\text{H2D }X}$ \\
+solo la D2H di $Y$ (\code{cudaEvent}) & dentro \code{local\_gemm} & a parte: $t_{\text{D2H }Y}$ \\
 \bottomrule
 \end{tabular}
 \caption{Che cosa entra in quale cronometro, uguale per tutti i backend GPU.}
@@ -53,10 +57,71 @@ l'interfaccia espone \code{local\_gemm\_last\_compute\_seconds}: \`e il canale c
 cui un backend che sa distinguere il kernel dal resto pubblica il dato, e i
 backend di CPU restituiscono un valore negativo per dire ``non applicabile''.
 
-\paragraph{La differenza $t_{\text{local}} - t_{\text{kernel}}$.} Viene riportata
-come \emph{transfer/runtime overhead}. Contiene H2D e D2H, ma anche lancio,
-record e sincronizzazione degli event e i controlli CUDA: non viene presentata
-come misura del solo PCIe, perch\'e non lo \`e.
+Lo stesso vale, e con un argomento ancora pi\`u stringente, per la D2H di $Y$:
+quella copia parte solo quando il kernel ha finito, quindi un cronometro
+sull'host misurerebbe ``attesa del kernel $+$ copia'' e attribuirebbe al PCIe
+del tempo di calcolo. Gli event non sono qui una raffinatezza, sono la
+condizione perch\'e il numero significhi ci\`o che dice.
+
+\paragraph{La fase locale \`e scomposta per intero.}
+\label{sec:scomposizione-locale}
+La differenza $t_{\text{local}} - t_{\text{kernel}}$ resta nel CSV come
+\emph{transfer/runtime overhead}, ma non \`e pi\`u l'unica informazione
+disponibile, e da sola non era \emph{discutibile}: metteva nello stesso numero
+il PCIe e il runtime dell'host, che hanno cause diverse e scalano in modo
+diverso --- il primo con $\nloc k$ e $\mloc k$, il secondo per niente. I due
+trasferimenti hanno quindi un canale ciascuno, e l'overhead del runtime \`e ci\`o
+che \textbf{avanza}:
+\begin{equation}
+  t_{\text{local}} \;=\;
+  t_{\text{H2D }X} \;+\; t_{\text{kernel}} \;+\; t_{\text{D2H }Y}
+  \;+\; t_{\text{launch}} .
+  \label{eq:scomposizione-locale}
+\end{equation}
+Solo un backend che misura tutte e tre le voci nominate pu\`o produrre
+$t_{\text{launch}}$; altrove resta la sentinella negativa. Nessuna delle voci
+di destra oltre $t_{\text{kernel}}$ entra nella metrica ufficiale: sono
+esattamente i tempi che la traccia esclude da $T$ e consente di misurare e
+discutere a parte (\cref{sec:tempi-esclusi}).
+
+\paragraph{Dai tempi alla banda.} I tre trasferimenti espongono anche i
+\emph{byte} trasferiti (\code{local\_gemm\_bytes\_h2d\_A} e le due per
+invocazione), cos\`i che il driver possa pubblicare
+$\code{bw\_h2d\_A\_gbs}$, $\code{bw\_h2d\_X\_gbs}$ e $\code{bw\_d2h\_Y\_gbs}$ e
+confrontarle con il picco del bus. Senza i byte, un tempo di copia non si pu\`o
+giudicare: dice che la copia costa, non se stia andando alla velocit\`a giusta.
+
+\paragraph{Anche il preprocessing \`e scomposto.} Il totale $t_{\text{setup}}$
+dice che la preparazione costa, non \emph{perch\'e}. Su CUDA le tre voci che lo
+compongono hanno cause e andamenti diversi, e vanno separate per essere
+discusse:
+
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{@{}lp{0.62\linewidth}@{}}
+\toprule
+\textbf{Voce} & \textbf{Che cos'\`e e come scala} \\
+\midrule
+$t_{\text{setup}}^{\text{init}}$ & creazione del contesto CUDA: costo fisso di
+  qualche centinaio di millisecondi, indipendente dalla taglia \\
+$t_{\text{setup}}^{\text{alloc}}$ & i \code{cudaMalloc} di $A$, $X$ e $Y$ in
+  VRAM: cresce con la taglia, ma non \`e un trasferimento \\
+$t_{\text{setup}}^{\text{H2D }A}$ & la copia H2D di $A$: l'unica delle tre che
+  sia PCIe e l'unica che scali con $MN$ \\
+\bottomrule
+\end{tabular}
+\caption{Scomposizione del preprocessing del backend GPU.}
+\label{tab:setup-scomposto}
+\end{table}
+
+L'ultima \`e il numero pi\`u interessante da riportare, perch\'e \`e esattamente il
+trasferimento che la scelta di separare \code{create} da \code{local\_gemm}
+(\cref{sec:tre-fasi}) ha tolto dal cammino misurato: quantificarlo \`e il modo
+onesto di dire quanto valga quella scelta. Le tre voci sommate sono $\le$ del
+totale --- restano fuori i controlli sugli argomenti e la creazione degli
+event --- e valgono $0$ sui backend di CPU, dove anche il totale \`e dell'ordine
+del microsecondo.
 
 \paragraph{Capienza della VRAM.} Non viene stimata prima, si verifica tentando.
 La catena di \code{cudaMalloc} si ferma alla prima allocazione che non entra, e
@@ -115,6 +180,60 @@ I cinque $k$ della traccia sono istanze template distinte, cos\`i che il numero 
 accumulatori sia una costante di compilazione --- lo stesso motivo per cui il
 nucleo di CPU genera cinque funzioni. Ogni altro $k$ attraversa un fallback
 runtime a tile di quattro colonne, senza limite massimo su $k$.
+
+Una nota di correttezza che vale la pena isolare: la riduzione usa la maschera
+piena e non \code{\_\_activemask()}. Da Volta in poi le lane di un warp possono
+divergere e riconvergere in modo indipendente, e la documentazione CUDA dice
+esplicitamente che il valore di \code{\_\_activemask()} non implica quali lane
+parteciperanno alla shuffle. Per questo il kernel \`e scritto in modo che tutte
+e $32$ le lane di un warp valido raggiungano le shuffle, anche nell'ultimo
+blocco o quando $\nloc$ \`e minore di $32$: i warp interamente fuori intervallo
+escono prima, quelli parziali no.
+
+\subsection{Un secondo layout per \texorpdfstring{$X$}{X}: \code{X\_LAYOUT=column}}
+\label{sec:x-layout}
+
+In \kernelname{cuda\_warp} la lane $l$ visita $j = l, l+32, \dots$, quindi le
+letture della riga di $A$ sono perfettamente coalescenti --- lane consecutive,
+indirizzi consecutivi. Le letture di $X$, invece, non lo sono: con $X$
+row-major la lane $l$ legge $X[j][c]$ e due lane consecutive distano $\code{ldx}$
+scalari. Il traffico c'\`e ma \`e sparso, e il numero di transazioni per warp
+cresce.
+
+Il rimedio non richiede di toccare il kernel: basta cambiare l'\emph{ordine in
+memoria} del blocco locale di $X$. Con \code{X\_LAYOUT=column} il driver, in
+preprocessing, riscrive $X_{\text{loc}}$ per colonne, cos\`i che
+\begin{equation}
+  X[j][c] \;=\; \code{X\_loc}\bigl[c \cdot \nloc + j\bigr],
+\end{equation}
+e allo stesso passo $c$ le $32$ lane leggono $\nloc$ elementi consecutivi: anche
+$X$ diventa coalescente. La selezione \`e una costante di compilazione, quindi
+non c'\`e nessun ramo nel percorso caldo, e la conversione \`e gi\`a terminata
+prima che il backend venga chiamato.
+
+Tre conseguenze da enunciare, perch\'e sono il motivo per cui l'opzione \`e
+limitata e non generale:
+
+\begin{itemize}[nosep,left=0pt]
+  \item \textbf{vale solo per \kernelname{cuda\_warp}}. Il \code{Makefile} la
+        accetta solo l\`i e gli altri backend rifiutano \code{column}: attivarla
+        altrove darebbe risultati sbagliati in silenzio, che \`e proprio la
+        categoria di errore che il progetto si impegna a rendere impossibile;
+  \item \textbf{$X$ deve essere compatta} ($\code{ldx} = k$): in questa build
+        $\code{ldx}$ descrive la capienza $\nloc \cdot \code{ldx}$ del buffer,
+        non lo stride fra colonne, che vale $\nloc$. Il padding di $X$ non \`e
+        ammesso, e il backend lo verifica;
+  \item \textbf{la conversione ha un costo}, ed \`e cronometrata a parte
+        (\code{t\_prep\_convert\_X\_s}). \`E preprocessing --- avviene una volta
+        sola, mentre $X$ viene poi riusata per tutte le repetition --- ma
+        riportarla \`e ci\`o che rende il confronto fra i due layout una misura
+        completa e non solo un confronto fra due tempi di kernel.
+\end{itemize}
+
+Le due build coesistono come binari distinti (\file{-xcol}) e
+\code{kernel\_name()} riporta il suffisso \code{(xcol)}, quindi le righe
+restano distinguibili nel CSV, che porta comunque anche una colonna
+\code{x\_layout} esplicita.
 
 \section{\kernelname{cuda\_warp\_smem}: la fetta di $X$ in shared memory}
 \label{sec:smem}
@@ -179,18 +298,80 @@ i conflict miss di L1: stesso fenomeno, altra gerarchia di memoria. Il padding
 vanno \emph{misurati} entrambi, e i due binari coesistono
 (\cref{tab:binari}): non c'\`e modo di misurare per sbaglio la build sbagliata.
 
-\subsection{Perch\'e il tile si dimensiona a runtime}
+\subsection{Che cosa il tile cambia davvero, e che cosa no}
+\label{sec:piano-tile}
 
-Il tile pesa
-$\code{x\_rows\_per\_tile} \cdot (k + \code{SMEM\_PAD}) \cdot s$ byte e $k$ \`e
-noto solo a runtime, quindi il numero di righe del tile viene scelto dal budget
-di shared memory per blocco e la memoria \`e allocata dinamicamente al lancio.
+Il tile pesa $\code{x\_rows\_per\_tile} \cdot (k + \code{SMEM\_PAD}) \cdot s$
+byte e $k$ \`e noto solo a runtime: la shared memory \`e quindi dinamica e il
+numero di righe si sceglie in \code{local\_gemm\_create}, una volta sola, fuori
+dal cammino cronometrato.
 
-Il budget \`e \SI{16}{\kib} e non i \SI{48}{\kib} massimi, per una ragione di
-occupancy: la Turing ha \SI{64}{\kib} di shared per SM, quindi \SI{16}{\kib} per
-blocco lasciano risiedere $4$ blocchi ($1024$ thread, $32$ warp) per SM, mentre
-\SI{48}{\kib} ne lascerebbero uno solo, cio\`e $8$ warp. Si guadagnerebbe
-traffico L2 e si perderebbe molto pi\`u parallelismo di quanto si guadagna.
+Il punto da chiarire prima di tutto \`e quale grandezza il tile governi, perch\'e
+l'intuizione naturale \`e sbagliata:
+
+\begin{tcolorbox}[colback=black!3,colframe=black!30,title=\textbf{Il tile non
+cambia il traffico verso L2}]
+Il fattore di riuso \`e il numero di warp per blocco, e basta. Ogni blocco legge
+comunque tutta la sua fetta di $X$ una volta, che lo faccia in due tile grandi o
+in venti piccoli: il traffico resta $\mloc \nloc k / W$ in ogni caso.
+
+Ci\`o su cui il tile agisce davvero \`e il \textbf{numero di barriere} e l'ILP.
+Ogni tile costa due \code{\_\_syncthreads()}, e un tile che contiene un solo
+passo di warp ($\code{x\_rows\_per\_tile} = 32$) fa arrivare ogni warp alla
+barriera successiva dopo una sola iterazione del ciclo su $j$, senza nessuna
+iterazione con cui coprire la latenza delle letture dalla shared memory.
+Dimezzare il numero di tile dimezza le barriere; non tocca il traffico.
+\end{tcolorbox}
+
+\paragraph{Il budget non si sceglie in assoluto.} La domanda giusta non \`e
+``quanti KiB dare a un blocco'' ma ``quanti gliene servono perch\'e la shared
+\emph{non sia lei} il vincolo attivo sull'occupancy''. La differenza \`e
+sostanziale: a $k = 32$ i $32$ accumulatori costano gi\`a $64$ registri a
+\SI{32}{\bit} per thread, quindi il vincolo attivo sono quasi certamente i
+registri --- e un budget di shared scelto a mano pi\`u stretto starebbe
+rimpicciolendo il tile per proteggere un'occupancy gi\`a persa altrove.
+
+La funzione \code{plan\_tile} risolve il problema dell'uovo e della gallina
+--- l'API dell'occupancy vuole i byte di shared che stiamo calcolando ---
+interrogandola con \code{smem = 0}:
+
+\begin{enumerate}[nosep,left=0pt]
+  \item \code{cudaOccupancyMaxActiveBlocksPerMultiprocessor} con shared memory
+        ``gratis'' d\`a quanti blocchi consentono \emph{registri e thread per SM
+        da soli}: \`e l'obiettivo da non peggiorare;
+  \item il budget per blocco \`e la shared memory per SM diviso quell'obiettivo
+        (oppure il valore forzato da \code{SMEM\_BUDGET\_BYTES}), limitato dal
+        tetto architetturale di \SI{48}{\kib} oltre il quale il \emph{lancio}
+        fallirebbe;
+  \item le righe che ci stanno vengono arrotondate per difetto a
+        \code{TILE\_GRANULARITY}, con un minimo di un passo di warp completo e
+        senza mai allocare pi\`u righe di quante $X$ ne abbia davvero;
+  \item il piano viene \textbf{verificato invece che creduto}: il driver riserva
+        shared memory per blocco oltre a quella richiesta, quindi il passo 2 pu\`o
+        essere ottimista. Si reinterroga l'API con i byte effettivi e si scende
+        di un passo finch\'e l'obiettivo \`e raggiunto. La riserva del driver non
+        viene modellata con una costante inventata: viene scoperta.
+\end{enumerate}
+
+Il piano risultante finisce nel CSV come \code{x\_rows\_per\_tile} e
+\code{blocks\_per\_sm}. Non sono metriche di prestazione: sono la configurazione
+effettivamente scelta, e senza di esse una campagna sul tiling mostrerebbe
+curve che salgono e scendono senza poter distinguere un cambio di tile da un
+cambio di occupancy.
+
+\paragraph{La granularit\`a \`e un compromesso, non un requisito.}
+\code{TILE\_GRANULARITY} vale $32$ per default, ma non \`e una condizione di
+correttezza: il kernel gestisce gi\`a i tile parziali, sia nel caricamento
+cooperativo sia nel ciclo di consumo. \`E soltanto l'ottimizzazione ``nessuna
+lane inattiva nell'ultimo passo di warp'', e ha un costo misurabile: a $k = 32$
+in doppia precisione le righe che entrano nel budget sono $62$, e arrotondare a
+$32$ ne butta via met\`a, raddoppiando le barriere per guadagnare zero lane. Da
+qui il parametro: costo e beneficio si misurano, non si assumono.
+
+Per lo stesso motivo non esiste pi\`u un massimo espresso in \emph{righe}: non
+era un vincolo fisico e, appena il budget cresce, sarebbe diventato
+silenziosamente il vincolo attivo ai $k$ piccoli, rendendo inefficace qualunque
+sweep sul budget. Il solo tetto rimasto \`e quello architetturale in byte.
 
 \subsection{Perch\'e non ci sono uscite anticipate}
 

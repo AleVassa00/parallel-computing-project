@@ -26,7 +26,14 @@ poggia l'analisi:
         prescrizione della traccia una propriet\`a strutturale e non una
         sottrazione a posteriori;
   \item \textbf{una variabile per volta} fra le varianti di kernel, che \`e la
-        condizione perch\'e ogni differenza misurata sia attribuibile.
+        condizione perch\'e ogni differenza misurata sia attribuibile;
+  \item \textbf{la strumentazione completa dei tempi esclusi}
+        (\cref{sec:tempi-esclusi}): la traccia permette di non metterli in $T$,
+        e il progetto li misura comunque, scomposti per fase. La fase locale su
+        GPU \`e separata nei suoi quattro addendi
+        (\cref{eq:scomposizione-locale}), il preprocessing del backend nelle sue
+        tre voci, e i trasferimenti riportano anche i byte, cos\`i che un tempo di
+        copia si possa giudicare e non solo constatare.
 \end{itemize}
 
 \section{Che cosa dicono i dati finora}
@@ -51,8 +58,11 @@ Il modello roofline prevede inoltre che sulla GPU, in doppia precisione, il
 nucleo sia compute-bound per ogni $k \ge 6$, con tetto a
 \SI{350}{\giga\flop\per\second} indipendente da $k$, mentre in singola
 precisione resti memory-bound per tutti i $k$ della traccia con tetto
-proporzionale a $k$. \`E una previsione forte e falsificabile, e le campagne C1 e
-C2 la mettono alla prova.
+proporzionale a $k$. \`E una previsione forte e falsificabile, e le campagne C1,
+C2 e soprattutto C7 la mettono alla prova: quest'ultima ne isola la conseguenza
+pi\`u netta --- il guadagno della singola precisione deve crescere con $k$ --- e
+la accompagna con i dati di \code{ptxas} che dicono se una parte del guadagno
+venga invece dalla pressione sui registri.
 
 \section{Lavori futuri}
 \label{sec:lavori-futuri}
@@ -76,7 +86,11 @@ agnostica rispetto alla posizione della memoria proprio per consentirlo:
 passando puntatori device direttamente a \code{MPI\_Bcast} e \code{MPI\_Reduce}
 si eliminerebbero H2D di $X$ e D2H di $Y$ dal cammino di ogni invocazione, senza
 riscrivere n\'e \code{mpi\_matmul} n\'e i kernel. Il primo passo \`e verificare il
-supporto sul nodo di calcolo con \code{ompi\_info | grep cuda}.
+supporto sul nodo di calcolo con \code{ompi\_info | grep cuda}; il secondo \`e
+gi\`a fatto, perch\'e la scomposizione di \cref{sec:ris-trasferimenti} dice
+esattamente quanto ci sarebbe da guadagnare --- $t_{\text{H2D }X}$ e
+$t_{\text{D2H }Y}$ misurati sono il tetto di quel guadagno, e senza quei due
+numeri l'intervento sarebbe una scommessa.
 
 \paragraph{MPS per la condivisione della GPU.} Con MPS attivo i contesti di pi\`u
 rank non si alternerebbero sulla scheda (\cref{sec:serializzazione}), e i

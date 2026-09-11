@@ -78,6 +78,84 @@ GPU nel CSV. Su GPU la colonna da leggere \`e \code{gflops\_kernel}; su CPU \`e
 $t_{\text{setup}}$ riporta separatamente il preprocessing del backend, che per
 costruzione sta fuori da tutte e tre le metriche: \`e riportato, non nascosto.
 
+\section{I tempi esclusi dalla misura ufficiale}
+\label{sec:tempi-esclusi}
+
+La traccia esclude da $T$ il preprocessing, l'I/O e i trasferimenti da e verso
+la scheda, ma consente esplicitamente di misurarli e discuterli a parte. Il
+progetto prende sul serio la seconda met\`a della frase: il driver raccoglie
+\emph{tutte} queste voci, in coda al CSV e sotto un titolo proprio nel report
+leggibile, senza che nessuna di esse entri in $t_{\text{official}}$.
+
+La ragione non \`e la completezza fine a s\'e stessa. Con $k \le 32$ la domanda
+``quanto costa portare i dati sulla scheda rispetto a calcolarci sopra'' non \`e
+oziosa: il calcolo per elemento trasferito \`e piccolo, ed \`e proprio il tipo di
+problema in cui il bus pu\`o dominare. Un numero che risponda a quella domanda
+serve, e serve separato.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Le voci escluse dalla metrica ufficiale e raccolte a parte.}
+\label{tab:tempi-esclusi}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.36\linewidth}p{0.58\linewidth}@{}}
+\toprule
+\textbf{Colonna} & \textbf{Che cosa misura} \\
+\midrule
+\code{t\_prep\_alloc\_buffers\_s} & allocazione dei blocchi locali $A$, $X$, $Y$ \\
+\code{t\_prep\_gen\_A\_s} & generazione dei valori di $A$ \\
+\code{t\_prep\_distrib\_A\_s} & distribuzione MPI di $A$ globale; $0$ con \code{--a-mode local} \\
+\code{t\_prep\_gen\_X\_s} & generazione di $X$ \\
+\code{t\_prep\_distrib\_X\_s} & \code{MPI\_Scatterv} di $X$ globale; $0$ con \code{--x-mode local} \\
+\code{t\_prep\_convert\_X\_s} & conversione di layout di $X$ (\cref{sec:x-layout}) \\
+\code{t\_prep\_total\_s} & somma \emph{locale} delle voci sopra, poi massimo fra i rank \\
+\code{t\_setup\_s} & preprocessing del backend (\code{local\_gemm\_create}) \\
+\code{t\_setup\_device\_init\_s} & dentro il precedente: creazione del contesto CUDA \\
+\code{t\_setup\_device\_alloc\_s} & dentro il precedente: i \code{cudaMalloc} in VRAM \\
+\code{t\_setup\_h2d\_A\_s} & dentro il precedente: la sola copia H2D di $A$ \\
+\code{t\_h2d\_X\_mean\_s}, \code{\_std\_s} & H2D di $X$ per invocazione \\
+\code{t\_d2h\_Y\_mean\_s}, \code{\_std\_s} & D2H di $Y$ per invocazione \\
+\code{t\_launch\_overhead\_mean\_s}, \code{\_std\_s} & ci\`o che resta di
+  $t_{\text{local}}$: runtime dell'host, non PCIe \\
+\code{bw\_h2d\_A\_gbs}, \code{bw\_h2d\_X\_gbs}, \code{bw\_d2h\_Y\_gbs} & banda
+  effettiva dei tre trasferimenti \\
+\code{t\_io\_csv\_raw\_s} & l'unico I/O del driver: scrittura del CSV per ripetizione \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Tre scelte di metodo meritano di essere enunciate, perch\'e cambiano il
+significato dei numeri:
+
+\begin{itemize}[nosep,left=0pt]
+  \item \textbf{le bande sono aggregate.} Sono byte \emph{sommati su tutti i
+        rank} diviso il tempo del rank pi\`u lento. Sul server i rank
+        condividono l'unica scheda, quindi ci\`o che si vuole sapere \`e quanto ha
+        trasportato il bus, non quanto ne ha usato un singolo processo;
+  \item \textbf{$t_{\text{prep}}^{\text{tot}}$ si compone prima di ridurre.}
+        Ogni voce viene ridotta con \code{MPI\_MAX} fra i rank (cammino
+        critico), ma il totale viene sommato \emph{localmente} e solo dopo
+        ridotto: la somma dei massimi di fasi diverse non \`e il preprocessing di
+        nessun processo reale;
+  \item \textbf{l'unico I/O misurabile \`e quello di uscita.} Gli input non si
+        leggono da file, si generano dal seme (\cref{sec:generazione}): non
+        esiste un tempo di lettura da riportare, ed \`e una conseguenza diretta
+        della scelta del generatore.
+\end{itemize}
+
+Sui backend di CPU le voci che riguardano la scheda valgono $-1$ (tempi) o $0$
+(byte e scomposizione del setup), cos\`i una riga di CPU si distingue a colpo
+d'occhio da una che i trasferimenti li ha davvero. Il CSV per ripetizione
+riporta le stesse voci non aggregate (\code{t\_h2d\_X\_s},
+\code{t\_d2h\_Y\_s}, \code{t\_launch\_overhead\_s}).
+
+\paragraph{Un controllo che il driver fa da solo.} Aggiungere righe con le
+nuove colonne a un CSV prodotto da una build precedente renderebbe il file
+ambiguo senza alcun errore. Il driver confronta quindi l'intestazione del file
+esistente con la propria e si ferma se differiscono: \`e lo stesso principio
+degli invarianti di \cref{cap:mpi} --- un errore che non fa fallire nulla va
+reso impossibile, non evitato con attenzione.
+
 \section{Stabilit\`a delle misure}
 
 Ogni configurazione esegue \code{--warmup} invocazioni non cronometrate (default
@@ -122,12 +200,14 @@ C1 & \file{c1\_size\_ratio\_\{cpu,gpu\}} & \textbf{obbligatoria}: dimensioni cre
 C6 & \file{c6\_grid\_shape} & quale forma di griglia conviene a $P$ fisso, cio\`e perch\'e 2D & 8/16/20 & \SI{6}{\minute} \\
 C4 & \file{c4\_strong\_scaling} & come scala a problema fisso & 1--20 & \SI{5}{\minute} \\
 C5 & \file{c5\_weak\_scaling} & quanto costa la sola comunicazione & 1--20 & \SI{5}{\minute} \\
+C7.1 & \file{c7\_1\_precision\_k} & quanto rende davvero la singola precisione, backend per backend e $k$ per $k$ & 1 & \SI{10}{\minute} \\
+C7.2 & \file{c7\_2\_precision\_resources} & \emph{perch\'e}: registri, spill e shared memory nelle due precisioni & --- & \SI{3}{\minute} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 C3 e C2 vengono per primi perch\'e producono i numeri di riferimento che tutte le
-altre citano. Cinque campagne su sei (tutte tranne le righe GPU di C2 e C1) non
+altre citano. C3, la riga \kernelname{scheme\_a} di C2, C4, C5 e C6 non
 richiedono \code{nvcc}: se la build CUDA non funziona, la parte MPI del progetto
 resta interamente misurabile.
 
@@ -182,6 +262,14 @@ Sei backend sulla stessa griglia di $k$: \kernelname{scheme\_a},
 \kernelname{cuda\_naive}, \kernelname{cuda\_warp}, \kernelname{cuda\_warp\_smem},
 \kernelname{cuda\_warp\_tiled}, \kernelname{cublas}.
 
+Le colonne in coda al CSV (\cref{tab:tempi-esclusi}) non entrano in nessuna
+delle metriche di questa campagna, ma vanno lette insieme a esse: sono il
+materiale con cui si risponde a ``quanto costa portare i dati sulla scheda
+rispetto a calcolarci sopra''. A $k$ piccolo il confronto fra
+$t_{\text{H2D }X} + t_{\text{D2H }Y}$ e $t_{\text{kernel}}$ \`e uno dei risultati
+pi\`u istruttivi dell'intera campagna, e si ottiene senza eseguire nulla di
+aggiuntivo.
+
 \subsection{C3 --- baseline di CPU e specializzazione contro fallback}
 
 Due ruoli in una campagna sola: il \emph{denominatore} di ogni speedup della
@@ -233,6 +321,59 @@ $t_{\text{bcast}}$ e $t_{\text{reduce}}$ vanno letti \textbf{in coppia}: per la
 forme, e l'ottimo sta in mezzo. \`E una previsione falsificabile, ed \`e il modo
 in cui la campagna verifica il modello di costo invece di limitarsi a
 illustrarlo.
+
+\subsection{C7 --- la precisione, misurata e spiegata}
+\label{sec:c7}
+
+\`E la campagna che mette alla prova la previsione pi\`u forte del modello
+(\cref{sec:roofline-gpu}): in FP64 il nucleo dovrebbe essere compute-bound per
+ogni $k \ge 6$ con un tetto indipendente da $k$, in FP32 memory-bound su tutti i
+$k$ della traccia con un tetto proporzionale a $k$. Se il modello regge, il
+guadagno della singola precisione deve \emph{crescere} con $k$; se il guadagno
+fosse piatto e vicino a $2$, sarebbe il modello a essere sbagliato.
+
+\`E divisa in due perch\'e risponde a due domande diverse, e mescolarle
+renderebbe entrambe le risposte deboli.
+
+\paragraph{C7.1 --- quanto.} Dieci configurazioni, cinque backend GPU
+(\kernelname{cuda\_naive}, \kernelname{cuda\_warp},
+\kernelname{cuda\_warp\_smem}, \kernelname{cuda\_warp\_tiled},
+\kernelname{cublas}) in coppie \code{double}/\code{float} adiacenti, con
+$M = N = \num{10000}$, $P = 1$, \code{BLOCK=256} e
+\code{WARP\_COL\_TILE=8}. Ogni coppia ha \emph{tutti} gli altri parametri
+identici, quindi il rapporto
+\begin{equation}
+  S_{32/64}(\text{kernel}, k)
+  = \frac{t_{\text{kernel}}^{\text{double}}}{t_{\text{kernel}}^{\text{float}}}
+  \label{eq:speedup-precisione}
+\end{equation}
+isola la sola precisione. Due regole nel calcolarlo: non mescolare tempi di
+kernel, di fase locale e totali nello stesso rapporto, e guardare anche la
+dispersione e i campioni per ripetizione, non solo lo speedup puntuale. Per
+\kernelname{cuda\_warp\_smem} vanno lette anche \code{x\_rows\_per\_tile} e
+\code{blocks\_per\_sm}: il piano di tiling \emph{cambia} con la precisione,
+perch\'e cambia sia la dimensione dello scalare sia il numero di registri, ed \`e
+uno dei casi in cui quelle due colonne fanno la differenza fra un grafico
+spiegato e uno solo descritto.
+
+\paragraph{C7.2 --- perch\'e.} Nessuna esecuzione di benchmark: sei
+compilazioni con \code{-Xptxas -v} dei tre backend che tengono accumulatori in
+registro, nelle due precisioni. Si raccolgono registri per thread, stack frame,
+spill store e load, e shared memory statica, e si selezionano dal log completo i
+casi $k \in \{3, 8, 20, 32\}$. Il numero di registri \`e espresso in registri a
+\SI{32}{\bit} in \emph{entrambe} le precisioni, quindi i due valori sono
+confrontabili direttamente --- ed \`e questo che rende leggibile l'attesa: a
+$k = 32$ un accumulatore \code{double} occupa due registri e uno \code{float}
+uno solo, quindi il passaggio a FP32 dovrebbe dimezzare la pressione e, se c'era
+spill, farlo sparire.
+
+Due avvertenze che la campagna stessa mette per iscritto, e che vanno rispettate
+nella lettura: \code{ptxas} non misura la shared memory \emph{dinamica}, quindi
+per \kernelname{cuda\_warp\_smem} il dato va correlato con il piano runtime dei
+CSV di C7.1 (per i $k$ specializzati,
+$\text{byte} = \code{x\_rows\_per\_tile} \cdot (k+1) \cdot s$); e
+\code{blocks\_per\_sm} \`e una \emph{capacit\`a teorica}, non l'occupancy
+raggiunta, che richiederebbe un profilo.
 
 \section{Riproducibilit\`a}
 

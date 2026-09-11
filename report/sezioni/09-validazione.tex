@@ -81,6 +81,16 @@ l'oracolo somma.
 \section{Il test delle funzioni indice}
 \label{sec:validazione-indici}
 
+\begin{daverificare}
+La cartella \file{test/} non \`e presente nella copia di lavoro corrente, mentre
+il \code{Makefile} continua a costruire \file{bin/test\_index} da
+\file{test/test\_index.c} e la sonda \code{check-cxx} da
+\file{test/cxx\_iface.cpp}: allo stato attuale \code{make}, \code{make test} e
+\code{make check-cxx} non possono funzionare. Ripristinare la cartella dal
+repository (\code{git checkout -{}- test/}) prima della consegna, oppure
+aggiornare questa sezione se i test sono stati rimossi di proposito.
+\end{daverificare}
+
 Le tre funzioni di \cref{sec:indici} hanno un test isolato
 (\file{test/test\_index.c}, \code{make test}) che non richiede MPI. Verifica su
 molte combinazioni $(n, p)$, inclusi i casi limite $p > n$ e $n \bmod p \neq 0$,
@@ -108,8 +118,9 @@ quello che si propagherebbe in silenzio in tutto il resto del sistema.
 \midrule
 \code{make test} & partizionamento degli indici, senza MPI \\
 \code{make check-cxx} & \file{kernel.h} e \file{util.h} restano includibili da
-  C++: intercetta le regressioni di \code{extern "C"} e \code{restrict} su
-  qualunque macchina, anche senza \code{nvcc} \\
+  C++ \emph{e} tutti i simboli dell'interfaccia conservano il linkage C
+  (verificato con \code{nm}): intercetta le regressioni di \code{extern "C"} e
+  \code{restrict} su qualunque macchina, anche senza \code{nvcc} \\
 \code{make check} & prodotto distribuito contro oracolo seriale, doppia
   precisione \\
 \code{make PREC=float check} & stessa validazione in singola precisione: \`e il

@@ -9,11 +9,19 @@ make FORCE_GENERIC_K=1                # bin/matmul_mpi-generic
 make PREC=float                       # bin/matmul_mpi-float
 make KERNEL=cuda_naive                # richiede nvcc: solo sul server
 make KERNEL=cuda_warp
+make KERNEL=cuda_warp X_LAYOUT=column # X compatta per colonne (solo cuda_warp)
 make KERNEL=cuda_warp_smem
 make KERNEL=cuda_warp_smem SMEM_PAD=0
+make KERNEL=cuda_warp_smem TILE_GRANULARITY=8
+make KERNEL=cuda_warp_smem SMEM_BUDGET_BYTES=16384
 make KERNEL=cuda_warp_tiled
+make KERNEL=cuda_warp_tiled WARP_COL_TILE=4
 make KERNEL=cublas                    # aggiunge -lcublas da solo
 \end{lstlisting}
+
+La riga finale di ogni \code{make} ricorda quale binario ha prodotto e con quali
+variabili, budget di shared memory incluso (\code{derivato} quando non \`e
+forzato).
 
 Ogni comando stampa in chiusura quale binario ha prodotto e con quali variabili.
 Su una macchina priva di \code{nvcc} le build CUDA si fermano con un messaggio
@@ -60,7 +68,14 @@ rumore.
 ./script/run_cuda_experiments.sh --suite experiments/c6_grid_shape.txt
 ./script/run_cuda_experiments.sh --suite experiments/c4_strong_scaling.txt
 ./script/run_cuda_experiments.sh --suite experiments/c5_weak_scaling.txt
+./script/run_cuda_experiments.sh --suite experiments/c7_1_precision_k.txt
+./script/run_cuda_experiments.sh --suite experiments/c7_2_precision_resources.txt
 \end{lstlisting}
+
+C7.2 non esegue benchmark: ricompila con \code{-Xptxas -v} e raccoglie i log
+delle risorse. I casi $k$ vanno selezionati dal log completo
+\file{*\_ptxas\_*.txt}, non dal solo \file{*\_registers.txt}, che omette i nomi
+delle funzioni e quindi non permette di attribuire i registri al $k$ giusto.
 
 \begin{tcolorbox}[colback=todogiallo,colframe=todorosso,boxrule=0.5pt,
                   title=\textbf{Prima di rilanciare una campagna}]
@@ -109,7 +124,7 @@ I file \code{*\_raw.csv} hanno un'altra intestazione e vanno uniti separatamente
 \section{Compilazione di questa relazione}
 
 \begin{lstlisting}[language=shell]
-cd report && make          # oppure: latexmk -pdf main.tex
+cd report && ./compila.sh   # oppure: latexmk -pdf main.tex
 \end{lstlisting}
 
 Per la versione di consegna, commentare la riga \code{\textbackslash todovisibiletrue}
