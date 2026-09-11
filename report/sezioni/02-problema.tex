@@ -10,31 +10,36 @@ Il nucleo calcola, per ogni riga $i$ di $Y$ e ogni colonna $c$ del multivettore,
   \label{eq:definizione}
 \end{equation}
 
-Ogni elemento di $Y$ richiede $N$ moltiplicazioni e $N-1$ addizioni; il conteggio
-convenzionale, e quello imposto dalla traccia, \`e di $2$ FLOP per termine:
+\noindent Ogni elemento di $Y$ richiede $N$ moltiplicazioni e $(N-1)$ addizioni. Il conteggio
+convenzionale, e quello imposto dalla traccia, è di $2$ FLOP per termine:
 \begin{equation}
   \mathrm{FLOP}(M,N,k) = 2\,M\,N\,k ,
   \qquad
   \mathrm{GFLOPS} = \frac{2\,M\,N\,k}{T \cdot 10^{9}} .
   \label{eq:flops}
 \end{equation}
-$T$ \`e il tempo \emph{medio} per invocazione, ottenuto ripetendo il nucleo pi\`u
-volte sulla stessa matrice. Che cosa esattamente entri in $T$ \`e una scelta con
-conseguenze rilevanti, ed \`e trattata in \cref{sec:metriche}.
+$T$ è il tempo \emph{medio} per invocazione, ottenuto ripetendo il nucleo più
+volte sulla stessa matrice. Che cosa esattamente entri in $T$ è una scelta con
+conseguenze rilevanti, ed è trattata in maniera dettagliata in \cref{sec:metriche}.
 
-Tutte le matrici sono memorizzate \textbf{row-major}. Ogni matrice ha una
-\emph{leading dimension} esplicita ($\code{lda}$, $\code{ldx}$, $\code{ldy}$):
-la riga $i$ comincia all'offset $i \cdot \code{ld}$. Questo permette a un blocco
-locale di non essere contiguo fra righe, propriet\`a che serve sia alla
-distribuzione con datatype derivati (\cref{sec:distribuzione-a}) sia alla
-misura dell'effetto del padding di $A$ (\cref{sec:padding}).
+\medskip
+
+\noindent Ogni matrice ha una propria \emph{leading dimension} \texttt{ld$^*$} esplicita
+($\code{lda}$ per la matrice $A$, $\code{ldx}$ per la matrice $X$, $\code{ldy}$ per la matrice $Y$):
+la riga $i$ di una data matrice comincia all'offset $i \cdot \code{ld}$: questo permette a un blocco
+locale di non essere contiguo fra righe, proprietà che serve sia alla
+misura dell'effetto del padding di $A$ (\cref{sec:padding}), ma anche alla
+distribuzione con datatype derivati (\cref{sec:distribuzione-a}).
 
 \section{Ordine dei cicli: schema A contro schema B}
 \label{sec:schemi}
 
-La \cref{eq:definizione} ammette pi\`u ordini di annidamento dei tre cicli, che
-sono matematicamente equivalenti e prestazionalmente no. I due candidati
-naturali sono:
+L'implementazione dell'equazione \cref{eq:definizione} ammette
+più ordini di annidamento dei tre cicli, che sono matematicamente equivalenti,
+ma non lo sono prestazionalmente. La scelta dell'ordine dei cicli è il primo
+punto in cui il progetto si differenzia da una trascrizione letterale della
+definizione, e il motivo è l'intensità aritmetica del nucleo.
+I due schemi candidati dell'ordine dei cicli per l'implementazione dell'equazione, sono:
 
 \begin{center}
 \begin{minipage}{0.46\linewidth}
@@ -62,19 +67,23 @@ for i:
 \end{minipage}
 \end{center}
 
-Lo schema~B \`e la trascrizione letterale della definizione, ed \`e esattamente
-$k$ prodotti matrice-vettore indipendenti: la riga $i$ di $A$ viene riletta una
-volta per ciascuna colonna $c$, cio\`e $k$ volte. Lo schema~A legge invece
-$A[i][j]$ \textbf{una sola volta} e lo riusa immediatamente per tutti i $k$
-accumulatori, che vivono in registro. \`E la ragione per cui il prodotto
-matrice-multivettore vale pi\`u di $k$ prodotti matrice-vettore, ed \`e lo schema
+\noindent Ogni schema ha le proprie caratteristiche e vantaggi.
+Lo schema~B è la trascrizione letterale della definizione, e corrisponde esattamente
+all'implementazione di $k$ prodotti matrice-vettore indipendenti:
+la riga $i$ di $A$ viene riletta una volta per ciascuna colonna $c$, cioè $k$ volte.
+Lo schema~A invece legge $A[i][j]$ \textbf{una sola volta} e lo riusa immediatamente
+per tutti i $k$ accumulatori, che vivono in registro.
+È la ragione per cui il prodotto
+matrice-multivettore vale più di $k$ prodotti matrice-vettore, ed è lo schema
 adottato da tutti i backend del progetto, di CPU e di GPU.
 
-Il vantaggio si quantifica con l'intensit\`a aritmetica, cio\`e il rapporto fra
-FLOP eseguiti e byte che attraversano il livello di memoria considerato. Contando
-il solo traffico su $A$ --- che \`e $\Theta(MN)$ e domina, mentre $X$ e $Y$ sono
-$\Theta(Nk)$ e $\Theta(Mk)$ con $k$ piccolo ---, e detta $s$ la dimensione in byte
-dello scalare:
+\medskip
+
+Il vantaggio si quantifica con l'\emph{intensità aritmetica}, cioè il rapporto fra
+FLOP eseguiti e byte che attraversano il livello di memoria considerato.
+Il solo traffico su $A$ conta $\Theta(MN)$ e domina, mentre $X$ e $Y$ sono
+$\Theta(Nk)$ e $\Theta(Mk)$ con $k$ piccolo. Detta $s$ la dimensione in byte
+dello scalare, che varia a seconda della precisione, l'intensità aritmetica dei due schemi è:
 
 \begin{equation}
   \Ai_{\text{A}} \;=\; \frac{2\,M N k}{M N s} \;=\; \frac{2k}{s},
@@ -83,23 +92,28 @@ dello scalare:
   \label{eq:intensita}
 \end{equation}
 
-In doppia precisione ($s = 8$) questo significa $\Ai_{\text{A}} = k/4$
+\noindent In doppia precisione FP64 ($s = 8$) questo significa che si ha
+$\Ai_{\text{A}} = k/4$
 $\si{\flop\per\byte}$ contro $\Ai_{\text{B}} = 1/4$
 $\si{\flop\per\byte}$: lo schema~A guadagna esattamente un fattore $k$, e per
-$k=32$ porta l'intensit\`a da $0{,}25$ a $8$ $\si{\flop\per\byte}$. \`E questo
-salto che sposta il nucleo da un regime saldamente memory-bound a un regime in
+$k=32$ porta l'intensità da $0{,}25$ a $8$ $\si{\flop\per\byte}$.
+È questo salto che sposta il nucleo da un regime saldamente memory-bound a un regime in
 cui, almeno sulla GPU in FP64, il limite pu\`o diventare il calcolo
 (\cref{cap:roofline}).
 
-Vale la pena osservare che $\Ai_{\text{A}} = 2k/s$ \`e il \emph{massimo}
+\medskip
+
+\noindent Vale la pena osservare che $\Ai_{\text{A}} = 2k/s$ è il \emph{massimo}
 ottenibile leggendo $A$ una volta sola: nessuna riorganizzazione ulteriore pu\`o
 migliorarlo, perch\'e $MN$ elementi di $A$ vanno comunque letti almeno una volta
-e i FLOP sono fissati. Il resto del lavoro di ottimizzazione, sia su CPU sia su
-GPU, riguarda quindi il traffico su $X$ e la capacit\`a di tenere i $k$
-accumulatori in registro --- non l'intensit\`a rispetto ad $A$, che \`e gi\`a al
+e i FLOP sono fissati. Perciò il resto del lavoro di ottimizzazione, sia su CPU sia su
+GPU, riguarda quindi il traffico su $X$ e la capacità di tenere i $k$
+accumulatori in registro e non l'intensità rispetto ad $A$, che è già al
 suo limite.
 
-Un'ultima propriet\`a dello schema~A che conta sull'hardware reale: entrambi gli
+\medskip
+
+\noindent Un'ultima proprietà dello schema~A che conta sull'hardware reale: entrambi gli
 stream di lettura sono a passo unitario. La riga di $A$ \`e contigua per
 costruzione, e la riga di $X$ lo \`e perch\'e $X$ \`e row-major con le $k$ colonne
 adiacenti. Nessuno dei due accessi ha stride, quindi i prefetcher hardware
@@ -111,28 +125,27 @@ stesso warp sono coalescibili.
 
 Tutto il codice usa un unico tipo \code{scalar\_t}, definito in
 \file{src/common/scalar.h}, che vale \code{double} per default e \code{float}
-compilando con \code{PREC=float}. Il confronto FP64/FP32 \`e quindi un flag di
+compilando con \code{PREC=float}. Il confronto FP64/FP32 è quindi un flag di
 compilazione e non una seconda copia dei sorgenti: le due build eseguono
 esattamente lo stesso codice sorgente, che \`e la sola condizione in cui il
 confronto misura la precisione e non due implementazioni diverse. Anche il tipo
 MPI segue lo scalare, tramite la macro \code{SCALAR\_MPI\_TYPE}.
 
-La scelta della precisione non \`e neutra rispetto al modello di
-\cref{cap:roofline}: dimezzando $s$ raddoppia l'intensit\`a aritmetica della
-\cref{eq:intensita}, ma su una GPU consumer o professionale di classe Turing il
-picco FP32 \`e $32$ volte il picco FP64. I due effetti vanno nella stessa
+\noindent La scelta della precisione non è neutra rispetto al modello roofline
+(\cref{cap:roofline}): dimezzando $s$ raddoppia l'intensità aritmetica della equazione
+\ref{eq:intensita}, ma su una GPU consumer o professionale di classe Turing il
+picco FP32 è $32$ volte il picco FP64. I due effetti vanno nella stessa
 direzione e spostano il nucleo, in singola precisione, saldamente nella regione
 memory-bound: la discussione quantitativa \`e in \cref{sec:roofline-gpu}.
 
 \section{Generazione riproducibile dei dati}
 \label{sec:generazione}
 
+\color{red}
 Le matrici di test sono generate, non lette da file. La traccia lo consente
-esplicitamente e chiede in cambio che la generazione sia \emph{ripetibile}; qui
-la ripetibilit\`a \`e pi\`u forte di quanto richiesto, ed \`e una necessit\`a
-architetturale prima che una comodit\`a.
+esplicitamente e chiede in cambio che la generazione sia \emph{ripetibile}.
 
-Il generatore \`e \code{splitmix64}, un mixer a 64 bit \textbf{senza stato}:
+\noindent Il generatore è \code{splitmix64}, un mixer a 64 bit \textbf{senza stato}:
 \begin{equation}
   A[i][j] \;=\; g\bigl(\text{seed},\ \Sigma_A,\ i \cdot N + j \bigr),
   \qquad
@@ -140,11 +153,10 @@ Il generatore \`e \code{splitmix64}, un mixer a 64 bit \textbf{senza stato}:
   \label{eq:gen}
 \end{equation}
 dove $\Sigma_A$ e $\Sigma_X$ sono due identificatori di stream distinti e la
-chiave \`e l'\textbf{indice lineare globale} dell'elemento. Il valore prodotto
-dipende dunque solo dalla posizione globale, mai dal processo che lo calcola n\'e
+chiave è l'\textbf{indice lineare globale} dell'elemento. Il valore prodotto
+dipende dunque solo dalla posizione globale, mai dal processo che lo calcola né
 dall'ordine in cui viene generato.
-
-Le conseguenze sono tre, e sono tutte e tre usate dal progetto:
+Le conseguenze sono diverse, e sono tutte usate dal progetto:
 
 \begin{enumerate}[nosep,left=0pt]
   \item ogni processo pu\`o generare \textbf{direttamente} il proprio blocco
@@ -158,8 +170,10 @@ Le conseguenze sono tre, e sono tutte e tre usate dal progetto:
         porzione che gli serve, senza ricevere dati dagli altri processi.
 \end{enumerate}
 
-I valori sono distribuiti in $[-1, 1)$ a media nulla. Anche questa non \`e una
+\noindent I valori sono distribuiti in $[-1, 1)$ a media nulla. Anche questa non \`e una
 scelta estetica: la tolleranza della validazione (\cref{sec:tolleranza})
 poggia sull'ipotesi che gli errori di arrotondamento della riduzione abbiano
 segno indipendente, ipotesi che vale per dati a media nulla e non varrebbe per
 dati tutti positivi.
+
+\color{black}

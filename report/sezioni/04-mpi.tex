@@ -6,13 +6,18 @@
 
 I $P$ processi sono organizzati in una griglia cartesiana
 $\Prow \times \Pcol = P$, creata con \code{MPI\_Cart\_create} e
-\code{reorder = 1}. La forma \`e scelta dall'utente con \code{--pr} e
-\code{--pc}; in assenza di indicazione, \code{grid\_default\_shape} prende la
-fattorizzazione pi\`u quadrata di $P$ (se $P$ \`e primo, $1 \times P$).
+\code{reorder = 1}. La forma può essere scelta dall'utente con i flag \code{--pr} e
+\code{--pc}, ma in assenza di indicazione, \code{grid\_default\_shape} prende la
+fattorizzazione più quadrata di $P$ (se $P$ \`e primo, $1 \times P$).
 
-Da \code{MPI\_Cart\_sub} si ricavano due sotto-comunicatori:
-\code{row\_comm}, che raccoglie i processi di una stessa \emph{riga} della
-griglia, e \code{col\_comm}, che raccoglie quelli di una stessa \emph{colonna}.
+\medskip
+
+\noindent Tramite \code{MPI\_Cart\_sub} si ricavano due sotto-comunicatori:
+
+\begin{itemize}
+  \item \code{row\_comm}, che raccoglie i processi di una stessa \emph{riga} della griglia;
+  \item \code{col\_comm}, che raccoglie quelli di una stessa \emph{colonna}.
+\end{itemize}
 Sono i due assi lungo cui viaggiano le uniche due collettive del cammino
 cronometrato.
 
@@ -38,17 +43,20 @@ cronometrato.
   \draw[->,thick,red!60!black] (2.95,-0.85) -- (2.15,-0.85)
       node[midway,above,yshift=1pt] {\code{Reduce}(Y)};
 \end{tikzpicture}
-\caption{Griglia $2\times 3$. $X$ scende lungo le colonne
+\caption{Esempio di Griglia $2\times 3$. $X$ scende lungo le colonne
 (\code{col\_comm}), i contributi parziali di $Y$ si sommano lungo le righe
 (\code{row\_comm}) verso la colonna 0.}
 \label{fig:griglia}
 \end{figure}
 
-Il codice fa affidamento su una propriet\`a dei sotto-comunicatori: in un
+\noindent Il codice fa affidamento su una proprietà dei sotto-comunicatori: in un
 comunicatore con una sola dimensione residua i rank sono ordinati per coordinata
-crescente, quindi il rank $0$ di \code{col\_comm} \`e il processo di riga $0$
-(root del broadcast di $X$) e il rank $0$ di \code{row\_comm} \`e il processo di
-colonna $0$ (root della reduce di $Y$). La propriet\`a \`e \emph{verificata} in
+crescente. Ciò significa che il rank $0$ di \code{col\_comm} è il processo di riga $0$
+(il \emph{responsabile} del broadcast di $X$) e il rank $0$ di \code{row\_comm} è il processo di
+colonna $0$ (il \emph{responsabile} della reduce di $Y$).
+
+\medskip
+\noindent La proprietà viene comunque verificata in
 \code{grid\_create} confrontando i rank con le coordinate cartesiane: dopo
 \code{reorder = 1} i rank possono differire da quelli di
 \code{MPI\_COMM\_WORLD}, e appoggiarsi a un'ipotesi non controllata darebbe
@@ -56,9 +64,10 @@ risultati sbagliati in silenzio.
 
 \section{Partizionamento degli indici}
 \label{sec:indici}
-
+\color{red}
 La partizione \`e a blocchi, con il resto distribuito sulle prime parti. Per $n$
-elementi su $p$ parti, la parte $i$ ha dimensione e offset
+elementi su $p$ parti, la parte $i$ ha dimensione e offset:
+
 \begin{equation}
   \mathrm{size}(n,p,i) = \Bigl\lfloor \frac{n}{p} \Bigr\rfloor +
       \begin{cases} 1 & i < n \bmod p\\ 0 & \text{altrimenti}\end{cases}
@@ -69,15 +78,11 @@ elementi su $p$ parti, la parte $i$ ha dimensione e offset
 \end{equation}
 La funzione inversa $\mathrm{owner}(n,p,g)$ restituisce la parte che possiede
 l'indice globale $g$ senza scorrere le parti. Le tre funzioni sono in
-\file{src/index/index.c}, sono indipendenti da MPI e hanno un test dedicato
-(\cref{sec:validazione-indici}): sono il punto in cui un errore di un solo
-elemento si propagherebbe silenziosamente in tutto il resto.
+\file{src/index/index.c} e sono indipendenti da MPI.
 
-Lo sbilanciamento massimo introdotto \`e di un elemento per dimensione, cio\`e al
-pi\`u una riga e una colonna di differenza fra due blocchi locali. Alle taglie
-delle campagne ($M, N \ge 3200$) l'effetto sul tempo \`e sotto il rumore di
-misura; \`e invece rilevante che la partizione sia \emph{la stessa} ovunque, come
-discusso subito sotto.
+\noindent Lo sbilanciamento massimo introdotto è di un elemento per dimensione, cioè al
+più una riga e una colonna di differenza fra due blocchi locali.
+\color{black}
 
 \section{Layout dei blocchi locali}
 \label{sec:layout}
@@ -94,18 +99,22 @@ sola:
 con $\mloc = \mathrm{size}(M, \Prow, \text{my\_row})$ e
 $\nloc = \mathrm{size}(N, \Pcol, \text{my\_col})$.
 
-Il multivettore non viene mai tagliato lungo $k$. Due ragioni: $k$ \`e piccolo, e
-frammentarlo produrrebbe messaggi dominati dalla latenza invece che dalla banda;
-ed \`e proprio da $k$ che viene tutto il riuso di $A$ in registro
-(\cref{sec:schemi}), che una divisione ridurrebbe.
+\medskip
+
+\noindent Il multivettore non viene mai tagliato lungo $k$. Due ragioni:
+
+\begin{itemize}
+  \item $k$ è piccolo, e frammentarlo produrrebbe messaggi dominati dalla latenza invece che dalla banda;
+  \item una divisione ridurrebbe il riuso di $A$ in registro (\cref{sec:schemi}), che viene proprio da $k$.
+\end{itemize}
+
+
+
 
 \begin{tcolorbox}[colback=black!3,colframe=black!30,title=\textbf{Invariante critico}]
 Il numero di righe locali di $X$ deve venire dalla \emph{stessa} partizione con
 cui si tagliano le colonne di $A$, e il numero di righe locali di $Y$ dalla
-stessa con cui si tagliano le righe di $A$. Se le due divergono, i risultati
-sono sbagliati in modo silenzioso.
-
-Qui l'invariante \`e garantito \emph{per costruzione}: esistono soltanto $\mloc$
+stessa con cui si tagliano le righe di $A$. Qui l'invariante \`e garantito \emph{per costruzione}: esistono soltanto $\mloc$
 e $\nloc$, calcolati una volta sola in \code{layout\_init}, e non due coppie di
 valori da tenere allineate. La struttura \code{layout\_t} \`e il punto unico di
 verit\`a sulla forma dei blocchi.
@@ -118,84 +127,98 @@ $\code{lda}$ \`e l'unica leading dimension che pu\`o essere maggiore della
 larghezza del blocco. $\code{ldx}$ e $\code{ldy}$ valgono \emph{sempre} $k$, e
 il codice lo impone con un controllo esplicito in \code{mpi\_matmul}.
 
-La ragione \`e che $X$ e $Y$ attraversano una collettiva. \code{MPI\_Bcast} e
+\medskip
+
+\noindent La ragione è che $X$ e $Y$ attraversano una collettiva: \code{MPI\_Bcast} e
 \code{MPI\_Reduce} usano conteggi contigui ($\nloc \cdot k$ e $\mloc \cdot k$
 elementi): descrivere uno stride richiederebbe di costruire un
 \code{MPI\_Type\_vector}, committarlo e liberarlo \emph{a ogni invocazione},
-cio\`e tre chiamate al runtime MPI dentro la regione cronometrata --- esattamente
-ci\`o che la misura non deve contenere. $A$, al contrario, non attraversa nessuna
-collettiva: il suo padding resta un fatto locale al kernel, e pu\`o quindi essere
-studiato. Il target \code{make check-padding} compila con
+cioè tre chiamate al runtime MPI dentro la regione cronometrata ed è esattamente
+ciò che la misura non deve contenere.
+
+\medskip
+
+\noindent Al contrario $A$ non attraversa nessuna
+collettiva: il suo padding resta un fatto locale al kernel e può quindi essere
+studiato.
+\color{red}
+Il target \code{make check-padding} compila con
 $\code{lda} = \nloc + 8$ e verifica che tutti i backend onorino la leading
 dimension.
-
-Il controllo su $\code{ldx}$ e $\code{ldy}$ costa due confronti fra interi ed \`e
-fuori dal cronometro. \`E un buon esempio del criterio enunciato in
-\cref{cap:introduzione}: violare quell'invariante non farebbe fallire nulla,
-produrrebbe solo numeri sbagliati.
+\color{black}
 
 \section{Distribuzione iniziale dei dati}
 \label{sec:distribuzione-a}
 
 Le modalit\`a di inizializzazione di $A$ e $X$ sono indipendenti
 (\code{--a-mode}, \code{--x-mode}), e tutte e quattro le combinazioni sono
-valide. Entrambe hanno \code{local} come default e producono gli stessi elementi
-globali a parit\`a di seed, per la propriet\`a del generatore discussa in
+valide. Entrambe producono gli stessi elementi
+globali a parità di seed, per la proprietà del generatore discussa in
 \cref{sec:generazione}.
-
-\paragraph{\code{--a-mode local}.} Ogni processo genera direttamente il proprio
-blocco 2D di $A$ dagli indici globali. Non esiste mai una copia globale, quindi
-non esiste un limite di memoria dato dal singolo nodo.
 
 \paragraph{\code{--a-mode global}.} Il grid rank $0$ materializza $A$ completa e
 la distribuisce. \`E il caso interessante dal punto di vista MPI: i sottoblocchi
 2D \textbf{non sono contigui} nella matrice row-major globale. Il mittente
 descrive il blocco da inviare con un \code{MPI\_Type\_vector} di $\mloc$ blocchi
-da $\nloc$ elementi e stride $N$; il destinatario ne descrive uno con stride
+da $\nloc$ elementi e stride $N$. Il destinatario ne descrive uno con stride
 $\code{lda}$, che pu\`o essere diverso. \`E il caso generale --- due layout diversi
 sui due lati della stessa comunicazione --- e non richiede nessun buffer
 intermedio n\'e nessuna copia manuale.
 
-\paragraph{\code{--x-mode local} / \code{global}.} Nel primo caso i processi
-della riga $0$ generano direttamente le proprie righe di $X$. Nel secondo il
+
+\paragraph{\code{--a-mode local}.} Ogni processo genera direttamente il proprio
+blocco 2D di $A$ dagli indici globali. Non esiste mai una copia globale, quindi
+non esiste un limite di memoria dato dal singolo nodo.
+
+
+\paragraph{\code{--x-mode global}} Il
 grid rank $0$ materializza la $X$ compatta $N \times k$ e un
 \code{MPI\_Scatterv} sulla sola riga $0$ ne distribuisce i blocchi di righe:
 entrambi i lati sono contigui, perch\'e $\code{ldx} = k$ ovunque, quindi non
-serve nessun datatype derivato. Il successivo broadcast lungo \code{col\_comm}
-\`e identico nelle due modalit\`a.
+serve nessun datatype derivato. 
 
-Generazione e distribuzione iniziale sono \textbf{preprocessing}, escluse dai
-tempi ufficiali. La modalit\`a \code{global} rappresenta uno scenario in cui
-l'input \`e inizialmente centralizzato; non \`e presentata come una modalit\`a pi\`u
-performante.
+\paragraph{\code{--x-mode local}} I processi
+della riga $0$ generano direttamente le proprie righe di $X$. Il successivo broadcast lungo \code{col\_comm}
+è identico alla modalità \code{global}.
+
+\medskip
+
+\noindent Generazione e distribuzione iniziale fanno parte del \textbf{preprocessing},
+perciò sono escluse dai tempi ufficiali.
+La modalità \code{global} rappresenta uno scenario in cui l'input è inizialmente centralizzato.
 
 \section{L'algoritmo distribuito}
 
-Una invocazione del prodotto esegue tre passi:
+Un'invocazione del prodotto esegue tre passi:
 
 \begin{lstlisting}[language=C,caption={Il corpo di \code{mpi\_matmul}, senza i cronometri.}]
 MPI_Bcast(X_loc, n_loc*k, SCALAR_MPI_TYPE, 0, grid->col_comm);
+
 local_gemm(ctx, X_loc, layout->ldx, Y_loc_part, layout->ldy);
+
 MPI_Reduce(Y_loc_part, Y_row_col0, m_loc*k, SCALAR_MPI_TYPE,
            MPI_SUM, 0, grid->row_comm);
 \end{lstlisting}
 
 \begin{enumerate}[nosep,left=0pt]
-  \item \textbf{Broadcast di $X$ lungo \code{col\_comm}.} Tutti i processi di una
+  \item \textbf{Broadcast di $X$ lungo \code{col\_comm}:} tutti i processi di una
         colonna della griglia lavorano sulle stesse colonne di $A$, quindi
-        servono loro le stesse righe di $X$. Il root \`e il processo di riga $0$,
-        l'unico che possiede inizialmente quella fetta.
-  \item \textbf{Prodotto locale.} Il risultato \`e \emph{parziale}: il processo
-        $(r,c)$ calcola il contributo delle sole colonne
+        servono loro le stesse righe di $X$. Il root è il processo di riga $0$,
+        l'unico che possiede inizialmenate quella fetta.
+  \item \textbf{Prodotto locale:} il risultato \`e \emph{parziale}: il processo
+        in posizione $(r,c)$ calcola il contributo delle sole colonne
         $[\text{col}_0, \text{col}_0 + \nloc)$ di $A$ alle righe
         $[\text{row}_0, \text{row}_0 + \mloc)$ di $Y$.
-  \item \textbf{Reduce lungo \code{row\_comm}.} I $\Pcol$ contributi parziali
+  \item \textbf{Reduce lungo \code{row\_comm}:} i $\Pcol$ contributi parziali
         della stessa banda di righe vivono sui processi di una stessa riga della
-        griglia: sommandoli si ottiene $Y$. Il \code{count} \`e $\mloc \cdot k$,
-        non $1$: la riduzione agisce lungo la dimensione dei processi e
-        preserva la posizione, producendo $\mloc \cdot k$ somme indipendenti. Il
-        root \`e il processo di colonna $0$, che \`e gi\`a il proprietario designato
-        di quella porzione di $Y$: nessuna ridistribuzione finale \`e necessaria.
+        griglia: sommandoli tra loro si ottiene $Y$.
+        
+        \noindent Il \code{count} \`e $\mloc \cdot k$
+        (e non $1$) dato che la riduzione agisce lungo la dimensione dei processi e
+        preserva la posizione, producendo dunque $\mloc \cdot k$ somme indipendenti.
+        
+        \noindent Il root è il processo di colonna $0$, che è già il \emph{responsabile} designato
+        di quella porzione di $Y$: nessuna ridistribuzione finale è necessaria.
 \end{enumerate}
 
 \section{Modello di costo della comunicazione}
