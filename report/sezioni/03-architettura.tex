@@ -3,9 +3,7 @@
 
 \section{Moduli}
 
-Il codice \`e diviso per responsabilit\`a, non per file: ogni cartella di
-\file{src/} ha un compito unico e dipende solo da quelle sotto di s\'e.
-
+Il codice è organizzato in moduli distinti in base alle rispettive responsabilità. Ogni sottocartella di src/ raccoglie le funzionalità relative a uno specifico aspetto dell'applicazione.
 \begin{table}[H]
 \centering
 \footnotesize
@@ -15,7 +13,7 @@ Il codice \`e diviso per responsabilit\`a, non per file: ogni cartella di
 \toprule
 \textbf{Modulo} & \textbf{Responsabilit\`a} \\
 \midrule
-\file{common/} & tipo scalare unico (\code{scalar\_t}), tolleranza di
+\file{common/} & definizione del tipo scalare (\code{scalar\_t}), configurabile come \code{float} o \code{double}, tolleranza di
   validazione, utility di terminazione e cronometro \\
 \file{index/} & partizionamento a blocchi degli indici globali: dimensione,
   offset e proprietario di ogni blocco \\
@@ -30,16 +28,19 @@ Il codice \`e diviso per responsabilit\`a, non per file: ogni cartella di
 \end{tabular}
 \end{table}
 
-La dipendenza pi\`u importante \`e quella che \textbf{non} esiste: \file{mpi/} non
-include mai un header di un backend specifico. Vede solo
-\file{kernel/kernel.h}, e non ha modo di sapere se sotto giri lo schema~A
-scalare o un kernel CUDA.
+Il tipo \code{scalar\_t} permette di utilizzare la stessa base di codice sia in singola precisione (\code{float}, FP32) sia in doppia precisione (\code{double}, FP64); la precisione viene selezionata a tempo di compilazione.
+
+Il modulo \file{mpi/} non dipende direttamente da uno specifico backend
+di calcolo: per l'esecuzione del prodotto locale utilizza esclusivamente
+l'interfaccia comune definita in \file{kernel/kernel.h}. Di conseguenza, l'algoritmo
+MPI rimane invariato sia utilizzando un'implementazione CPU sia utilizzando uno dei backend CUDA.
+La scelta del backend avviene quindi in fase di compilazione,
+senza richiedere modifiche al codice che gestisce la distribuzione dei dati e le comunicazioni MPI.
 
 \section{L'interfaccia unica del kernel locale}
 \label{sec:interfaccia}
 
-Ogni backend implementa tre funzioni di esecuzione e un insieme di canali di
-misura e di introspezione:
+Ogni backend implementa tre operazioni fondamentali per la gestione e l'esecuzione del kernel locale, oltre ad alcune funzioni ausiliarie utilizzate per la raccolta delle metriche sperimentali.
 
 \begin{lstlisting}[language=C,caption={Interfaccia di \file{src/kernel/kernel.h}.}]
 /* esecuzione */
@@ -51,188 +52,87 @@ void local_gemm(local_gemm_t *ctx,
                 scalar_t *RESTRICT Y, int ldy);
 void local_gemm_destroy(local_gemm_t *ctx);
 
-/* tempi della singola invocazione */
-double local_gemm_last_compute_seconds(const local_gemm_t *ctx);
-double local_gemm_last_h2d_X_seconds(const local_gemm_t *ctx);
-double local_gemm_last_d2h_Y_seconds(const local_gemm_t *ctx);
-
-/* byte trasferiti, per trasformare i tempi in banda */
-size_t local_gemm_bytes_h2d_A(const local_gemm_t *ctx);
-size_t local_gemm_bytes_h2d_X_per_call(const local_gemm_t *ctx);
-size_t local_gemm_bytes_d2h_Y_per_call(const local_gemm_t *ctx);
-
-/* preparazione, totale e scomposta */
-double local_gemm_setup_seconds(const local_gemm_t *ctx);
-double local_gemm_setup_device_init_seconds(const local_gemm_t *ctx);
-double local_gemm_setup_device_alloc_seconds(const local_gemm_t *ctx);
-double local_gemm_setup_h2d_A_seconds(const local_gemm_t *ctx);
-
-/* piano di esecuzione effettivamente scelto a runtime */
-int local_gemm_blocks_per_sm(const local_gemm_t *ctx);
-int local_gemm_x_rows_per_tile(const local_gemm_t *ctx);
-
-const char *kernel_name(void);
 \end{lstlisting}
+\color{red}
+L'interfaccia segue un ciclo di vita composto da tre fasi rappresentate da altrettante funzioni che definiscono il ciclo di vita del kernel locale:
+\code{local\_gemm\_create} ne inizializza il contesto,
+\code{local\_gemm} esegue il calcolo e
+\code{local\_gemm\_destroy} rilascia le risorse associate.
+\color{black}
 
-I canali oltre i primi tre sono la parte che ha richiesto pi\`u lavoro, e la
-ragione \`e in \cref{sec:metriche}: la traccia esclude dal tempo $T$ i
-trasferimenti da e verso la scheda e il preprocessing, ma consente
-esplicitamente di misurarli e discuterli a parte --- e per discuterli non basta
-il totale, servono le singole voci. Tutti seguono la stessa convenzione: un
-valore \textbf{negativo} (o $0$ per i byte) significa ``non applicabile a questo
-backend'', ed \`e ci\`o che rende una riga di CPU riconoscibile a colpo d'occhio
-in un CSV che contiene anche righe GPU.
 
-Le ultime due funzioni non sono metriche di prestazione ma la
-\emph{configurazione} scelta a runtime dal backend: senza di esse una campagna
-sul tiling mostrerebbe curve che salgono e scendono senza poter dire se sia
-cambiato il tile, l'occupancy, o entrambi (\cref{sec:piano-tile}).
+Inoltre l'interfaccia espone alcune funzioni di introspezione utilizzate dal driver di
+benchmark per raccogliere separatamente tempi di calcolo, trasferimenti, costi di
+inizializzazione e parametri di esecuzione del backend. Tali metriche vengono descritte nella sezione dedicata alla metodologia sperimentale.
 
-La scelta del backend \`e del \code{Makefile} (variabile \code{KERNEL}), non del
-codice: non esiste nessun \code{switch} a runtime fra implementazioni, e quindi
-nessun costo n\'e nessuna possibilit\`a di misurare per sbaglio un percorso
-diverso da quello che si crede.
-
-\subsection{Perch\'e il ciclo di vita ha tre fasi}
+\subsection{Ciclo di vita del kernel}
 \label{sec:tre-fasi}
 
-La separazione fra \code{create}, \code{local\_gemm} e \code{destroy} \`e la
-scelta architetturale con l'effetto pi\`u diretto sulle misure, e discende da una
-asimmetria del problema:
+La separazione tra \code{local\_gemm\_create}, \code{local\_gemm} e
+\code{local\_gemm\_destroy} deriva dal diverso ciclo di vita dei dati
+e delle risorse coinvolte nel calcolo.
 
-\begin{center}
-\emph{$A$ non cambia mai fra un'invocazione e l'altra; $X$ e $Y$ cambiano sempre.}
-\end{center}
+La matrice $A$ rimane invariata durante tutte le ripetizioni, mentre
+$X$ e $Y$ sono coinvolte in ogni esecuzione del prodotto locale.
+Questa differenza permette di separare le operazioni eseguite una sola
+volta da quelle necessarie a ogni invocazione.
 
-$X$ arriva da un \code{MPI\_Bcast} e $Y$ deve tornare a un \code{MPI\_Reduce},
-quindi entrambe attraversano ogni invocazione. $A$, invece, viene generata (o
-ricevuta) una volta sola e resta identica per tutte le repetition. Tutto ci\`o che
-riguarda $A$ pu\`o dunque stare in \code{create}, che \`e preprocessing e non viene
-cronometrato.
+\begin{enumerate}
 
-Per il backend di CPU questo \`e quasi vuoto: \code{create} registra forma e
-puntatore. Per i backend CUDA \`e invece il punto in cui $A$ viene copiata in VRAM
-\emph{una volta sola}. Il guadagno non \`e cosmetico: con $A$ dell'ordine dei
-gigabyte, una \code{cudaMemcpy} H2D per invocazione misurerebbe la banda PCIe e
-non la GPU. La traccia consente esplicitamente di escludere dal tempo $T$ i
-trasferimenti da e verso la scheda, e l'architettura rende questa esclusione una
-propriet\`a strutturale invece che una sottrazione a posteriori.
+    \item \textbf{Inizializzazione (\code{local\_gemm\_create}).}
+    Viene creato il contesto del backend e vengono predisposte le
+    risorse riutilizzabili durante le successive esecuzioni.
+    
+    Nei backend CPU vengono memorizzate le informazioni necessarie
+    all'esecuzione, tra cui le dimensioni del problema e il riferimento
+    al blocco locale di $A$.
+    
+    Nei backend CUDA vengono inoltre allocati i buffer sul device e
+    $A$ viene trasferita una sola volta nella memoria della GPU.
 
-Nella stessa fase vengono allocati anche i buffer di $X$ e $Y$ sul device e viene
-eseguita una \code{cudaDeviceSynchronize} finale. La conseguenza \`e che nessuna
-allocazione, e nessuna coda residua della copia di $A$, pu\`o cadere dentro la
-prima repetition, neppure con \code{--warmup 0}.
+    \item \textbf{Esecuzione (\code{local\_gemm}).}
+    Questa fase viene ripetuta per ogni invocazione del prodotto
+    locale. La matrice $X$, precedentemente distribuita tra i processi tramite
+    \code{MPI\_Bcast}, viene utilizzata insieme al blocco locale di $A$
+    per produrre il contributo locale a $Y$.
+    
+    Nei backend CUDA vengono riutilizzati i buffer allocati durante
+    l'inizializzazione: la matrice $X$ viene trasferita sul device, viene eseguito
+    il kernel e il risultato $Y$ viene riportato in memoria host.
+    
+    I contributi prodotti dai processi vengono successivamente
+    combinati tramite \code{MPI\_Reduce}.
 
-\subsection{Lo stato in un contesto opaco}
+    \item \textbf{Finalizzazione (\code{local\_gemm\_destroy}).}
+    Al termine delle ripetizioni vengono rilasciate le risorse
+    associate al contesto, comprese le eventuali allocazioni sulla GPU.
 
-Lo stato del backend vive in una \code{struct local\_gemm\_context} opaca, non in
-variabili statiche di modulo. Il tipo \`e dichiarato in \file{kernel.h} e definito
-in ciascun \code{.c}/\code{.cu}, quindi ogni backend gli d\`a i campi che gli
-servono: il backend di CPU tiene forma e puntatore ad $A$, i backend CUDA
-tengono i tre puntatori device, i due \code{cudaEvent} e i tempi.
-
-Tre conseguenze pratiche: \`e esplicito nel tipo chi possiede la copia di $A$;
-non esiste inizializzazione globale nascosta; il backend resta riutilizzabile,
-perch\'e nulla vieta di avere pi\`u contesti vivi contemporaneamente.
-
-\subsection{Compatibilit\`a C / C++ e il test che la difende}
-
-I file \code{.cu} sono compilati da \code{nvcc} come C++, mentre il resto del
-progetto \`e C11 compilato da \code{mpicc}. Due differenze toccano proprio
-l'header condiviso: \code{restrict} non \`e una parola chiave del C++
-(si scrive \code{\_\_restrict\_\_}) e i nomi delle funzioni C++ vengono decorati,
-quindi senza \code{extern "C"} un backend \code{.cu} compilerebbe ma non
-linkerebbe.
-
-Entrambe le protezioni sono nell'header. La parte interessante \`e che la
-propriet\`a \`e \emph{verificata}, e in due modi: il target \code{make check-cxx}
-compila una sonda C++ che include \file{kernel.h} e \file{util.h}, e poi
-controlla con \code{nm} che ognuno dei simboli dell'interfaccia --- tutte e
-sedici le funzioni del listato precedente, pi\`u \code{xmalloc} e \code{die} ---
-compaia \emph{non decorato} fra gli indefiniti dell'oggetto prodotto. Un
-\code{extern "C"} dimenticato su una funzione aggiunta in seguito fallisce
-quindi qui, su qualunque macchina e anche senza \code{nvcc}, e non come errore
-di link sul server il giorno della campagna.
-
-\section{Il driver di misura}
-
-\file{src/bench/main.c} \`e l'unico punto che conosce sia MPI sia il kernel sia
-le metriche. Fa, nell'ordine:
-
-\begin{enumerate}[nosep,left=0pt]
-  \item parsing e validazione delle opzioni (\cref{app:cli});
-  \item creazione della griglia cartesiana e calcolo del layout locale;
-  \item generazione o distribuzione di $A$ e $X$, e conversione del layout di
-        $X$ se la build lo richiede --- ogni fase cronometrata separatamente
-        (\cref{sec:tempi-esclusi});
-  \item \code{local\_gemm\_create} (preprocessing del backend);
-  \item \code{--warmup} invocazioni non cronometrate;
-  \item \code{--reps} invocazioni cronometrate, con i tempi delle tre fasi
-        raccolti per ogni repetition;
-  \item riduzione dei tempi fra i rank, calcolo di media, mediana, minimo,
-        deviazione standard e coefficiente di variazione;
-  \item validazione opzionale contro l'oracolo seriale (\code{--check});
-  \item stampa leggibile oppure riga CSV.
 \end{enumerate}
 
-Il fatto che warm-up e misura siano due cicli distinti sullo stesso codice, e non
-un ciclo unico con i primi giri scartati a posteriori, \`e voluto: le
-repetition cronometrate non contengono nessun ramo che le distingua dalle altre.
+Questa organizzazione evita di ripetere a ogni invocazione le
+operazioni associate ad $A$ e separa il costo di inizializzazione
+dal costo delle successive esecuzioni del prodotto locale.
 
-\section{Build: una configurazione, un binario}
-\label{sec:build}
+\subsection{Contesto opaco del backend}
 
-Ogni scostamento dalla configurazione di default produce un binario con un nome
-proprio, come mostrato in \cref{tab:binari}. Non esiste un solo
-\file{bin/matmul\_mpi} riscritto a ogni \code{make}.
+Lo stato specifico di ciascun backend è mantenuto all'interno del 
+tipo opaco \code{local\_gemm\_t}. La struttura concreta è definita
+separatamente da ogni implementazione e può quindi contenere
+informazioni differenti senza modificare l'interfaccia comune.
 
-\begin{table}[H]
-\centering
-\footnotesize
-\caption{Corrispondenza fra configurazione di build e binario prodotto.}
-\label{tab:binari}
-\begin{tabular}{@{}p{0.46\linewidth}p{0.46\linewidth}@{}}
-\toprule
-\textbf{Comando} & \textbf{Binario} \\
-\midrule
-\code{make} & \file{bin/matmul\_mpi} \\
-\code{make PREC=float} & \file{bin/matmul\_mpi-float} \\
-\code{make FORCE\_GENERIC\_K=1} & \file{bin/matmul\_mpi-generic} \\
-\code{make TEST\_A\_PADDING=8} & \file{bin/matmul\_mpi-pad8} \\
-\code{make KERNEL=cuda\_naive} & \file{bin/matmul\_mpi-cuda\_naive} \\
-\code{make KERNEL=cuda\_warp} & \file{bin/matmul\_mpi-cuda\_warp} \\
-\code{make KERNEL=cuda\_warp\_smem} & \file{bin/matmul\_mpi-cuda\_warp\_smem} \\
-\code{make KERNEL=cuda\_warp\_smem SMEM\_PAD=0} & \file{bin/matmul\_mpi-cuda\_warp\_smem-smempad0} \\
-\code{make KERNEL=cuda\_warp\_smem TILE\_GRANULARITY=8} & \file{bin/matmul\_mpi-cuda\_warp\_smem-g8} \\
-\code{make KERNEL=cuda\_warp\_smem SMEM\_BUDGET\_BYTES=16384} & \file{bin/matmul\_mpi-cuda\_warp\_smem-bud16384} \\
-\code{make KERNEL=cuda\_warp\_tiled WARP\_COL\_TILE=4} & \file{bin/matmul\_mpi-cuda\_warp\_tiled-tile4} \\
-\code{make KERNEL=cuda\_warp X\_LAYOUT=column} & \file{bin/matmul\_mpi-cuda\_warp-xcol} \\
-\code{make BLOCK=512 KERNEL=cuda\_warp} & \file{bin/matmul\_mpi-cuda\_warp-blk512} \\
-\code{make KERNEL=cublas} & \file{bin/matmul\_mpi-cublas} \\
-\bottomrule
-\end{tabular}
-\end{table}
+Ad esempio, un backend CPU può memorizzare le dimensioni del problema
+e il riferimento ad $A$, mentre un backend CUDA mantiene anche i
+puntatori alla memoria del device e le risorse necessarie
+all'esecuzione. I dettagli interni del backend rimangono così
+nascosti al resto dell'applicazione.
 
-I parametri che entrano nel nome sono solo quelli che il backend selezionato
-legge davvero: \code{TILE\_GRANULARITY} e \code{SMEM\_BUDGET\_BYTES} compaiono
-soltanto con \kernelname{cuda\_warp\_smem}, \code{WARP\_COL\_TILE} soltanto con
-\kernelname{cuda\_warp\_tiled}. Altrimenti si otterrebbero binari con nomi
-diversi e contenuto identico, indistinguibili nel CSV perch\'e
-\code{kernel\_name()} non cambierebbe. Anche gli oggetti sono per
-configurazione (\file{obj/matmul\_mpi<config>/}), quindi cambiare precisione o
-backend non pu\`o riutilizzare per sbaglio una compilazione precedente.
+\subsection{Configurazione delle build}
 
-Il motivo \`e sperimentale, non organizzativo: una build non pu\`o sovrascriverne
-un'altra e far misurare in singola precisione una campagna che si credeva in
-doppia. Nello stesso spirito, \code{kernel\_name()} riporta nel CSV anche i
-parametri che cambiano il codice generato --- per esempio
-\code{cuda\_warp\_tiled(tile8)} oppure il suffisso \code{(blk512)} quando la
-dimensione del blocco non \`e quella di default --- cos\`i le righe di uno sweep
-restano distinguibili anche a distanza di settimane.
+Le principali scelte sperimentali, tra cui backend di calcolo,
+precisione numerica e alcuni parametri dei kernel CUDA, vengono
+selezionate a tempo di compilazione tramite il \code{Makefile}.
 
-Il \code{Makefile} riconosce da s\'e se il backend richiesto \`e C o CUDA: se
-esiste \file{src/kernel/<nome>.cu} lo compila con \code{nvcc -arch=sm\_75} e
-linka \code{-lcudart} (e \code{-lcublas} per il backend cuBLAS). Su una macchina
-priva di \code{nvcc} la build CUDA si ferma con un messaggio esplicito, mentre
-tutto il resto del progetto continua a compilare: \`e la propriet\`a che ha
-permesso di sviluppare su una macchina ARM64 senza GPU e misurare sul server.
+Le principali varianti di configurazione utilizzate nelle campagne
+sperimentali vengono associate a binari distinti, evitando che build
+differenti si sovrascrivano e rendendo immediatamente identificabile
+la configurazione utilizzata.

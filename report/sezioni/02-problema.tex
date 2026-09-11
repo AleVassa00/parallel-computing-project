@@ -3,7 +3,7 @@
 
 \section{Formalizzazione e conteggio delle operazioni}
 
-Il nucleo calcola, per ogni riga $i$ di $Y$ e ogni colonna $c$ del multivettore,
+Il nucleo calcola, per ogni riga $i$ di $Y$ e ogni colonna $c$ del multivettore:
 \begin{equation}
   Y[i][c] \;=\; \sum_{j=0}^{N-1} A[i][j]\, X[j][c],
   \qquad 0 \le i < M,\ 0 \le c < k .
@@ -18,23 +18,24 @@ convenzionale, e quello imposto dalla traccia, è di $2$ FLOP per termine:
   \mathrm{GFLOPS} = \frac{2\,M\,N\,k}{T \cdot 10^{9}} .
   \label{eq:flops}
 \end{equation}
-$T$ è il tempo \emph{medio} per invocazione, ottenuto ripetendo il nucleo più
+dove $T$ è il tempo \emph{medio} per invocazione, ottenuto ripetendo il nucleo più
 volte sulla stessa matrice. Che cosa esattamente entri in $T$ è una scelta con
 conseguenze rilevanti, ed è trattata in maniera dettagliata in \cref{sec:metriche}.
 
 \medskip
 
-Ogni matrice ha una propria \emph{leading dimension} \texttt{ld$^*$} esplicita
-($\code{lda}$ per la matrice $A$, $\code{ldx}$ per la matrice $X$, $\code{ldy}$ per la matrice $Y$):
-la riga $i$ di una data matrice comincia all'offset $i \cdot \code{ld}$: questo permette a un blocco
-locale di non essere contiguo fra righe, proprietà che serve sia alla
-misura dell'effetto del padding di $A$ (\cref{sec:padding}), ma anche alla
-distribuzione con datatype derivati (\cref{sec:distribuzione-a}).
+La matrice $A$ è memorizzata in formato row-major con leading dimension \texttt{lda},
+che può essere maggiore del numero di colonne effettivamente possedute dal processo.
+Ciò permette di introdurre padding tra righe consecutive e di ricevere direttamente
+blocchi non contigui mediante datatype MPI derivati.
+L'interfaccia del kernel espone analogamente \texttt{ldx} e \texttt{ldy}; nel percorso distribuito ordinario,
+tuttavia, $X$ e $Y$ sono mantenute compatte, con \texttt{ldx = ldy = k}.
 
+\color{red}
 \section{Ordine dei cicli: schema A contro schema B}
 \label{sec:schemi}
 
-L'implementazione dell'equazione \cref{eq:definizione} ammette
+L'implementazione dell'equazione \ref{eq:definizione} ammette
 più ordini di annidamento dei tre cicli, che sono matematicamente equivalenti,
 ma non lo sono prestazionalmente. La scelta dell'ordine dei cicli è il primo
 punto in cui il progetto si differenzia da una trascrizione letterale della
@@ -42,17 +43,7 @@ definizione, e il motivo è l'intensità aritmetica del nucleo.
 I due schemi candidati dell'ordine dei cicli per l'implementazione dell'equazione, sono:
 
 \begin{center}
-\begin{minipage}{0.46\linewidth}
-\textbf{Schema B} ($i \to c \to j$)
-\begin{lstlisting}[language=C]
-for i:
-  for c:
-    s = 0
-    for j:
-      s += A[i][j] * X[j][c]
-    Y[i][c] = s
-\end{lstlisting}
-\end{minipage}\hfill
+
 \begin{minipage}{0.46\linewidth}
 \textbf{Schema A} ($i \to j \to c$)
 \begin{lstlisting}[language=C]
@@ -65,23 +56,39 @@ for i:
   Y[i][0..k) = acc[0..k)
 \end{lstlisting}
 \end{minipage}
+
+
+
+\begin{minipage}{0.46\linewidth}
+\textbf{Schema B} ($i \to c \to j$)
+\begin{lstlisting}[language=C]
+for i:
+  for c:
+    s = 0
+    for j:
+      s += A[i][j] * X[j][c]
+    Y[i][c] = s
+\end{lstlisting}
+\end{minipage}\hfill
+
 \end{center}
 
 Ogni schema ha le proprie caratteristiche e vantaggi.
-Lo schema~B è la trascrizione letterale della definizione, e corrisponde esattamente
+Lo schema~B è la trascrizione letterale della definizione e corrisponde esattamente
 all'implementazione di $k$ prodotti matrice-vettore indipendenti:
 la riga $i$ di $A$ viene riletta una volta per ciascuna colonna $c$, cioè $k$ volte.
 Lo schema~A invece legge $A[i][j]$ \textbf{una sola volta} e lo riusa immediatamente
 per tutti i $k$ accumulatori, che vivono in registro.
-È la ragione per cui il prodotto
-matrice-multivettore vale più di $k$ prodotti matrice-vettore, ed è lo schema
-adottato da tutti i backend del progetto, di CPU e di GPU.
+Lo schema A è adottato dai backend CPU come organizzazione di base del calcolo e
+costituisce inoltre un riferimento per le successive ottimizzazioni orientate al riuso di $A$.
+I backend CUDA introducono invece differenti strategie di mapping del lavoro sui thread e sui warp,
+descritte nel capitolo dedicato.
 
 \medskip
 
 Il vantaggio si quantifica con l'\emph{intensità aritmetica}, cioè il rapporto fra
 FLOP eseguiti e byte che attraversano il livello di memoria considerato.
-Il solo traffico su $A$ conta $\Theta(MN)$ e domina, mentre $X$ e $Y$ sono
+Il solo traffico sulla matrice $A$ conta $\Theta(MN)$ e domina, mentre $X$ e $Y$ sono
 $\Theta(Nk)$ e $\Theta(Mk)$ con $k$ piccolo. Detta $s$ la dimensione in byte
 dello scalare, che varia a seconda della precisione, l'intensità aritmetica dei due schemi è:
 
@@ -92,13 +99,14 @@ dello scalare, che varia a seconda della precisione, l'intensità aritmetica dei
   \label{eq:intensita}
 \end{equation}
 
-In doppia precisione FP64 ($s = 8$) questo significa che si ha
+In doppia precisione FP64 ($s = 8$ byte) questo significa che si ha
 $\Ai_{\text{A}} = k/4$
 $\si{\flop\per\byte}$ contro $\Ai_{\text{B}} = 1/4$
 $\si{\flop\per\byte}$: lo schema~A guadagna esattamente un fattore $k$, e per
 $k=32$ porta l'intensità da $0{,}25$ a $8$ $\si{\flop\per\byte}$.
 È questo salto che sposta il nucleo da un regime saldamente memory-bound a un regime in
-cui, almeno sulla GPU in FP64, il limite pu\`o diventare il calcolo
+cui, almeno sulla GPU in FP64, il limite pul diventare il calcolo quindi un regime compute-bound,
+come discusso nel capitolo dedicato al modello roofline
 (\cref{cap:roofline}).
 
 \medskip
@@ -120,6 +128,8 @@ adiacenti. Nessuno dei due accessi ha stride, quindi i prefetcher hardware
 lavorano nelle condizioni migliori e, sulla GPU, gli accessi delle lane di uno
 stesso warp sono coalescibili.
 
+\color{black}
+
 \section{Precisione}
 \label{sec:precisione}
 
@@ -128,20 +138,26 @@ Tutto il codice usa un unico tipo \code{scalar\_t}, definito in
 compilando con \code{PREC=float}. Il confronto FP64/FP32 è quindi un flag di
 compilazione e non una seconda copia dei sorgenti: le due build eseguono
 esattamente lo stesso codice sorgente, che \`e la sola condizione in cui il
-confronto misura la precisione e non due implementazioni diverse. Anche il tipo
+confronto misura la precisione e non due implementazioni diverse.
+\color{red}
+Anche il tipo
 MPI segue lo scalare, tramite la macro \code{SCALAR\_MPI\_TYPE}.
+\color{black}
 
+\color{red}
 La scelta della precisione non è neutra rispetto al modello roofline
 (\cref{cap:roofline}): dimezzando $s$ raddoppia l'intensità aritmetica della equazione
 \ref{eq:intensita}, ma su una GPU consumer o professionale di classe Turing il
 picco FP32 è $32$ volte il picco FP64. I due effetti vanno nella stessa
 direzione e spostano il nucleo, in singola precisione, saldamente nella regione
 memory-bound: la discussione quantitativa \`e in \cref{sec:roofline-gpu}.
+\color{black}
 
 \section{Generazione riproducibile dei dati}
 \label{sec:generazione}
 
 \color{red}
+
 Le matrici di test sono generate, non lette da file. La traccia lo consente
 esplicitamente e chiede in cambio che la generazione sia \emph{ripetibile}.
 
@@ -154,15 +170,14 @@ Il generatore è \code{splitmix64}, un mixer a 64 bit \textbf{senza stato}:
 \end{equation}
 dove $\Sigma_A$ e $\Sigma_X$ sono due identificatori di stream distinti e la
 chiave è l'\textbf{indice lineare globale} dell'elemento. Il valore prodotto
-dipende dunque solo dalla posizione globale, mai dal processo che lo calcola né
+dipende dunque \emph{solo} dalla posizione globale, mai dal processo che lo calcola né
 dall'ordine in cui viene generato.
 Le conseguenze sono diverse, e sono tutte usate dal progetto:
 
 \begin{enumerate}[nosep,left=0pt]
   \item ogni processo pu\`o generare \textbf{direttamente} il proprio blocco
-        locale, senza che esista mai una copia globale della matrice. \`E ci\`o che
-        rende misurabili taglie in cui $A$ globale non entrerebbe nella memoria
-        di un solo nodo;
+        locale, senza che esista mai una copia globale della matrice. 
+
   \item la stessa matrice globale si ottiene con \emph{qualunque} griglia di
         processi e con qualunque modalit\`a di inizializzazione, quindi due
         configurazioni diverse sono confrontabili elemento per elemento;
@@ -170,10 +185,6 @@ Le conseguenze sono diverse, e sono tutte usate dal progetto:
         porzione che gli serve, senza ricevere dati dagli altri processi.
 \end{enumerate}
 
-I valori sono distribuiti in $[-1, 1)$ a media nulla. Anche questa non \`e una
-scelta estetica: la tolleranza della validazione (\cref{sec:tolleranza})
-poggia sull'ipotesi che gli errori di arrotondamento della riduzione abbiano
-segno indipendente, ipotesi che vale per dati a media nulla e non varrebbe per
-dati tutti positivi.
+I valori sono distribuiti in $[-1, 1)$ a media nulla.
 
 \color{black}

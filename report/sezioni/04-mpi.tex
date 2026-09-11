@@ -5,7 +5,7 @@
 \label{sec:griglia}
 
 I $P$ processi sono organizzati in una griglia cartesiana
-$\Prow \times \Pcol = P$, creata con \code{MPI\_Cart\_create} e
+$\Prow \times \Pcol = P$, creata con \code{MPI\_Cart\_create} e con
 \code{reorder = 1}. La forma può essere scelta dall'utente con i flag \code{--pr} e
 \code{--pc}, ma in assenza di indicazione, \code{grid\_default\_shape} prende la
 fattorizzazione più quadrata di $P$ (se $P$ \`e primo, $1 \times P$).
@@ -52,8 +52,9 @@ cronometrato.
 Il codice fa affidamento su una proprietà dei sotto-comunicatori: in un
 comunicatore con una sola dimensione residua i rank sono ordinati per coordinata
 crescente. Ciò significa che il rank $0$ di \code{col\_comm} è il processo di riga $0$
-(il \emph{responsabile} del broadcast di $X$) e il rank $0$ di \code{row\_comm} è il processo di
-colonna $0$ (il \emph{responsabile} della reduce di $Y$).
+(il \emph{responsabile} del broadcast di $X$, cioè il root del sotto-comunicatore)
+e il rank $0$ di \code{row\_comm} è il processo di
+colonna $0$ (il \emph{responsabile} della reduce di $Y$, cioè il root del sotto-comunicatore).
 
 \medskip
 La proprietà viene comunque verificata in
@@ -70,7 +71,7 @@ elementi su $p$ parti, la parte $i$ ha dimensione e offset:
 
 \begin{equation}
   \mathrm{size}(n,p,i) = \Bigl\lfloor \frac{n}{p} \Bigr\rfloor +
-      \begin{cases} 1 & i < n \bmod p\\ 0 & \text{altrimenti}\end{cases}
+      \begin{cases} 1 & i < (n \bmod p)\\ 0 & \text{altrimenti}\end{cases}
   \qquad
   \mathrm{start}(n,p,i) = i\Bigl\lfloor \frac{n}{p} \Bigr\rfloor +
       \min(i,\ n \bmod p).
@@ -92,20 +93,27 @@ sola:
 \begin{equation}
   A_{\text{loc}} : \mloc \times \nloc,
   \qquad
-  X_{\text{loc}} : \nloc \times k \ \ (\text{riga } 0),
+  X_{\text{loc}} : \nloc \times k \ \ ,
   \qquad
-  Y_{\text{loc}} : \mloc \times k \ \ (\text{colonna } 0),
+  Y_{\text{loc}} : \mloc \times k \ \ ,
 \end{equation}
 con $\mloc = \mathrm{size}(M, \Prow, \text{my\_row})$ e
 $\nloc = \mathrm{size}(N, \Pcol, \text{my\_col})$.
 
+Prima del broadcast, $X_{\mathrm{loc}}$
+contiene dati significativi soltanto sui processi della riga 0.
+Dopo il prodotto locale, ogni processo possiede un contributo parziale a $Y$;
+la MPI_Reduce lungo \code{row_comm} produce il blocco finale di $Y$ sui processi
+della colonna 0.
+
 Il multivettore non viene mai tagliato lungo $k$. Due ragioni:
 
+\color{red}
 \begin{itemize}
   \item $k$ è piccolo, e frammentarlo produrrebbe messaggi dominati dalla latenza invece che dalla banda;
   \item una divisione ridurrebbe il riuso di $A$ in registro (\cref{sec:schemi}), che viene proprio da $k$.
 \end{itemize}
-
+\color{black}
 
 
 
@@ -127,6 +135,7 @@ il codice lo impone con un controllo esplicito in \code{mpi\_matmul}.
 
 \medskip
 
+\color{red}
 La ragione è che $X$ e $Y$ attraversano una collettiva: \code{MPI\_Bcast} e
 \code{MPI\_Reduce} usano conteggi contigui ($\nloc \cdot k$ e $\mloc \cdot k$
 elementi): descrivere uno stride richiederebbe di costruire un
@@ -139,7 +148,7 @@ ciò che la misura non deve contenere.
 Al contrario $A$ non attraversa nessuna
 collettiva: il suo padding resta un fatto locale al kernel e può quindi essere
 studiato.
-\color{red}
+
 Il target \code{make check-padding} compila con
 $\code{lda} = \nloc + 8$ e verifica che tutti i backend onorino la leading
 dimension.
@@ -159,14 +168,16 @@ la distribuisce. \`E il caso interessante dal punto di vista MPI: i sottoblocchi
 2D \textbf{non sono contigui} nella matrice row-major globale. Il mittente
 descrive il blocco da inviare con un \code{MPI\_Type\_vector} di $\mloc$ blocchi
 da $\nloc$ elementi e stride $N$. Il destinatario ne descrive uno con stride
-$\code{lda}$, che pu\`o essere diverso. \`E il caso generale --- due layout diversi
-sui due lati della stessa comunicazione --- e non richiede nessun buffer
+$\code{lda}$, che pu\`o essere diverso
+\color{red}
+È il caso generale - due layout diversi
+sui due lati della stessa comunicazione - e non richiede nessun buffer
 intermedio n\'e nessuna copia manuale.
+\color{black}
 
-
-\paragraph{\code{--a-mode local}.} Ogni processo genera direttamente il proprio
-blocco 2D di $A$ dagli indici globali. Non esiste mai una copia globale, quindi
-non esiste un limite di memoria dato dal singolo nodo.
+\paragraph{\code{--a-mode local}.} Ogni processo genera direttamente il proprio blocco 2D di 
+$A$ dagli indici globali. In questo modo non è necessario materializzare una copia globale
+aggiuntiva della matrice su un singolo processo.
 
 
 \paragraph{\code{--x-mode global}} Il
@@ -192,7 +203,7 @@ Un'invocazione del prodotto esegue tre passi:
 \begin{lstlisting}[language=C,caption={Il corpo di \code{mpi\_matmul}, senza i cronometri.}]
 MPI_Bcast(X_loc, n_loc*k, SCALAR_MPI_TYPE, 0, grid->col_comm);
 
-local_gemm(ctx, X_loc, layout->ldx, Y_loc_part, layout->ldy);
+local_gemm(local_gemm_context, X_loc, layout->ldx, Y_loc_part, layout->ldy);
 
 MPI_Reduce(Y_loc_part, Y_row_col0, m_loc*k, SCALAR_MPI_TYPE,
            MPI_SUM, 0, grid->row_comm);
@@ -202,11 +213,11 @@ MPI_Reduce(Y_loc_part, Y_row_col0, m_loc*k, SCALAR_MPI_TYPE,
   \item \textbf{Broadcast di $X$ lungo \code{col\_comm}:} tutti i processi di una
         colonna della griglia lavorano sulle stesse colonne di $A$, quindi
         servono loro le stesse righe di $X$. Il root è il processo di riga $0$,
-        l'unico che possiede inizialmenate quella fetta.
+        l'unico che possiede inizialmenate quella fetta, ne è il \emph{responsabile}.
   \item \textbf{Prodotto locale:} il risultato \`e \emph{parziale}: il processo
         in posizione $(r,c)$ calcola il contributo delle sole colonne
         $[\text{col}_0, \text{col}_0 + \nloc)$ di $A$ alle righe
-        $[\text{row}_0, \text{row}_0 + \mloc)$ di $Y$.
+        $[\text{row}_0, \text{row}_0 + \mloc)$ di $Y$ (dove $\text{row}_0$ e $\text{col}_0$ sono gli offset globali del blocco locale).
   \item \textbf{Reduce lungo \code{row\_comm}:} i $\Pcol$ contributi parziali
         della stessa banda di righe vivono sui processi di una stessa riga della
         griglia: sommandoli tra loro si ottiene $Y$.
@@ -219,6 +230,7 @@ MPI_Reduce(Y_loc_part, Y_row_col0, m_loc*k, SCALAR_MPI_TYPE,
         di quella porzione di $Y$: nessuna ridistribuzione finale è necessaria.
 \end{enumerate}
 
+\color{red}
 \section{Modello di costo della comunicazione}
 \label{sec:modello-comunicazione}
 
@@ -274,3 +286,4 @@ su una griglia 2D con blocco locale costante, $M$ segue $\Prow$ e $N$ segue
 $\Pcol$, quindi cambiare $P$ cambia \emph{anche} il rapporto $M{:}N$. \`E
 inerente alla decomposizione, ed \`e la ragione per cui l'effetto della forma
 viene misurato separatamente in C1 e C6.
+\color{black}
