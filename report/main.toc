@@ -1,14 +1,15 @@
 \babel@toc {italian}{}\relax 
 \babel@toc {italian}{}\relax 
 \contentsline {chapter}{\numberline {1}Introduzione}{1}{chapter.1}%
-\contentsline {section}{\numberline {1.1}Il problema}{1}{section.1.1}%
-\contentsline {section}{\numberline {1.2}Requisiti della traccia e dove sono soddisfatti}{1}{section.1.2}%
-\contentsline {section}{\numberline {1.3}Contributo e criteri di progetto}{2}{section.1.3}%
-\contentsline {paragraph}{Una variabile per volta.}{2}{section*.3}%
-\contentsline {paragraph}{Gli invarianti si impongono, non si sperano.}{2}{section*.4}%
-\contentsline {paragraph}{Ogni numero \`e riproducibile.}{2}{section*.5}%
-\contentsline {section}{\numberline {1.4}Struttura della relazione}{3}{section.1.4}%
-\contentsline {section}{\numberline {1.5}Ripartizione del lavoro}{3}{section.1.5}%
+\contentsline {section}{\numberline {1.1}Obiettivo}{1}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Requisiti e scelte progettuali}{1}{section.1.2}%
+\contentsline {paragraph}{Dimensioni e geometria scelte a runtime.}{1}{section*.2}%
+\contentsline {paragraph}{Distribuzione bidimensionale e gestione degli indici.}{1}{section*.3}%
+\contentsline {paragraph}{Disaccoppiamento fra comunicazione e calcolo locale.}{1}{section*.4}%
+\contentsline {paragraph}{Backend di calcolo locale.}{2}{section*.5}%
+\contentsline {paragraph}{Preprocessamento e collaudo funzionale.}{2}{section*.6}%
+\contentsline {paragraph}{Misura delle prestazioni.}{2}{section*.7}%
+\contentsline {section}{\numberline {1.3}Ripartizione del lavoro}{3}{section.1.3}%
 \contentsline {chapter}{\numberline {2}Il nucleo di calcolo}{4}{chapter.2}%
 \contentsline {section}{\numberline {2.1}Formalizzazione e conteggio delle operazioni}{4}{section.2.1}%
 \contentsline {section}{\numberline {2.2}Ordine dei cicli: schema A contro schema B}{4}{section.2.2}%
@@ -28,9 +29,9 @@
 \contentsline {section}{\numberline {4.3}Layout dei blocchi locali}{12}{section.4.3}%
 \contentsline {subsection}{\numberline {4.3.1}Le tre leading dimension non sono equivalenti}{12}{subsection.4.3.1}%
 \contentsline {section}{\numberline {4.4}Distribuzione iniziale dei dati}{12}{section.4.4}%
-\contentsline {paragraph}{\texttt {--a-mode local}.}{12}{section*.10}%
-\contentsline {paragraph}{\texttt {--a-mode global}.}{13}{section*.11}%
-\contentsline {paragraph}{\texttt {--x-mode local} / \texttt {global}.}{13}{section*.12}%
+\contentsline {paragraph}{\texttt {--a-mode local}.}{12}{section*.12}%
+\contentsline {paragraph}{\texttt {--a-mode global}.}{13}{section*.13}%
+\contentsline {paragraph}{\texttt {--x-mode local} / \texttt {global}.}{13}{section*.14}%
 \contentsline {section}{\numberline {4.5}L'algoritmo distribuito}{13}{section.4.5}%
 \contentsline {section}{\numberline {4.6}Modello di costo della comunicazione}{13}{section.4.6}%
 \contentsline {chapter}{\numberline {5}Il nucleo di CPU}{15}{chapter.5}%
@@ -41,22 +42,22 @@
 \contentsline {section}{\numberline {5.4}Il costo nascosto: la rilettura di $X$}{16}{section.5.4}%
 \contentsline {chapter}{\numberline {6}I backend CUDA}{18}{chapter.6}%
 \contentsline {section}{\numberline {6.1}Struttura comune}{18}{section.6.1}%
-\contentsline {paragraph}{Perch\'e i \texttt {cudaEvent} e non l'orologio dell'host.}{18}{section*.15}%
-\contentsline {paragraph}{La fase locale \`e scomposta per intero.}{19}{section*.16}%
-\contentsline {paragraph}{Dai tempi alla banda.}{19}{section*.17}%
-\contentsline {paragraph}{Anche il preprocessing \`e scomposto.}{19}{section*.18}%
-\contentsline {paragraph}{Capienza della VRAM.}{19}{section*.20}%
-\contentsline {paragraph}{Un solo device.}{19}{section*.21}%
+\contentsline {paragraph}{Perch\'e i \texttt {cudaEvent} e non l'orologio dell'host.}{18}{section*.17}%
+\contentsline {paragraph}{La fase locale \`e scomposta per intero.}{19}{section*.18}%
+\contentsline {paragraph}{Dai tempi alla banda.}{19}{section*.19}%
+\contentsline {paragraph}{Anche il preprocessing \`e scomposto.}{19}{section*.20}%
+\contentsline {paragraph}{Capienza della VRAM.}{19}{section*.22}%
+\contentsline {paragraph}{Un solo device.}{19}{section*.23}%
 \contentsline {section}{\numberline {6.2}\texttt {cuda\_naive}: la baseline}{20}{section.6.2}%
 \contentsline {section}{\numberline {6.3}\texttt {cuda\_warp}: un warp per riga}{20}{section.6.3}%
 \contentsline {subsection}{\numberline {6.3.1}Un secondo layout per $X$: \texttt {X\_LAYOUT=column}}{20}{subsection.6.3.1}%
 \contentsline {section}{\numberline {6.4}\texttt {cuda\_warp\_smem}: la fetta di $X$ in shared memory}{21}{section.6.4}%
-\contentsline {paragraph}{Il difetto attaccato.}{21}{section*.22}%
-\contentsline {paragraph}{Il rimedio.}{21}{section*.23}%
+\contentsline {paragraph}{Il difetto attaccato.}{21}{section*.24}%
+\contentsline {paragraph}{Il rimedio.}{21}{section*.25}%
 \contentsline {subsection}{\numberline {6.4.1}Il conflitto sui banchi e il padding a $k+1$}{21}{subsection.6.4.1}%
 \contentsline {subsection}{\numberline {6.4.2}Che cosa il tile cambia davvero, e che cosa no}{22}{subsection.6.4.2}%
-\contentsline {paragraph}{Il budget non si sceglie in assoluto.}{22}{section*.24}%
-\contentsline {paragraph}{La granularit\`a \`e un compromesso, non un requisito.}{23}{section*.25}%
+\contentsline {paragraph}{Il budget non si sceglie in assoluto.}{22}{section*.26}%
+\contentsline {paragraph}{La granularit\`a \`e un compromesso, non un requisito.}{23}{section*.27}%
 \contentsline {subsection}{\numberline {6.4.3}Perch\'e non ci sono uscite anticipate}{23}{subsection.6.4.3}%
 \contentsline {section}{\numberline {6.5}\texttt {cuda\_warp\_tiled}: meno accumulatori per lane}{23}{section.6.5}%
 \contentsline {section}{\numberline {6.6}\texttt {cublas}: il riferimento esterno}{23}{section.6.6}%
@@ -69,10 +70,10 @@
 \contentsline {section}{\numberline {7.2}Roofline della CPU}{27}{section.7.2}%
 \contentsline {chapter}{\numberline {8}Metodologia sperimentale}{28}{chapter.8}%
 \contentsline {section}{\numberline {8.1}Ambiente di misura}{28}{section.8.1}%
-\contentsline {paragraph}{Binding obbligatorio.}{28}{section*.31}%
+\contentsline {paragraph}{Binding obbligatorio.}{28}{section*.33}%
 \contentsline {section}{\numberline {8.2}Che cosa entra nel cronometro}{28}{section.8.2}%
 \contentsline {section}{\numberline {8.3}I tempi esclusi dalla misura ufficiale}{29}{section.8.3}%
-\contentsline {paragraph}{Un controllo che il driver fa da solo.}{30}{section*.33}%
+\contentsline {paragraph}{Un controllo che il driver fa da solo.}{30}{section*.35}%
 \contentsline {section}{\numberline {8.4}Stabilit\`a delle misure}{30}{section.8.4}%
 \contentsline {section}{\numberline {8.5}Le campagne}{30}{section.8.5}%
 \contentsline {subsection}{\numberline {8.5.1}C1 --- dimensioni crescenti per rapporto $M{:}N$}{31}{subsection.8.5.1}%
@@ -82,8 +83,8 @@
 \contentsline {subsection}{\numberline {8.5.5}C5 --- weak scaling}{32}{subsection.8.5.5}%
 \contentsline {subsection}{\numberline {8.5.6}C6 --- forma della griglia a $P$ fisso}{32}{subsection.8.5.6}%
 \contentsline {subsection}{\numberline {8.5.7}C7 --- la precisione, misurata e spiegata}{32}{subsection.8.5.7}%
-\contentsline {paragraph}{C7.1 --- quanto.}{32}{section*.36}%
-\contentsline {paragraph}{C7.2 --- perch\'e.}{33}{section*.37}%
+\contentsline {paragraph}{C7.1 --- quanto.}{32}{section*.38}%
+\contentsline {paragraph}{C7.2 --- perch\'e.}{33}{section*.39}%
 \contentsline {section}{\numberline {8.6}Riproducibilit\`a}{33}{section.8.6}%
 \contentsline {chapter}{\numberline {9}Correttezza e validazione}{34}{chapter.9}%
 \contentsline {section}{\numberline {9.1}L'oracolo seriale}{34}{section.9.1}%
@@ -111,11 +112,11 @@
 \contentsline {section}{\numberline {11.1}Che cosa \`e stato realizzato}{48}{section.11.1}%
 \contentsline {section}{\numberline {11.2}Che cosa dicono i dati finora}{48}{section.11.2}%
 \contentsline {section}{\numberline {11.3}Lavori futuri}{49}{section.11.3}%
-\contentsline {paragraph}{Blocking del ciclo su $j$ sul nucleo di CPU.}{49}{section*.62}%
-\contentsline {paragraph}{Parallelizzazione OpenMP interna al processo.}{49}{section*.63}%
-\contentsline {paragraph}{MPI CUDA-aware.}{49}{section*.64}%
-\contentsline {paragraph}{MPS per la condivisione della GPU.}{49}{section*.65}%
-\contentsline {paragraph}{Profilazione con \texttt {ncu}.}{49}{section*.66}%
+\contentsline {paragraph}{Blocking del ciclo su $j$ sul nucleo di CPU.}{49}{section*.64}%
+\contentsline {paragraph}{Parallelizzazione OpenMP interna al processo.}{49}{section*.65}%
+\contentsline {paragraph}{MPI CUDA-aware.}{49}{section*.66}%
+\contentsline {paragraph}{MPS per la condivisione della GPU.}{49}{section*.67}%
+\contentsline {paragraph}{Profilazione con \texttt {ncu}.}{49}{section*.68}%
 \contentsline {chapter}{\numberline {A}Interfaccia a riga di comando e formato dei dati}{50}{appendix.Alph1}%
 \contentsline {section}{\numberline {A.1}Opzioni del driver}{50}{section.Alph1.1}%
 \contentsline {section}{\numberline {A.2}Colonne del CSV}{50}{section.Alph1.2}%

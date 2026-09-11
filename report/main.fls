@@ -468,6 +468,12 @@ INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmbx12.tfm
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmr12.tfm
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmbx12.tfm
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmri10.tfm
+INPUT /usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-mathsy.enc
+INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/lm/ts1lmr.fd
+INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/lm/ts1lmr.fd
+INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/lm/ts1lmr.fd
+INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ts1-lmr10.tfm
+INPUT /usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-ts1.enc
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmr9.tfm
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/rm-lmr9.tfm
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/lmmi9.tfm
@@ -475,8 +481,6 @@ INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/lmsy9.tfm
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/amsfonts/symbols/msam10.tfm
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/amsfonts/symbols/msbm10.tfm
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmbx9.tfm
-INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmtt9.tfm
-INPUT /usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-mathsy.enc
 INPUT ./sezioni/02-problema.tex
 INPUT ./sezioni/02-problema.tex
 INPUT ./sezioni/02-problema.tex
@@ -488,6 +492,7 @@ INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/listings/lstlang1.sty
 INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/listings/lstmisc.sty
 INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/listings/lstmisc.sty
 INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/listings/lstmisc.sty
+INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmtt9.tfm
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmtk10.tfm
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-mathex.enc
 INPUT ./sezioni/03-architettura.tex
@@ -503,16 +508,11 @@ INPUT ./sezioni/04-mpi.tex
 INPUT ./sezioni/04-mpi.tex
 INPUT sezioni/04-mpi.tex
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmtk10.tfm
-INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/lm/ts1lmr.fd
-INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/lm/ts1lmr.fd
-INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/lm/ts1lmr.fd
-INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ts1-lmr10.tfm
 INPUT ./sezioni/05-kernel-cpu.tex
 INPUT ./sezioni/05-kernel-cpu.tex
 INPUT ./sezioni/05-kernel-cpu.tex
 INPUT ./sezioni/05-kernel-cpu.tex
 INPUT sezioni/05-kernel-cpu.tex
-INPUT /usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-ts1.enc
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/rm-lmr12.tfm
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/lmmi12.tfm
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/lmsy10.tfm

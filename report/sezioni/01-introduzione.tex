@@ -1,7 +1,7 @@
 \chapter{Introduzione}
 \label{cap:introduzione}
 
-\section{Il problema}
+\section{Obiettivo}
 
 Il progetto realizza un nucleo di calcolo per il prodotto fra una matrice densa
 e un multivettore,
@@ -13,111 +13,134 @@ e un multivettore,
   Y \in \mathbb{R}^{M \times k},
   \label{eq:problema}
 \end{equation}
-con $k$ \emph{piccolo}: il multivettore \`e una matrice densa alta e strettissima.
-Il codice funziona per $k$ generico ed \`e collaudato sui cinque valori richiesti
-dalla traccia, $k \in \{3, 6, 8, 20, 32\}$, oltre che su valori che non ricevono
-alcuna specializzazione ($k \in \{1, 7, 17, 40, 64\}$), usati proprio per
-misurare quanto vale la specializzazione stessa.
+con $k$ \emph{piccolo}: il multivettore è una matrice densa alta e strettissima.
+Il codice funziona per $k$ generico ed è collaudato sui cinque valori richiesti
+dalla traccia, $k \in \{3, 6, 8, 20, 32\}$.
 
-La ristrettezza di $k$ non \`e un dettaglio: \`e la caratteristica che rende il
-problema diverso sia da un GEMM quadrato sia da $k$ prodotti matrice-vettore
-indipendenti. \`E troppo poco perch\'e una libreria general-purpose ammortizzi il
-proprio percorso di selezione dell'algoritmo, ed \`e abbastanza perch\'e il riuso
-in registro degli elementi di $A$ cambi radicalmente l'intensit\`a aritmetica del
-nucleo. Entrambe le affermazioni sono verificate sperimentalmente in questa
-relazione e non date per buone: la prima con il backend cuBLAS
-(\cref{sec:cublas}), la seconda con il confronto fra schema~A e schema~B
-(\cref{sec:schemi}).
+\medskip
 
-\section{Requisiti della traccia e dove sono soddisfatti}
+\noindent La parallelizzazione è ibrida a due livelli. MPI costituisce il livello
+esterno, responsabile della distribuzione dei dati su una griglia di processi
+bidimensionale e della comunicazione fra processi; la parallelizzazione interna
+al singolo processo è affidata a CUDA, l'opzione scelta fra le due ammesse
+dalla traccia. I due livelli non sono alternativi ma sovrapposti: ogni processo
+MPI possiede un blocco di $A$ e delega il calcolo del proprio contributo
+parziale a un \emph{backend} locale, che può essere un kernel CUDA oppure un nucleo di CPU.
 
-\Cref{tab:requisiti} mette in corrispondenza ogni requisito con il punto della
-relazione e del codice che lo soddisfa. \`E la mappa di lettura del documento.
+\section{Requisiti e scelte progettuali}
 
-\begin{table}[H]
-\centering
-\caption{Requisiti della traccia e loro copertura.}
-\label{tab:requisiti}
-\footnotesize
-\begin{tabular}{@{}p{0.44\linewidth}p{0.26\linewidth}p{0.24\linewidth}@{}}
-\toprule
-\textbf{Requisito} & \textbf{Dove nel codice} & \textbf{Dove in relazione} \\
-\midrule
-$Y \leftarrow AX$, $A$ densa $M\times N$, $X$ multivettore $N\times k$
-  & \file{src/mpi/matmul\_mpi.c} & \cref{cap:problema} \\
-$k$ generico, collaudato su $3,6,8,20,32$
-  & \file{src/kernel/*} (specializzazioni + fallback) & \cref{sec:specializzazione} \\
-$M$, $N$ scelti dall'utente a runtime
-  & \file{src/bench/main.c} (\code{-M -N}) & \cref{app:cli} \\
-Parallelizzazione MPI con attenzione allo scambio dati
-  & \file{src/mpi/} & \cref{cap:mpi} \\
-Corretta gestione degli indici
-  & \file{src/index/index.c} + test dedicato & \cref{sec:indici}, \cref{sec:validazione-indici} \\
-Parallelizzazione interna al processo (CUDA)
-  & \file{src/kernel/cuda\_*.cu} & \cref{cap:cuda} \\
-$A$ distribuita su griglia di processi 2D, estensione scelta dall'utente
-  & \file{src/mpi/grid.c} (\code{--pr --pc}) & \cref{sec:griglia} \\
-$X$ e $Y$ su una sola riga/colonna della griglia
-  & \file{src/mpi/distrib.c} & \cref{sec:layout} \\
-Sviluppo in C
-  & tutto \file{src/} (C11; i soli \file{.cu} sono C++ per nvcc) & \cref{sec:interfaccia} \\
-Collaudo contro implementazione seriale minimale
-  & \file{src/serial/serial.c}, \code{--check} & \cref{cap:validazione} \\
-Funzioni ausiliarie di preprocessamento dei dati
-  & \file{src/gen/}, \file{src/index/}, \file{src/mpi/distrib.c} & \cref{sec:generazione} \\
-Misura delle prestazioni sul server di dipartimento
-  & \file{script/}, \file{experiments/} & \cref{cap:metodologia} \\
-Almeno 3 rapporti $M:N$ crescenti, incluso $M=N$
-  & campagna C1 & \cref{sec:c1} \\
-$\mathrm{FLOPS} = 2MNk/T$, trasferimenti CUDA esclusi da $T$
-  & \file{src/bench/main.c} & \cref{sec:metriche} \\
-Trasferimenti e preprocessing misurati e discussi a parte
-  & \file{src/kernel/kernel.h}, \file{src/bench/main.c} & \cref{sec:tempi-esclusi}, \cref{sec:ris-trasferimenti} \\
-Ripartizione del lavoro nel gruppo
-  & --- & \cref{sec:ripartizione} \\
-\bottomrule
-\end{tabular}
-\end{table}
+\paragraph{Dimensioni e geometria scelte a runtime.}
+Nessuna dimensione del problema è nota a tempo di compilazione: $M$, $N$, $k$
+e l'estensione $\Prow \times \Pcol$ della griglia sono opzioni da linea di
+comando (\cref{app:cli}), validate prima di qualunque allocazione. L'unica eccezione, deliberata, riguarda $k$: i cinque valori della traccia
+hanno un percorso \emph{specializzato} a tempo di compilazione, perch\'e solo
+così i $k$ accumulatori possono restare in registro
+(\cref{sec:specializzazione}); ogni altro $k$ attraversa un percorso generico,
+che resta corretto ed è misurato a parte.
 
-\section{Contributo e criteri di progetto}
+\paragraph{Distribuzione bidimensionale e gestione degli indici.}
+I processi sono organizzati in una griglia cartesiana costruita con
+\code{MPI\_Cart\_create}, da cui \code{MPI\_Cart\_sub} ricava i comunicatori di
+riga e di colonna usati dalle collettive (\cref{sec:griglia}). $A$ è
+distribuita a blocchi lungo entrambe le dimensioni: il processo di coordinate
+$(i,j)$ detiene un blocco di $\mloc \times \nloc$ elementi.
 
-Tre criteri hanno guidato tutte le scelte descritte nel seguito, e conviene
-enunciarli qui perch\'e ricorrono in ogni capitolo.
+\noindent Coerentemente con quanto consentito dalla traccia, i multivettori non sono
+distribuiti sull'intera griglia: $X$ risiede sulla sola riga~0 di processi e
+viene propagata lungo ogni colonna con un \code{MPI\_Bcast}. I contributi
+parziali di $Y$ vengono sommati lungo ogni riga della griglia con un
+\code{MPI\_Reduce} e raccolti sulla sola colonna~0. Ogni invocazione del
+prodotto costa quindi due collettive, entrambe su sottocomunicatori di
+dimensione ridotta, con un volume proporzionale a $k$.
 
-\paragraph{Una variabile per volta.} Ogni variante di kernel differisce dalla
-precedente per un solo aspetto, in modo che la differenza di tempo misurata sia
-attribuibile. \kernelname{cuda\_warp\_smem}, per esempio, \`e
-\kernelname{cuda\_warp} con cambiata soltanto la provenienza degli elementi di
-$X$: stesso ordine dei cicli, stessa lettura singola di $A$, stessa riduzione
-per shuffle. \`E ci\`o che rende il confronto una misura e non un aneddoto.
+\paragraph{Disaccoppiamento fra comunicazione e calcolo locale.}
+Il livello MPI non conosce il backend con cui viene eseguito il calcolo locale:
+vede soltanto l'interfaccia \code{local\_gemm} di \file{src/kernel/kernel.h}
+(\cref{sec:interfaccia}), a contesto opaco, con le tre operazioni di creazione,
+esecuzione e rilascio. Il ciclo di vita a tre fasi (\cref{sec:tre-fasi}) è
+la scelta con l'effetto più ampio sull'intero progetto: $A$ non cambia mai fra
+un'invocazione e l'altra, quindi tutto ciò che la riguarda avviene una volta sola in
+\code{local\_gemm\_create} e resta fuori dal cronometro per costruzione, non per
+sottrazione a posteriori. La stessa interfaccia è agnostica rispetto alla
+collocazione della memoria, host o device, il che lascia aperta la strada a un
+MPI CUDA-aware senza modifiche al codice di distribuzione
+(\cref{sec:lavori-futuri}).
 
-\paragraph{Gli invarianti si impongono, non si sperano.} Diversi errori
-possibili in questo progetto non fanno fallire nulla: producono risultati
-sbagliati in silenzio. Un $\code{ldx} \neq k$ renderebbe scorretto il conteggio
-contiguo di \code{MPI\_Bcast}; una partizione degli indici applicata in modo
-incoerente fra colonne di $A$ e righe di $X$ darebbe somme sbagliate. Dove un
-invariante di questo tipo esiste, il codice lo verifica esplicitamente e
-termina il job con un messaggio, fuori dalla regione cronometrata.
+\paragraph{Backend di calcolo locale.}
 
-\paragraph{Ogni numero \`e riproducibile.} La generazione dei dati \`e
-deterministica e senza stato, ogni configurazione di build produce un binario
-con nome proprio, e ogni campagna scrive accanto ai risultati i metadati
-completi dell'ambiente (commit git, versione di \code{nvcc} e \code{mpirun},
-parametri). \`E la premessa perch\'e un confronto fra due righe di un CSV significhi
-qualcosa.
 
-\section{Struttura della relazione}
+Sul lato GPU il progetto contiene quattro kernel e un
+riferimento esterno (\cref{cap:cuda}), concepiti come una \emph{sequenza} in
+cui ogni versione cambia una sola cosa rispetto alla precedente:
 
-\Cref{cap:problema} formalizza il problema e giustifica l'ordine dei cicli
-scelto per il nucleo locale. \Cref{cap:architettura} descrive l'architettura
-del software e l'interfaccia unica che rende il codice MPI indipendente dal
-backend. \Cref{cap:mpi} tratta la decomposizione a griglia 2D, la
-distribuzione dei dati e il modello di costo delle comunicazioni.
-\Cref{cap:kernel-cpu,cap:cuda} descrivono rispettivamente il nucleo di CPU e i
-quattro backend CUDA. \Cref{cap:roofline} costruisce il modello roofline che
-fa da riferimento a tutte le misure. \Cref{cap:metodologia} definisce metriche
-e campagne, \cref{cap:validazione} la strategia di correttezza,
-\cref{cap:risultati} presenta e discute i risultati.
+\begin{itemize}
+  \item \kernelname{cuda\_naive} (un thread per elemento di $Y$, la baseline),
+  \item \kernelname{cuda\_warp} (un warp per riga di $Y$, $k$ accumulatori per lane e riduzione con \code{\_\_shfl\_down\_sync}),
+  \item  \kernelname{cuda\_warp\_smem} (la fetta di $X$ passa da un tile in shared memory, con padding sui banchi regolabile da \code{SMEM\_PAD}),
+  \item \kernelname{cuda\_warp\_tiled} (un warp per tile di colonne).
+
+\end{itemize}
+Come accennato in precedenza, \kernelname{cublas} non è una proposta, ma viene sfruttato come riferimento
+con il quale confrontare le performance dei vari kernel CUDA.
+
+\medskip
+
+\noindent Sul lato CPU, troviamo tre proposte: \kernelname{scheme\_a} è l'implementazione
+di base, con due ottimizzazioni di cache
+\kernelname{scheme\_a\_jblock} e \kernelname{scheme\_a\_jblock\_rb}
+(\cref{cap:kernel-cpu}).
+
+\medskip
+
+\noindent Tutto il codice usa un unico tipo \code{scalar\_t}, pari a \code{double} per default e
+\code{float} con \code{PREC=float}: il confronto fra le due precisioni è un
+flag di compilazione sullo stesso sorgente (\cref{sec:precisione}), il modello
+roofline ne prevede l'effetto (\cref{cap:roofline}).
+
+\paragraph{Preprocessamento e collaudo funzionale.}
+Le matrici sono generate, non lette da file, con un generatore senza stato
+funzione dei soli indici globali e del seme (\cref{sec:generazione}): ogni
+processo può produrre direttamente il proprio blocco (\code{--a-mode local},
+\code{--x-mode local}), oppure il rank~0 materializza l'intera matrice e la
+distribuisce: $A$ con datatype \code{MPI\_Type\_vector}, $X$ con
+\code{MPI\_Scatterv} sulla riga~0 (\cref{sec:distribuzione-a}).
+Generazione e distribuzione compongono una fase di preprocessing
+e per questo motivo sono state escluse dal tempo ufficiale, ma vengono comunque cronometrate, riportate
+e discusse a parte.
+
+\medskip 
+
+\noindent La correttezza è stata verificata con \code{--check} contro
+un'implementazione seriale minimale usata come oracolo
+(\cref{cap:validazione}): il rank~0 raccoglie $Y$ distribuita, ricostruisce
+$A$ e $X$ dal generatore, e confronta in norma $L_2$ relativa con una
+tolleranza che cresce come $\varepsilon\sqrt{N}$, coerente con la non
+associatività dell'aritmetica in virgola mobile.
+
+\paragraph{Misura delle prestazioni.}
+Le misure sono state condotte sul server di dipartimento: un nodo a doppio socket con
+una singola GPU Quadro RTX 5000 (Turing, \code{sm\_75}), raggiungibile solo dai
+nodi di calcolo attraverso lo scheduler e non dal frontend
+(\cref{cap:metodologia}).
+
+\medskip
+
+\noindent La metrica ufficiale è quella imposta dalla
+traccia, $\mathrm{FLOPS} =2MNk/T$ con $T$ tempo medio per invocazione su esecuzioni ripetute.
+I tempi dei kernel sono rilevati con \code{cudaEvent}, e la fase locale su GPU
+è scomposta per intero in tempo \emph{host-to-device} (H2D) di $X$, tempo di kernel,
+tempo \emph{device-to-host} (D2H) di $Y$ e overhead del
+runtime (\cref{sec:tempi-esclusi}).
+
+\medskip
+
+\noindent Le campagne sono descritte da file
+\code{.conf} e lanciate da un unico runner (\cref{sec:campagne}). Un aspetto
+dell'ambiente va enunciato prima dei numeri: senza MPS, più rank MPI sulla
+stessa GPU si alternano sulla scheda, per cui con $P>1$ il tempo di kernel è
+un throughput aggregato e non il tempo di una GPU dedicata. Le campagne di
+caratterizzazione del kernel sono perciò a rank singolo
+(\cref{sec:serializzazione}).
 
 \section{Ripartizione del lavoro}
 \label{sec:ripartizione}
@@ -130,14 +153,15 @@ lavoro fra i componenti. Compilare la tabella seguente prima della consegna.
 \begin{table}[H]
 \centering
 \footnotesize
-\begin{tabular}{@{}p{0.32\linewidth}p{0.3\linewidth}p{0.3\linewidth}@{}}
+\begin{tabular}{@{}p{0.40\linewidth}p{0.26\linewidth}p{0.26\linewidth}@{}}
 \toprule
-\textbf{Attivit\`a} & \textbf{\autoreuno} & \textbf{\autoredue} \\
+\textbf{Attività} & \textbf{\autoreuno} & \textbf{\autoredue} \\
 \midrule
-Infrastruttura MPI e distribuzione dati & \dato & \dato \\
-Nucleo di CPU e specializzazioni & \dato & \dato \\
-Backend CUDA & \dato & \dato \\
-Campagne di misura e analisi & \dato & \dato \\
+Infrastruttura MPI, griglia, indici e distribuzione & \dato & \dato \\
+Nucleo di CPU e specializzazioni su $k$ & \dato & \dato \\
+Backend CUDA e riferimento cuBLAS & \dato & \dato \\
+Driver di misura, cronometri e CSV & \dato & \dato \\
+Campagne sperimentali e analisi & \dato & \dato \\
 Validazione e test & \dato & \dato \\
 Relazione & \dato & \dato \\
 \bottomrule

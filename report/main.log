@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.8.27)  11 SEP 2026 14:56
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.8.27)  11 SEP 2026 18:04
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -968,7 +968,7 @@ Package cleveref Info: loaded `italian' language definitions on input line 2.
 
 
 {/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-mathit.enc}{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-rm.enc}]
-Package cleveref Info: loaded `italian' language definitions on input line 105.
+Package cleveref Info: loaded `italian' language definitions on input line 111.
  [2])
 \tf@toc=\write5
 \openout5 = `main.toc'.
@@ -976,19 +976,24 @@ Package cleveref Info: loaded `italian' language definitions on input line 105.
 Package cleveref Info: loaded `italian' language definitions on input line 29.
  [3] (./sezioni/01-introduzione.tex
 Capitolo 1.
-LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <9> on input line 42.
 
 pdfTeX warning (ext4): destination with the same identifier (name{page.1}) has been already used, duplicate ignored
 <to be read again> 
                    \relax 
-l.81 
+l.68 
       [1
 
 
 {/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-mathsy.enc}]
-Package cleveref Info: loaded `italian' language definitions on input line 121.
- [2]) (./sezioni/02-problema.tex
+LaTeX Font Info:    Trying to load font information for TS1+lmr on input line 77.
+ (/usr/local/texlive/2026/texmf-dist/tex/latex/lm/ts1lmr.fd
+File: ts1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
+)
+Package cleveref Info: loaded `italian' language definitions on input line 144.
+ [2{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-ts1.enc}]
+LaTeX Font Info:    External font `lmex10' loaded for size
+(Font)              <9> on input line 156.
+) (./sezioni/02-problema.tex
 Package cleveref Info: loaded `italian' language definitions on input line 1.
  [3]
 Capitolo 2.
@@ -1026,13 +1031,9 @@ LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <10.95> not available
 Package cleveref Info: loaded `italian' language definitions on input line 158.
  [12]
 Package cleveref Info: loaded `italian' language definitions on input line 230.
- [13]
-LaTeX Font Info:    Trying to load font information for TS1+lmr on input line 234.
- (/usr/local/texlive/2026/texmf-dist/tex/latex/lm/ts1lmr.fd
-File: ts1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
-)) (./sezioni/05-kernel-cpu.tex
+ [13]) (./sezioni/05-kernel-cpu.tex
 Package cleveref Info: loaded `italian' language definitions on input line 1.
- [14{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-ts1.enc}]
+ [14]
 Capitolo 5.
 LaTeX Font Info:    External font `lmex10' loaded for size
 (Font)              <14.4> on input line 10.
@@ -1221,6 +1222,9 @@ Package cleveref Info: loaded `italian' language definitions on input line 645.
 Package cleveref Info: loaded `italian' language definitions on input line 1.
  [47]
 Capitolo 11.
+
+LaTeX Warning: Reference `tab:requisiti' on page 1 undefined on input line 10.
+
 [48
 
 ]) (./sezioni/A-interfaccia.tex
@@ -1249,22 +1253,26 @@ Package cleveref Info: loaded `italian' language definitions on input line 8.
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
  ***********
+
+
+LaTeX Warning: There were undefined references.
+
 Package rerunfilecheck Info: File `main.out' has not changed.
-(rerunfilecheck)             Checksum: 154FEAB32B7A8512DE6BD831DB266867;21267.
+(rerunfilecheck)             Checksum: E7C73C9663B507867B6AE2D78467270C;20745.
  ) 
 Here is how much of TeX's memory you used:
- 48529 strings out of 467525
- 1115222 string characters out of 5418982
- 1935431 words of memory out of 5000000
- 75931 multiletter control sequences out of 15000+600000
- 773775 words of font info for 336 fonts, out of 8000000 for 9000
+ 48524 strings out of 467525
+ 1115162 string characters out of 5418982
+ 1935130 words of memory out of 5000000
+ 75928 multiletter control sequences out of 15000+600000
+ 773727 words of font info for 335 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  103i,19n,111p,1082b,2696s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmcsc10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmex10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi6.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr6.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy6.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtk10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtt10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtt8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtt9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtti10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/symbols/msam10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on main.pdf (59 pages, 818877 bytes).
+Output written on main.pdf (59 pages, 819445 bytes).
 PDF statistics:
- 1439 PDF objects out of 1440 (max. 8388607)
- 1295 compressed objects within 13 object streams
+ 1417 PDF objects out of 1440 (max. 8388607)
+ 1273 compressed objects within 13 object streams
  397 named destinations out of 1000 (max. 500000)
- 87365 words of extra memory for PDF output out of 89155 (max. 10000000)
+ 87349 words of extra memory for PDF output out of 89155 (max. 10000000)
 

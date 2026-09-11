@@ -1,6 +1,6 @@
 # Fdb version 4
-["pdflatex"] 1789131380.2945 "/Users/andreagalluzzi/Desktop/03-progetto-scpa/parallel-computing-project/report/main.tex" "main.pdf" "main" 1789131384.13568 0
-  "/Users/andreagalluzzi/Desktop/03-progetto-scpa/parallel-computing-project/report/main.tex" 1789131375.85359 1566 b14ba29162d984745a9668c684f184d4 ""
+["pdflatex"] 1789142662.2045 "/Users/andreagalluzzi/Desktop/03-progetto-scpa/parallel-computing-project/report/main.tex" "main.pdf" "main" 1789142667.09645 0
+  "/Users/andreagalluzzi/Desktop/03-progetto-scpa/parallel-computing-project/report/main.tex" 1789138203.0568 1566 b14ba29162d984745a9668c684f184d4 ""
   "/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-ec.enc" 1254269338 2375 baa924870cfb487815765f9094cf3728 ""
   "/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-mathex.enc" 1202520719 3486 c7eadf5dcc57b3b2d11736679f6636ba ""
   "/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-mathit.enc" 1202520719 2405 5dcf2c1b967ee25cc46c58cd52244aed ""
@@ -301,13 +301,13 @@
   "/usr/local/texlive/2026/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1787854856 5573038 b99aad5e4898a9034e953632f940512b ""
   "/usr/local/texlive/2026/texmf-var/web2c/pdftex/pdflatex.fmt" 1787854834 3636771 791d00354dffef62b12f1c0170294205 ""
   "/usr/local/texlive/2026/texmf.cnf" 1774209515 577 648cd9f92f9c0eac486f4c71c85cfbbe ""
-  "main.aux" 1789131383.82934 46745 e9c382a6b2efdaedac868bbe049b1a44 "pdflatex"
-  "main.out" 1789131383.85013 21267 154feab32b7a8512de6bd831db266867 "pdflatex"
-  "main.tex" 1789131375.85359 1566 b14ba29162d984745a9668c684f184d4 ""
-  "main.toc" 1789131383.85049 11530 36d533a7e5672249bb340709420f13a2 "pdflatex"
+  "main.aux" 1789142666.8466 46538 66d65507d05a8c72ca9b16061e61ef7b "pdflatex"
+  "main.out" 1789142666.86761 20745 e7c73c9663b507867b6ae2d78467270c "pdflatex"
+  "main.tex" 1789138203.0568 1566 b14ba29162d984745a9668c684f184d4 ""
+  "main.toc" 1789142666.86796 11603 fa99d155ed1bd5aa8ec5587298d67ac4 "pdflatex"
   "preambolo.tex" 1789081532.94395 6506 e8897cbca75905fd7ae353d1497f66d1 ""
   "sezioni/00-frontespizio.tex" 1788999436.88905 1240 e2b26749a506ea04c86c88626069c0c8 ""
-  "sezioni/01-introduzione.tex" 1789081534.15976 6873 af9784746e199ec980f21890fb350f2d ""
+  "sezioni/01-introduzione.tex" 1789142661.66155 8135 33d737ace235b4578999b1934d5a0cd4 ""
   "sezioni/02-problema.tex" 1788999437.60236 7475 d06914223cb671fd22535ef3f9448dbd ""
   "sezioni/03-architettura.tex" 1789081534.53673 11983 238d82c2b0b9aa0ae3a6f578fb9d9f56 ""
   "sezioni/04-mpi.tex" 1788999438.31224 12408 2518f2ec8360bd532c4949999100cb2f ""
