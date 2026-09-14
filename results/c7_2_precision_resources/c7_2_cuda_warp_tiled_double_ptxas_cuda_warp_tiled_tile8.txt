@@ -1,0 +1,43 @@
+mpicc -std=c11 -O3 -march=native -ffp-contract=fast -Wall -Wextra -Wpedantic -Isrc -MMD -MP    -c src/common/util.c -o obj/matmul_mpi-cuda_warp_tiled/common/util.o
+mpicc -std=c11 -O3 -march=native -ffp-contract=fast -Wall -Wextra -Wpedantic -Isrc -MMD -MP    -c src/index/index.c -o obj/matmul_mpi-cuda_warp_tiled/index/index.o
+mpicc -std=c11 -O3 -march=native -ffp-contract=fast -Wall -Wextra -Wpedantic -Isrc -MMD -MP    -c src/gen/gen.c -o obj/matmul_mpi-cuda_warp_tiled/gen/gen.o
+mpicc -std=c11 -O3 -march=native -ffp-contract=fast -Wall -Wextra -Wpedantic -Isrc -MMD -MP    -c src/serial/serial.c -o obj/matmul_mpi-cuda_warp_tiled/serial/serial.o
+mpicc -std=c11 -O3 -march=native -ffp-contract=fast -Wall -Wextra -Wpedantic -Isrc -MMD -MP    -c src/mpi/grid.c -o obj/matmul_mpi-cuda_warp_tiled/mpi/grid.o
+mpicc -std=c11 -O3 -march=native -ffp-contract=fast -Wall -Wextra -Wpedantic -Isrc -MMD -MP    -c src/mpi/distrib.c -o obj/matmul_mpi-cuda_warp_tiled/mpi/distrib.o
+mpicc -std=c11 -O3 -march=native -ffp-contract=fast -Wall -Wextra -Wpedantic -Isrc -MMD -MP    -c src/mpi/matmul_mpi.c -o obj/matmul_mpi-cuda_warp_tiled/mpi/matmul_mpi.o
+mpicc -std=c11 -O3 -march=native -ffp-contract=fast -Wall -Wextra -Wpedantic -Isrc -MMD -MP    -c src/bench/check.c -o obj/matmul_mpi-cuda_warp_tiled/bench/check.o
+mpicc -std=c11 -O3 -march=native -ffp-contract=fast -Wall -Wextra -Wpedantic -Isrc -MMD -MP    -c src/bench/main.c -o obj/matmul_mpi-cuda_warp_tiled/bench/main.o
+nvcc -O3 -std=c++14 -arch=sm_75 -Isrc  -lineinfo  -DSMEM_PAD=1 -DBLOCK_THREADS=256 -Xptxas -v -Xcompiler -Wall -Xcompiler -Wextra -Xptxas -v -DWARP_COL_TILE=8 -Xcompiler -march=native -c src/kernel/cuda_warp_tiled.cu -o obj/matmul_mpi-cuda_warp_tiled/kernel/cuda_warp_tiled.o
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z17warp_tiled_kernelILi0EEviiiPKdiS1_iPdi' for 'sm_75'
+ptxas info    : Function properties for _Z17warp_tiled_kernelILi0EEviiiPKdiS1_iPdi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 60 registers, used 0 barriers, 412 bytes cmem[0]
+ptxas info    : Compile time = 41.942 ms
+ptxas info    : Compiling entry function '_Z17warp_tiled_kernelILi32EEviiiPKdiS1_iPdi' for 'sm_75'
+ptxas info    : Function properties for _Z17warp_tiled_kernelILi32EEviiiPKdiS1_iPdi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 64 registers, used 0 barriers, 412 bytes cmem[0]
+ptxas info    : Compile time = 29.460 ms
+ptxas info    : Compiling entry function '_Z17warp_tiled_kernelILi20EEviiiPKdiS1_iPdi' for 'sm_75'
+ptxas info    : Function properties for _Z17warp_tiled_kernelILi20EEviiiPKdiS1_iPdi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 60 registers, used 0 barriers, 412 bytes cmem[0]
+ptxas info    : Compile time = 32.042 ms
+ptxas info    : Compiling entry function '_Z17warp_tiled_kernelILi8EEviiiPKdiS1_iPdi' for 'sm_75'
+ptxas info    : Function properties for _Z17warp_tiled_kernelILi8EEviiiPKdiS1_iPdi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 64 registers, used 0 barriers, 412 bytes cmem[0]
+ptxas info    : Compile time = 28.441 ms
+ptxas info    : Compiling entry function '_Z17warp_tiled_kernelILi6EEviiiPKdiS1_iPdi' for 'sm_75'
+ptxas info    : Function properties for _Z17warp_tiled_kernelILi6EEviiiPKdiS1_iPdi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 64 registers, used 0 barriers, 412 bytes cmem[0]
+ptxas info    : Compile time = 31.173 ms
+ptxas info    : Compiling entry function '_Z17warp_tiled_kernelILi3EEviiiPKdiS1_iPdi' for 'sm_75'
+ptxas info    : Function properties for _Z17warp_tiled_kernelILi3EEviiiPKdiS1_iPdi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 62 registers, used 0 barriers, 412 bytes cmem[0]
+ptxas info    : Compile time = 25.008 ms
+mpicc -std=c11 -O3 -march=native -ffp-contract=fast -Wall -Wextra -Wpedantic -Isrc -MMD -MP    obj/matmul_mpi-cuda_warp_tiled/common/util.o obj/matmul_mpi-cuda_warp_tiled/index/index.o obj/matmul_mpi-cuda_warp_tiled/gen/gen.o obj/matmul_mpi-cuda_warp_tiled/serial/serial.o obj/matmul_mpi-cuda_warp_tiled/mpi/grid.o obj/matmul_mpi-cuda_warp_tiled/mpi/distrib.o obj/matmul_mpi-cuda_warp_tiled/mpi/matmul_mpi.o obj/matmul_mpi-cuda_warp_tiled/bench/check.o obj/matmul_mpi-cuda_warp_tiled/bench/main.o obj/matmul_mpi-cuda_warp_tiled/kernel/cuda_warp_tiled.o -o bin/matmul_mpi-cuda_warp_tiled -L/opt/cuda/12.8/lib64 -lm -lcudart -lstdc++
+built bin/matmul_mpi-cuda_warp_tiled  [PREC=double KERNEL=cuda_warp_tiled (src/kernel/cuda_warp_tiled.cu) FORCE_GENERIC_K=0 TEST_A_PADDING=0 SMEM_PAD=1 BLOCK=256 TILE_GRANULARITY=32 SMEM_BUDGET_BYTES=derivato]
