@@ -35,6 +35,15 @@ typedef struct {
      *
      * Negativo su CPU, dove non c'e' nessuna delle tre voci. */
     double launch_overhead_time;
+    /* Tempo DI GRUPPO della fase locale, misurato solo con group_timing:
+     * MPI_Barrier -> MPI_Wtime -> local_gemm -> MPI_Barrier -> MPI_Wtime.
+     * Parte quando TUTTI i rank sono pronti a lanciare e finisce quando
+     * l'ULTIMO ha ricevuto il risultato dalla GPU: e' identico su ogni rank e
+     * non dipende da come il driver ha alternato i contesti sulla scheda.
+     * Serve quando piu' rank condividono la stessa GPU, dove t_kernel dei
+     * cudaEvent misura anche i turni degli altri processi e il suo massimo
+     * fra i rank non e' piu' un tempo di gruppo. Negativo se disattivato. */
+    double local_group_time;
 } matmul_time_t;
 
 /* Y = A*X distribuito. Tutti i processi eseguono lo stesso codice.
@@ -56,12 +65,16 @@ typedef struct {
  * Ypart: buffer di lavoro m_loc x k, richiesto su tutti i processi.
  * Y_loc: significativo solo sulla colonna 0; puo' essere NULL altrove.
  *        Volutamente distinto da Ypart, cosi' non serve MPI_IN_PLACE.
- * t:     puo' essere NULL se non interessa la scomposizione dei tempi. */
+ * t:     puo' essere NULL se non interessa la scomposizione dei tempi.
+ * group_timing: se diverso da zero, racchiude local_gemm fra due MPI_Barrier
+ *        e riempie local_group_time. Le barriere entrano in t_local, t_total
+ *        e t_official: e' una modalita' diagnostica, non quella ufficiale. */
 void mpi_matmul(const grid_t *grid, const layout_t *layout,
                 local_gemm_t *local_gemm_context,
                 scalar_t *X_loc,
                 scalar_t *Y_loc_part,
                 scalar_t *Y_row_col0,
-                matmul_time_t *times_struct_rep);
+                matmul_time_t *times_struct_rep,
+                int group_timing);
 
 #endif /* MATMUL_MPI_H */

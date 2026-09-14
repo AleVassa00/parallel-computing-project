@@ -48,6 +48,10 @@ typedef struct {
     uint64_t seed;
     int check;
     int csv;
+    /* Cronometro di gruppo attorno alla fase locale (vedi matmul_mpi.h).
+     * Diagnostico: le due barriere che introduce entrano nei tempi ufficiali,
+     * quindi non va usato nelle campagne da cui si ricavano i GFLOPS. */
+    int group_timing;
     const char *csv_raw_file;
     a_mode_t a_mode;
     x_mode_t x_mode;
@@ -73,13 +77,18 @@ static const char *CSV_HEADER =
     "t_launch_overhead_mean_s,t_launch_overhead_std_s,"
     "t_prep_alloc_buffers_s,t_prep_gen_A_s,t_prep_distrib_A_s,"
     "t_prep_gen_X_s,t_prep_distrib_X_s,t_prep_total_s,t_io_csv_raw_s,"
-    "x_layout,t_prep_convert_X_s";
+    "x_layout,t_prep_convert_X_s,"
+    /* Cronometro di gruppo della fase locale (--group-timing). Sentinella
+     * negativa quando la modalita' e' spenta, cosi' le righe restano
+     * distinguibili anche senza guardare la colonna group_timing. */
+    "group_timing,t_local_group_mean_s,t_local_group_std_s,gflops_local_group";
 
 static const char *CSV_RAW_HEADER =
     "kernel,scalar,a_mode,x_mode,M,N,k,P,pr,pc,rep,"
     "t_bcast_s,t_local_s,t_reduce_s,t_total_s,t_official_s,t_kernel_s,"
     "t_transfer_runtime_overhead_s,gflops,gflops_compute,gflops_kernel,"
-    "t_h2d_X_s,t_d2h_Y_s,t_launch_overhead_s,x_layout";
+    "t_h2d_X_s,t_d2h_Y_s,t_launch_overhead_s,x_layout,"
+    "group_timing,t_local_group_s,gflops_local_group";
 
 static const char *a_mode_name(a_mode_t mode)
 {
@@ -135,6 +144,13 @@ static void usage(const char *prog)
     printf("  --csv-header    print the CSV header and exit\n");
     printf("  --csv-raw-file <path>\n");
     printf("                  append one row per timed repetition to a raw CSV\n");
+    printf("  --group-timing  wrap the local phase in two MPI_Barrier and report\n");
+    printf("                  its group wall-clock time (t_local_group): the time\n");
+    printf("                  from when ALL ranks are ready to launch until the\n");
+    printf("                  LAST one has its result. Meaningful when several\n");
+    printf("                  ranks share one GPU, where per-rank cudaEvent kernel\n");
+    printf("                  times also count the other ranks' turns. Diagnostic:\n");
+    printf("                  the barriers perturb t_local/t_total/t_official.\n");
     printf("  -h, --help      this message\n");
 }
 
@@ -191,6 +207,7 @@ static void parse_args(int argc, char **argv, opts_t *options, int rank)
     options->seed = GEN_DEFAULT_SEED;
     options->check = 0;
     options->csv = 0;
+    options->group_timing = 0;
     options->csv_raw_file = NULL;
     options->a_mode = A_MODE_LOCAL;
     options->x_mode = X_MODE_LOCAL;
@@ -241,6 +258,8 @@ static void parse_args(int argc, char **argv, opts_t *options, int rank)
             options->check = 1;
         else if (!strcmp(argv[i], "--csv"))
             options->csv = 1;
+        else if (!strcmp(argv[i], "--group-timing"))
+            options->group_timing = 1;
         else if (!strcmp(argv[i], "--csv-raw-file")) {
             if (i + 1 >= argc)
                 die("option --csv-raw-file requires a path");
@@ -350,7 +369,8 @@ static void append_raw_csv(const char *path,
                            const double *non_kernel_local_times,
                            const double *h2d_X_transfer_times,
                            const double *d2h_Y_transfer_times,
-                           const double *launch_overhead_times)
+                           const double *launch_overhead_times,
+                           const double *local_group_times)
 {
     FILE *fp;
     long file_size;
@@ -406,12 +426,16 @@ static void append_raw_csv(const char *path,
         double rep_gflops_kernel = kernel_times[rep] > 0.0
                                      ? flop / kernel_times[rep] / 1.0e9
                                      : -1.0;
+        double rep_gflops_local_group = local_group_times[rep] > 0.0
+                                          ? flop / local_group_times[rep] / 1.0e9
+                                          : -1.0;
 
         fprintf(fp,
                 "%s,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,"
                 "%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,"
                 "%.6f,%.6f,%.6f,"
-                "%.9e,%.9e,%.9e,%s\n",
+                "%.9e,%.9e,%.9e,%s,"
+                "%d,%.9e,%.6f\n",
                 kernel_name(), SCALAR_NAME,
                 a_mode_name(options->a_mode), x_mode_name(options->x_mode),
                 options->M, options->N, options->k,
@@ -421,7 +445,9 @@ static void append_raw_csv(const char *path,
                 non_kernel_local_times[rep],
                 rep_gflops, rep_gflops_compute, rep_gflops_kernel,
                 h2d_X_transfer_times[rep], d2h_Y_transfer_times[rep],
-                launch_overhead_times[rep], X_LAYOUT_NAME);
+                launch_overhead_times[rep], X_LAYOUT_NAME,
+                options->group_timing, local_group_times[rep],
+                rep_gflops_local_group);
     }
 
     if (fclose(fp) != 0)
@@ -447,6 +473,12 @@ int main(int argc, char **argv)
     /* Voci per ripetizione escluse dal tempo ufficiale: i due trasferimenti
      * host<->device e cio' che di essi non e' PCIe ma runtime. */
     double *h2d_X_transfer_times, *d2h_Y_transfer_times, *launch_overhead_times;
+
+    /* Cronometro di gruppo della fase locale (--group-timing). Sentinella
+     * negativa quando spento. */
+    double *local_group_times;
+    double mean_local_group_time = -1.0, std_local_group_time = 0.0;
+    double gflops_local_group = -1.0;
 
     double mean_bcast_time, mean_local_phase_time, mean_reduce_time;
     double mean_total_time, mean_official_time, mean_kernel_time;
@@ -646,9 +678,13 @@ int main(int argc, char **argv)
     h2d_X_transfer_times = xmalloc((size_t)options.reps * sizeof *h2d_X_transfer_times);
     d2h_Y_transfer_times = xmalloc((size_t)options.reps * sizeof *d2h_Y_transfer_times);
     launch_overhead_times = xmalloc((size_t)options.reps * sizeof *launch_overhead_times);
+    local_group_times = xmalloc((size_t)options.reps * sizeof *local_group_times);
 
+    /* Il warm-up segue lo stesso cammino delle ripetizioni misurate, barriere
+     * comprese: cio' che si scalda deve essere cio' che poi si cronometra. */
     for (rep = 0; rep < options.warmup_reps; rep++)
-        mpi_matmul(&grid, &layout, local_gemm_context, X_loc, Y_loc_part, Y_row_col0, NULL);
+        mpi_matmul(&grid, &layout, local_gemm_context, X_loc, Y_loc_part, Y_row_col0, NULL,
+                   options.group_timing);
 
     for (rep = 0; rep < options.reps; rep++) {
 
@@ -657,7 +693,8 @@ int main(int argc, char **argv)
          * comincerebbe a cronometrare mentre gli altri sono ancora indietro */
         MPI_Barrier(grid.grid_comm);
 
-        mpi_matmul(&grid, &layout, local_gemm_context, X_loc, Y_loc_part, Y_row_col0, &times_struct_rep);
+        mpi_matmul(&grid, &layout, local_gemm_context, X_loc, Y_loc_part, Y_row_col0, &times_struct_rep,
+                   options.group_timing);
 
         bcast_times[rep] = times_struct_rep.bcast_time;
         total_times[rep] = times_struct_rep.total_time;
@@ -674,6 +711,7 @@ int main(int argc, char **argv)
         h2d_X_transfer_times[rep] = times_struct_rep.h2d_X_transfer_time;
         d2h_Y_transfer_times[rep] = times_struct_rep.d2h_Y_transfer_time;
         launch_overhead_times[rep] = times_struct_rep.launch_overhead_time;
+        local_group_times[rep] = times_struct_rep.local_group_time;
     }
 
     /* Il tempo di una invocazione e' il MASSIMO fra i processi, non quello del
@@ -696,6 +734,9 @@ int main(int argc, char **argv)
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : h2d_X_transfer_times, h2d_X_transfer_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : d2h_Y_transfer_times, d2h_Y_transfer_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : launch_overhead_times, launch_overhead_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
+    /* Gia' identico su tutti i rank (due barriere e un MPI_Wtime ciascuna):
+     * la riduzione serve solo a portarlo sul rank 0 con lo stesso schema. */
+    MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : local_group_times, local_group_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
 
     setup_time = local_gemm_setup_seconds(local_gemm_context);
     setup_device_init_time = local_gemm_setup_device_init_seconds(local_gemm_context);
@@ -821,6 +862,18 @@ int main(int argc, char **argv)
             gflops_kernel = gflops_compute;
         }
 
+        /* Cronometro di gruppo: il denominatore e' il tempo visto "da fuori"
+         * dal via comune all'ultimo arrivo, quindi i GFLOPS sono quelli del
+         * gruppo, non del rank piu' veloce. Include H2D di X e D2H di Y. */
+        if (options.group_timing) {
+            mean_local_group_time = vec_mean(local_group_times, options.reps);
+            std_local_group_time = vec_stddev(local_group_times, options.reps);
+            if (mean_local_group_time > 0.0)
+                gflops_local_group = 2.0 * (double)options.M * (double)options.N
+                                       * (double)options.k
+                                       / mean_local_group_time / 1.0e9;
+        }
+
         /* L'unico I/O del driver, e anch'esso escluso dalla misura ufficiale:
          * lo si cronometra qui per potere dire di quanto, invece di affermare
          * che e' trascurabile. La riga aggregata viene stampata dopo, quindi
@@ -831,7 +884,8 @@ int main(int argc, char **argv)
                            bcast_times, local_phase_times, reduce_times,
                            total_times, official_times, kernel_times,
                            non_kernel_local_times, h2d_X_transfer_times,
-                           d2h_Y_transfer_times, launch_overhead_times);
+                           d2h_Y_transfer_times, launch_overhead_times,
+                           local_group_times);
             io_csv_raw_write_time = now_seconds() - io_csv_raw_start;
         }
 
@@ -852,7 +906,8 @@ int main(int argc, char **argv)
                    "%.9e,%.9e,%.6f,"
                    "%.9e,%.9e,"
                    "%.9e,%.9e,%.9e,"
-                   "%.9e,%.9e,%.9e,%.9e,%s,%.9e\n",
+                   "%.9e,%.9e,%.9e,%.9e,%s,%.9e,"
+                   "%d,%.9e,%.9e,%.6f\n",
                    kernel_name(), SCALAR_NAME, a_mode_name(options.a_mode),
                    x_mode_name(options.x_mode),
                    options.M, options.N, options.k,
@@ -880,7 +935,9 @@ int main(int argc, char **argv)
                    prep_alloc_local_buffers_time, prep_gen_A_time,
                    prep_distrib_A_time, prep_gen_X_time, prep_distrib_X_time,
                    prep_total_time, io_csv_raw_write_time,
-                   X_LAYOUT_NAME, prep_convert_X_time);
+                   X_LAYOUT_NAME, prep_convert_X_time,
+                   options.group_timing, mean_local_group_time,
+                   std_local_group_time, gflops_local_group);
         } else {
             double bytes_A = (double)options.M * options.N * sizeof(scalar_t);
             printf("matmul_mpi  M=%d N=%d k=%d  grid=%dx%d (P=%d)  %s  kernel=%s  A=%s X=%s X_layout=%s\n",
@@ -896,6 +953,10 @@ int main(int argc, char **argv)
                    mean_bcast_time * 1e3, std_bcast_time * 1e3);
             printf("  Local mean              %.3f ms   std %.3f ms\n",
                    mean_local_phase_time * 1e3, std_local_phase_time * 1e3);
+            if (options.group_timing)
+                printf("  Local GROUP mean        %.3f ms   std %.3f ms"
+                       "   (barrier -> all ranks done; includes H2D X / D2H Y)\n",
+                       mean_local_group_time * 1e3, std_local_group_time * 1e3);
             printf("  Reduce mean             %.3f ms   std %.3f ms\n",
                    mean_reduce_time * 1e3, std_reduce_time * 1e3);
             printf("  Total mean (end-to-end) %.3f ms   std %.3f ms   CV %.2f%%\n",
@@ -932,8 +993,15 @@ int main(int argc, char **argv)
             printf("  GFLOPS compute-only     %.3f\n", gflops_compute);
             if (gflops_kernel > 0.0)
                 printf("  GFLOPS kernel-only      %.3f\n", gflops_kernel);
+            if (gflops_local_group > 0.0)
+                printf("  GFLOPS local-group      %.3f   (group wall-clock of the local phase)\n",
+                       gflops_local_group);
             printf("                          (2*M*N*k = %.3f GFLOP; official T = official mean)\n",
                    2.0 * (double)options.M * (double)options.N * (double)options.k / 1e9);
+            if (options.group_timing)
+                printf("  NOTE: --group-timing adds two MPI_Barrier inside the timed path:\n"
+                       "        t_local, t_total and t_official include them. Use this run\n"
+                       "        for the group time only, not for the official GFLOPS.\n");
             /* ------------------------------------------------------------
              * Tempi esclusi dalla misura ufficiale.
              *
@@ -1013,6 +1081,7 @@ int main(int argc, char **argv)
     xfree(h2d_X_transfer_times);
     xfree(d2h_Y_transfer_times);
     xfree(launch_overhead_times);
+    xfree(local_group_times);
     grid_free(&grid);
     MPI_Finalize();
 

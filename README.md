@@ -94,8 +94,9 @@ mpirun -np 20 --bind-to core --map-by core --report-bindings \
 Opzioni principali: `-M -N -k`, `--pr --pc` (forma della griglia, default la
 fattorizzazione piu' quadrata di P), `--reps --warmup`, `--seed`,
 `--a-mode local|global`, `--x-mode local|global`, `--check` (validazione contro
-il seriale), `--csv` / `--csv-header` per la campagna di misura. `--help` per
-l'elenco completo.
+il seriale), `--csv` / `--csv-header` per la campagna di misura,
+`--group-timing` (cronometro di gruppo della fase locale, diagnostico per
+P > 1 sulla stessa GPU: vedi sotto). `--help` per l'elenco completo.
 
 Una invocazione del prodotto MPI esegue, nell'ordine, `MPI_Bcast` della fetta
 di X lungo il column communicator, `local_gemm`, e `MPI_Reduce(MPI_SUM)` lungo
@@ -257,6 +258,31 @@ non come tempo di una GPU dedicata. Per caratterizzare il kernel in se' - per
 esempio nel confronto fra i backend o nello sweep su `BLOCK` - conviene quindi
 misurare con `-np 1`, che sulla stessa scheda esegue lo stesso lavoro totale
 senza contesa fra contesti.
+
+Il massimo fra i rank di `t_kernel` ha un secondo problema con P > 1: dopo il
+broadcast i rank sono sfasati (il root esce prima, gli altri dopo), quindi i
+kernel possono sovrapporsi sulla scheda oppure no, e `max_rank(t_kernel)` va
+da "tempo di gruppo" a "tempo di un solo blocco" a seconda del caso. Per avere
+un tempo di gruppo che non dipenda da come il driver ha alternato i contesti,
+`--group-timing` racchiude `local_gemm` fra due `MPI_Barrier`:
+
+```text
+MPI_Barrier -> MPI_Wtime -> local_gemm -> MPI_Barrier -> MPI_Wtime
+```
+
+Il cronometro parte quando TUTTI i rank sono pronti a lanciare e si ferma
+quando l'ULTIMO ha ricevuto il risultato dalla scheda; `local_gemm` ritorna
+dopo `cudaEventSynchronize`, quindi alla seconda barriera la GPU ha davvero
+finito. Il valore e' identico su ogni rank e finisce nel CSV come
+`t_local_group_mean_s` / `t_local_group_std_s` e `gflops_local_group` (nel raw
+`t_local_group_s`), con la colonna `group_timing` che dice se la modalita' era
+attiva; spento, le colonne valgono `-1`. Include H2D di X e D2H di Y, perche'
+stanno dentro `local_gemm`. E' una modalita' diagnostica: le due barriere
+entrano in `t_local`, `t_total` e `t_official`, quindi una campagna con
+`--group-timing` non va usata per i GFLOPS ufficiali. Un confronto utile e'
+`t_local_group` contro `max_rank(t_kernel)` e contro la somma dei `t_kernel`
+dei rank: se il gruppo e' vicino al massimo i kernel si sovrapponevano, se e'
+vicino alla somma erano in fila.
 
 Se il blocco locale non entra in VRAM (40000x40000 in double sono 12.8 GiB
 contro i 15.5 GiB della Quadro RTX 5000) il programma si ferma prima di

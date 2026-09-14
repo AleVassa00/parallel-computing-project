@@ -4,11 +4,12 @@
 
 #include "common/util.h"
 
-void mpi_matmul(const grid_t *grid, const layout_t *layout, local_gemm_t *local_gemm_context,  scalar_t *X_loc, scalar_t *Y_loc_part, scalar_t *Y_row_col0, matmul_time_t *times_struct_rep)
+void mpi_matmul(const grid_t *grid, const layout_t *layout, local_gemm_t *local_gemm_context,  scalar_t *X_loc, scalar_t *Y_loc_part, scalar_t *Y_row_col0, matmul_time_t *times_struct_rep, int group_timing)
 {
     const int x_count = layout->n_loc * layout->k; //numero elementi di x locali
     const int y_count = layout->m_loc * layout->k; //numero elemento di y locali
     double t0, t1, t2, t3;
+    double tg0 = 0.0, tg1 = 0.0;
 
     /* Le due collettive qui sotto trattano X_loc e Y come buffer CONTIGUI di
      * n_loc*k e m_loc*k elementi. Richiediamo ldx == k e ldy == k.
@@ -39,8 +40,24 @@ void mpi_matmul(const grid_t *grid, const layout_t *layout, local_gemm_t *local_
     t1 = MPI_Wtime();
 
     /* 2. Contributo locale: righe [row0, row0+m_loc) di Y, limitatamente alle
-     *    colonne [col0, col0+n_loc) di A. E' un risultato PARZIALE. */
+     *    colonne [col0, col0+n_loc) di A. E' un risultato PARZIALE.
+     *
+     *    Con group_timing la fase e' racchiusa fra due barriere: la prima da'
+     *    un "via" comune (dopo il Bcast i rank sono sfasati: il root esce
+     *    prima, gli altri dopo), la seconda aspetta che l'ultimo abbia finito.
+     *    local_gemm ritorna solo dopo cudaEventSynchronize, quindi alla
+     *    seconda barriera la GPU ha davvero concluso per questo rank. */
+    if (group_timing) {
+        MPI_Barrier(grid->grid_comm);
+        tg0 = MPI_Wtime();
+    }
+
     local_gemm(local_gemm_context, X_loc, layout->ldx, Y_loc_part, layout->ldy);
+
+    if (group_timing) {
+        MPI_Barrier(grid->grid_comm);
+        tg1 = MPI_Wtime();
+    }
 
     t2 = MPI_Wtime();
 
@@ -87,5 +104,10 @@ void mpi_matmul(const grid_t *grid, const layout_t *layout, local_gemm_t *local_
               ? times_struct_rep->local_phase_time - kernel_time
                     - h2d_X_transfer_time - d2h_Y_transfer_time
               : -1.0;
+
+        /* Identico su tutti i rank per costruzione: la riduzione MAX che il
+         * driver applica a tutti i vettori e' innocua e il sentinella
+         * negativo sopravvive quando la modalita' e' spenta. */
+        times_struct_rep->local_group_time = group_timing ? (tg1 - tg0) : -1.0;
     }
 }

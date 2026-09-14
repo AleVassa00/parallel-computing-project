@@ -57,6 +57,7 @@ X_MODE="local"
 X_LAYOUT="row"
 X_PAD=0
 CHECK=0
+GROUP_TIMING=0
 
 NP=1
 PR=1
@@ -171,6 +172,10 @@ FLAG DEL PROBLEMA
   --warmup N                  Warmup                     [default 5]
   --seed N                    Seed esplicito
   --check                     Abilita validazione seriale
+  --group-timing              Cronometro di gruppo della fase locale
+                              (due MPI_Barrier attorno a local_gemm; colonne
+                              t_local_group_*). Diagnostico per np>1 sulla
+                              stessa GPU: perturba t_local/t_total/t_official.
   --a-mode local|global       Modalita' A                [default local]
   --x-mode local|global       Modalita' X                [default local]
   --x-layout row|column       Layout di X (column solo cuda_warp) [default row]
@@ -321,6 +326,9 @@ apply_config_kv() {
         seed) SEED="$value" ;;
         check)
             [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" ]] && CHECK=1 || CHECK=0
+            ;;
+        group_timing|group-timing)
+            [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" ]] && GROUP_TIMING=1 || GROUP_TIMING=0
             ;;
         a_mode|a-mode) A_MODE="$value" ;;
         x_mode|x-mode) X_MODE="$value" ;;
@@ -566,6 +574,10 @@ while [[ $# -gt 0 ]]; do
             need_value "$@"; SEED="$2"; shift 2 ;;
         --check)
             CHECK=1
+            shift
+            ;;
+        --group-timing)
+            GROUP_TIMING=1
             shift
             ;;
         --a-mode)
@@ -1154,6 +1166,9 @@ run_csv_row() {
     if [[ "$CHECK" -eq 1 ]]; then
         args+=(--check)
     fi
+    if [[ "$GROUP_TIMING" -eq 1 ]]; then
+        args+=(--group-timing)
+    fi
 
     set +e
     if [[ "$VERBOSE" -eq 1 ]]; then
@@ -1189,6 +1204,7 @@ write_metadata() {
         echo "warmup=$WARMUP"
         echo "seed=${SEED:-default}"
         echo "check=$CHECK"
+        echo "group_timing=$GROUP_TIMING"
         echo "a_mode=$A_MODE"
         echo "x_mode=$X_MODE"
         echo "x_layout=$X_LAYOUT"
