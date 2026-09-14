@@ -1,0 +1,18 @@
+# C8 - tuning di BLOCK sui cinque k specializzati, in FP64 e con un rank.
+#
+# Prima si caratterizza ciascun kernel CUDA custom mantenendo fissi M, N,
+# precisione, topologia MPI e tutti i knob specifici del backend. L'unica
+# variabile di compilazione comune che cambia e' BLOCK; per ogni BLOCK vengono
+# misurati k = 3, 6, 8, 20, 32.
+#
+# cuda_warp usa X column-major: e' la versione candidata perche' rende
+# contigue fra le lane le letture di X. Il confronto controllato con row-major
+# verra' creato dopo questa campagna, usando il BLOCK qui selezionato.
+#
+# Esecuzione:
+#   ./script/run_cuda_experiments.sh --suite experiments/campagna_VAS_block_k_tuning.txt
+
+campagna_VAS_block_k_tuning/cuda_naive.conf
+campagna_VAS_block_k_tuning/cuda_warp_column.conf
+campagna_VAS_block_k_tuning/cuda_warp_smem.conf
+campagna_VAS_block_k_tuning/cuda_warp_tiled.conf
