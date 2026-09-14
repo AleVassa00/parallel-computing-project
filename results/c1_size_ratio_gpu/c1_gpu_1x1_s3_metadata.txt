@@ -1,0 +1,54 @@
+command=./script/run_cuda_experiments.sh --config /home/avassallo/parallel-computing-project/experiments/c1_size_ratio/gpu_1x1_s3.conf 
+timestamp=20260914_135427
+name=c1_gpu_1x1_s3
+experiment=k-sweep
+config_file=/home/avassallo/parallel-computing-project/experiments/c1_size_ratio/gpu_1x1_s3.conf
+M=12800
+N=12800
+reps=10
+warmup=3
+seed=20252026
+check=0
+a_mode=local
+x_mode=local
+x_layout=row
+x_pad=0
+kernel=cuda_warp
+kernels=cuda_naive cuda_warp cuda_warp_smem
+k_sweep=8 32
+block_sweep_k=8 32
+compare_k=8 32
+block=256
+blocks=64 128 192 256 384 512 1024
+prec=double
+smem_pad=1
+smem_pads=0 1
+warp_col_tile=8
+warp_col_tiles=4 8 16 32
+force_generic_k=0
+test_a_padding=0
+nvcc_arch=sm_75
+all_grids=no
+btl=self,sm
+bind_to=core
+map_by=core
+report_bindings=0
+grids:
+  np=1 pr=1 pc=1
+
+git_commit=5f5d58a589922a31f71c9d836ee0f19d0ad0cd67
+git_status:
+ M script/run_cuda_experiments.sh
+
+nvcc:
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2025 NVIDIA Corporation
+Built on Wed_Jan_15_19:20:09_PST_2025
+Cuda compilation tools, release 12.8, V12.8.61
+Build cuda_12.8.r12.8/compiler.35404655_0
+
+mpirun:
+mpirun (Open MPI) 5.0.9
+
+
+gpu:
