@@ -23,27 +23,49 @@ non si sovrascrivono a vicenda.
 |---|---|---|---|---|
 | C3 | `c3_cpu_baseline.txt` | qual e' il denominatore di ogni speedup, e quanto vale la specializzazione su k | 1 | ~5 min |
 | C2 | `c2_k_sweep.txt` | come si comporta ogni backend al variare di k, incluso il fallback generico | 1 | ~10 min |
-| C1 | `c1_size_ratio_cpu.txt`<br>`c1_size_ratio_gpu.txt` | **campagna obbligatoria**: dimensioni crescenti su 3 rapporti M:N | 1 | ~5 + ~3 min |
+| C1 | `c1_size_ratio_cpu.txt`<br>`c1_size_ratio_gpu.txt`<br>`c1_size_ratio_mpi20.txt` | **campagna obbligatoria**: dimensioni crescenti x 3 rapporti M:N x i 5 k richiesti, per ogni kernel (a P=20 anche x tutte le forme di griglia) | 1<br>1<br>20 | ~30 min<br>~10 min<br>~30 min |
 | C6 | `c6_grid_shape.txt` | quale forma di griglia conviene a P fisso, cioe' perche' la griglia e' 2D | 8/16/20 | ~6 min |
 | C4 | `c4_strong_scaling.txt` | come scala a problema fisso | 1..20 | ~5 min |
 | C5 | `c5_weak_scaling.txt` | quanto costa la sola comunicazione | 1..20 | ~5 min |
 
-Totale ~45 minuti di macchina, escluse le compilazioni. C3 e C2 vengono per
+Totale ~105 minuti di macchina, escluse le compilazioni. C3 e C2 vengono per
 primi perche' producono i numeri di riferimento che tutte le altre citano.
 
-C3, C2 (riga `scheme_a`), C4, C5 e C6 **non richiedono nvcc**: se la build
-CUDA non funziona, cinque campagne su sei restano eseguibili.
+C3, C2 (riga `scheme_a`), C1 (`cpu` e `mpi20`), C4, C5 e C6 **non richiedono
+nvcc**: se la build CUDA non funziona, quasi tutto resta eseguibile.
 
 ---
 
 ## Le campagne
 
-### C1 - dimensioni crescenti x rapporto M:N
+### C1 - dimensioni crescenti x rapporto M:N x k x kernel (campagna obbligatoria)
 
-`c1_size_ratio_cpu.txt`, `c1_size_ratio_gpu.txt` -> `results/c1_size_ratio_{cpu,gpu}/`
+`c1_size_ratio_cpu.txt`, `c1_size_ratio_gpu.txt`, `c1_size_ratio_mpi20.txt`
+-> `results/c1_size_ratio_{cpu,gpu,mpi20}/`
 
 La traccia lo chiede esplicitamente: misure ripetute per M ed N crescenti, su
-almeno 3 rapporti fra M ed N, e l'insieme deve contenere M = N.
+almeno 3 rapporti fra M ed N, l'insieme deve contenere M = N, e il collaudo
+e' su k = 3, 6, 8, 20, 32. C1 e' il **prodotto completo** di questi assi, per
+ogni kernel. Gli assi, dall'esterno all'interno:
+
+| asse | valori | dove |
+|---|---|---|
+| processi | `np=1` (kernel isolato) e P=20 (codice MPI completo) | tre suite: `cpu`, `gpu`, `mpi20` |
+| taglia | `s1`..`s4` | un `.conf` per (taglia, rapporto) |
+| rapporto M:N | 1:1, 3:1, 1:2 | idem |
+| k | `ks=3 6 8 20 32` | dentro il `.conf` |
+| kernel | `kernels=...` | dentro il `.conf`, `experiment=compare` |
+| griglia (solo `mpi20`) | 1x20, 2x10, 4x5, 5x4, 10x2, 20x1 | `all_grids=20` nel `.conf` |
+
+Per suite: `cpu` = `scheme_a`, `scheme_a_jblock`, `scheme_a_jblock_rb` a
+`np=1`; `gpu` = `cuda_naive`, `cuda_warp`, `cuda_warp_smem`,
+`cuda_warp_tiled`, `cublas` a `np=1`; `mpi20` = gli stessi tre kernel di CPU
+a P=20 su tutte le forme di griglia. Ogni `.conf` produce **un** CSV con una
+riga per (kernel, k[, griglia]): 15 righe per i file CPU, 25 per quelli GPU,
+90 per quelli MPI (le colonne `pr`,`pc` distinguono le forme).
+
+Tutto in double. I k **senza** specializzazione (1, 7, 17, 40, 64) restano in
+C2: rispondono a un'altra domanda e non hanno bisogno di tutte le taglie.
 
 Quattro passi (`s1`..`s4`, fattore 4 in `M*N` a ogni passo) per tre rapporti,
 scelti in modo che a parita' di passo il lavoro sia lo stesso entro il 5%:
@@ -67,11 +89,39 @@ Quadro RTX 5000, ma e' il primo punto che puo' fallire. Le suite sono in
 ordine di taglia crescente e hanno `continue_on_error=1`, quindi un eventuale
 OOM non invalida i punti gia' raccolti.
 
-`reps=10` invece di 20: sono 24 punti per backend. La colonna
+`reps=10` invece di 20: sono 60 punti per kernel. La colonna
 `t_official_cv_pct` dice riga per riga se la media e' stabile.
 
-Per ripetere lo stesso sweep su un altro backend basta cambiare `kernel=` nei
-12 `.conf` corrispondenti (e `name=`/`outdir=`, per non sovrascrivere).
+**Perche' `np=20` e perche' solo su CPU.** 20 e' il numero di core fisici del
+nodo ed e' il massimo usato da C4/C5/C6: e' la configurazione di produzione,
+quella che un utente lancerebbe. P resta **fisso** lungo tutte le taglie di
+proposito: scegliere il P migliore per ogni taglia confonderebbe l'effetto
+della taglia con quello del parallelismo. Alle taglie piccole (`s1` a P=20:
+blocco locale 800x640, 4 MB) la comunicazione domina e l'efficienza e' bassa;
+e' un risultato da mostrare, non un difetto, ed e' il motivo per cui la stessa
+griglia esiste anche a `np=1`. Se P=20 sia anche il P *piu' veloce* a problema
+fisso lo dice C4.
+
+**Perche' tutte le forme di griglia e non solo 4x5.** Il volume comunicato
+dipende da griglia e rapporto *insieme*: `Bcast ~ (N/pc)*k`,
+`Reduce ~ (M/pr)*k`. La forma migliore deve quindi spostarsi col rapporto:
+verso piu' righe (10x2, 5x4) per M=3N, verso piu' colonne (2x10, 4x5) per
+N=2M. C6 misura le forme solo a M=N e non puo' vederlo; qui la predizione e'
+verificabile punto per punto. Due letture degli stessi dati: per la tabella
+"obbligatoria" si prende la riga 4x5 (il default di `grid_default_shape`)
+oppure la migliore per ogni punto; le altre forme vanno nel grafico che
+conferma o smentisce il modello. Costa 6x le righe della suite, ma nulla va
+perso: 4x5 e' una delle sei forme.
+
+Sulla GPU una variante multi-rank non ha senso: il server ha una sola scheda,
+con `np>1` i contesti CUDA si alternano sul device 0 senza MPS e `t_kernel`
+misurerebbe la contesa fra contesti, non il kernel (README, "Backend CUDA").
+Su un nodo con una GPU l'ottimo e' `np=1`, ed e' quello che la suite `gpu`
+misura.
+
+Per aggiungere un backend basta aggiungerlo a `kernels=` nei 12 `.conf` della
+suite giusta. I file sono generati: tutto quello che cambia lo si cambia una
+volta sola nel generatore, non in 36 file a mano.
 
 ### C2 - sweep su k, un backend per riga
 

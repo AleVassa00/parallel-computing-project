@@ -1,9 +1,11 @@
-# C1 - dimensioni crescenti su 3 rapporti M:N   (cpu, kernel=scheme_a)
+# C1 - campagna obbligatoria, variante CPU a np=1
+#     taglie s1..s4 x rapporti 1:1, 3:1, 1:2 x k = 3 6 8 20 32
+#     kernel: scheme_a, scheme_a_jblock, scheme_a_jblock_rb
 #
 #   ./script/run_cuda_experiments.sh --suite experiments/c1_size_ratio_cpu.txt
 #
-# Le taglie sono in ordine crescente: se il punto piu' grande non entra in
-# memoria, i punti gia' raccolti restano validi.
+# Non richiede nvcc. Le taglie sono in ordine crescente: se il punto piu'
+# grande non entra in memoria, i punti gia' raccolti restano validi.
 c1_size_ratio/cpu_1x1_s1.conf
 c1_size_ratio/cpu_3x1_s1.conf
 c1_size_ratio/cpu_1x2_s1.conf

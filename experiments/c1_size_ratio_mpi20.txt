@@ -1,0 +1,22 @@
+# C1 - campagna obbligatoria, variante MPI a P=20, tutte le forme di griglia
+#     taglie s1..s4 x rapporti 1:1, 3:1, 1:2 x k = 3 6 8 20 32
+#     x griglie 1x20 2x10 4x5 5x4 10x2 20x1 (all_grids=20)
+#     kernel: scheme_a, scheme_a_jblock, scheme_a_jblock_rb
+#
+#   ./script/run_cuda_experiments.sh --suite experiments/c1_size_ratio_mpi20.txt
+#
+# Non richiede nvcc. Richiede un nodo con 20 core liberi e il binding
+# (bind_to=core, map_by=core sono nei .conf). Se il trasporto MPI fallisce
+# con un errore di BTL, vedere CAMPAGNE.md ("Trasporto MPI").
+c1_size_ratio/mpi20_1x1_s1.conf
+c1_size_ratio/mpi20_3x1_s1.conf
+c1_size_ratio/mpi20_1x2_s1.conf
+c1_size_ratio/mpi20_1x1_s2.conf
+c1_size_ratio/mpi20_3x1_s2.conf
+c1_size_ratio/mpi20_1x2_s2.conf
+c1_size_ratio/mpi20_1x1_s3.conf
+c1_size_ratio/mpi20_3x1_s3.conf
+c1_size_ratio/mpi20_1x2_s3.conf
+c1_size_ratio/mpi20_1x1_s4.conf
+c1_size_ratio/mpi20_3x1_s4.conf
+c1_size_ratio/mpi20_1x2_s4.conf

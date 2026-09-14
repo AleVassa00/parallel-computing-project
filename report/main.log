@@ -1,10 +1,10 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.8.27)  11 SEP 2026 18:04
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.8.27)  14 SEP 2026 22:08
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
  %&-line parsing enabled.
-**/Users/andreagalluzzi/Desktop/03-progetto-scpa/parallel-computing-project/report/main.tex
-(/Users/andreagalluzzi/Desktop/03-progetto-scpa/parallel-computing-project/report/main.tex
+**/Users/andreagalluzzi/Desktop/00-progetto-scpa/parallel-computing-project/report/main.tex
+(/Users/andreagalluzzi/Desktop/00-progetto-scpa/parallel-computing-project/report/main.tex
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
 (/usr/local/texlive/2026/texmf-dist/tex/latex/base/report.cls
@@ -24,10 +24,31 @@ File: size11.clo 2025/01/22 v1.4n Standard LaTeX file (size option)
 \abovecaptionskip=\skip49
 \belowcaptionskip=\skip50
 \bibindent=\dimen148
-) (./preambolo.tex (/usr/local/texlive/2026/texmf-dist/tex/latex/base/inputenc.sty
+) (./preambolo.tex (/usr/local/texlive/2026/texmf-dist/tex/latex/parskip/parskip.sty
+Package: parskip 2021-03-14 v2.0h non-zero parskip adjustments
+ (/usr/local/texlive/2026/texmf-dist/tex/latex/kvoptions/kvoptions.sty
+Package: kvoptions 2022-06-15 v3.15 Key value format for package options (HO)
+ (/usr/local/texlive/2026/texmf-dist/tex/latex/graphics/keyval.sty
+Package: keyval 2022/05/29 v1.15 key=value parser (DPC)
+\KV@toks@=\toks17
+) (/usr/local/texlive/2026/texmf-dist/tex/generic/ltxcmds/ltxcmds.sty
+Package: ltxcmds 2023-12-04 v1.26 LaTeX kernel commands for general use (HO)
+) (/usr/local/texlive/2026/texmf-dist/tex/latex/kvsetkeys/kvsetkeys.sty
+Package: kvsetkeys 2022-10-05 v1.19 Key value parser (HO)
+)) (/usr/local/texlive/2026/texmf-dist/tex/latex/etoolbox/etoolbox.sty
+Package: etoolbox 2025/10/02 v2.5m e-TeX tools for LaTeX (JAW)
+\etb@tempcnta=\count284
+)) (/usr/local/texlive/2026/texmf-dist/tex/latex/underscore/underscore.sty
+Package: underscore 2006/09/13
+LaTeX Info: Redefining \_ on input line 42.
+)
+==> First Aid for underscore.sty applied!
+(/usr/local/texlive/2026/texmf-dist/tex/latex/firstaid/underscore-ltx.sty
+Package: underscore-ltx 2023/09/20 LaTeX firstaid to make underscore protected 
+) (/usr/local/texlive/2026/texmf-dist/tex/latex/base/inputenc.sty
 Package: inputenc 2024/02/08 v1.3d Input encoding file
-\inpenc@prehook=\toks17
-\inpenc@posthook=\toks18
+\inpenc@prehook=\toks18
+\inpenc@posthook=\toks19
 ) (/usr/local/texlive/2026/texmf-dist/tex/latex/base/fontenc.sty
 Package: fontenc 2025/07/18 v2.1d Standard LaTeX package
 ) (/usr/local/texlive/2026/texmf-dist/tex/latex/lm/lmodern.sty
@@ -66,7 +87,7 @@ LaTeX Font Info:    Overwriting math alphabet `\mathtt' in version `bold'
 (Font)                  OT1/cmtt/m/n --> OT1/lmtt/m/n on input line 38.
 ) (/usr/local/texlive/2026/texmf-dist/tex/generic/babel/babel.sty
 Package: babel 2026/03/08 v26.4 The multilingual framework for LuaLaTeX, pdfLaTeX and XeLaTeX
-\babel@savecnt=\count284
+\babel@savecnt=\count285
 LaTeX Encoding Info:    Redeclaring text command \ij (encoding OT1) on input line 2078.
 LaTeX Encoding Info:    Redeclaring text command \IJ (encoding OT1) on input line 2080.
 LaTeX Encoding Info:    Redeclaring text command \ij (encoding T1) on input line 2082.
@@ -78,24 +99,17 @@ LaTeX Encoding Info:    Ignoring declaration for text command \SS (encoding ?) o
 \l@unhyphenated=\language91
  (/usr/local/texlive/2026/texmf-dist/tex/generic/babel/txtbabel.def)
 \bbl@readstream=\read2
-\bbl@dirlevel=\count285
+\bbl@dirlevel=\count286
  (/usr/local/texlive/2026/texmf-dist/tex/generic/babel/locale/it/babel-italian.tex)
 Package babel Info: Importing font and identification data for italian
 (babel)             from babel-it.ini. Reported on input line 4330.
  (/usr/local/texlive/2026/texmf-dist/tex/generic/babel-italian/italian.ldf
 Language: italian 2026/01/13 v.1.5.02 Italian support for the babel system
-\it@lettering=\count286
-\it@doublequoteactive=\count287
-\it@ISOcompliance=\count288
-)) (/usr/local/texlive/2026/texmf-dist/tex/latex/etoolbox/etoolbox.sty
-Package: etoolbox 2025/10/02 v2.5m e-TeX tools for LaTeX (JAW)
-\etb@tempcnta=\count289
-) (/usr/local/texlive/2026/texmf-dist/tex/latex/microtype/microtype.sty
+\it@lettering=\count287
+\it@doublequoteactive=\count288
+\it@ISOcompliance=\count289
+)) (/usr/local/texlive/2026/texmf-dist/tex/latex/microtype/microtype.sty
 Package: microtype 2026/03/01 v3.2d Micro-typographical refinements (RS)
- (/usr/local/texlive/2026/texmf-dist/tex/latex/graphics/keyval.sty
-Package: keyval 2022/05/29 v1.15 key=value parser (DPC)
-\KV@toks@=\toks19
-)
 \MT@toks=\toks20
 \MT@tempbox=\box53
 \MT@count=\count290
@@ -607,8 +621,6 @@ Package: translations 2022/02/05 v1.12 internationalization of LaTeX2e packages 
 Package: pdftexcmds 2020-06-27 v0.33 Utility functions of pdfTeX for LuaTeX (HO)
  (/usr/local/texlive/2026/texmf-dist/tex/generic/infwarerr/infwarerr.sty
 Package: infwarerr 2019/12/03 v1.5 Providing info/warning/error messages (HO)
-) (/usr/local/texlive/2026/texmf-dist/tex/generic/ltxcmds/ltxcmds.sty
-Package: ltxcmds 2023-12-04 v1.26 LaTeX kernel commands for general use (HO)
 )
 Package pdftexcmds Info: \pdf@primitive is available.
 Package pdftexcmds Info: \pdf@ifprimitive is available.
@@ -664,16 +676,14 @@ Package: pgfplots 2025/08/14 v1.18.2 Data Visualization (1.18.2)
 \pgfplots@zmax@reg=\dimen325
 ) (/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryplotmarks.code.tex
 File: tikzlibraryplotmarks.code.tex 2025-08-29 v3.1.11a (3.1.11a)
-
-(/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/libraries/pgflibraryplotmarks.code.tex
+ (/usr/local/texlive/2026/texmf-dist/tex/generic/pgf/libraries/pgflibraryplotmarks.code.tex
 File: pgflibraryplotmarks.code.tex 2025-08-29 v3.1.11a (3.1.11a)
-))) (/usr/local/texlive/2026/texmf-dist/tex/latex/pgfplots/pgfplotstable.sty (/usr/local/texlive/2026/texmf-dist/tex/generic/pgfplots/pgfplots.revision.tex)
+)))
+(/usr/local/texlive/2026/texmf-dist/tex/latex/pgfplots/pgfplotstable.sty (/usr/local/texlive/2026/texmf-dist/tex/generic/pgfplots/pgfplots.revision.tex)
 Package: pgfplotstable 2025/08/14 v1.18.2 Table typesetting and Pretty-printing (1.18.2)
  (/usr/local/texlive/2026/texmf-dist/tex/generic/pgfplots/numtable/pgfplotstable.code.tex (/usr/local/texlive/2026/texmf-dist/tex/generic/pgfplots/numtable/pgfplotstable.coltype.code.tex))) (/usr/local/texlive/2026/texmf-dist/tex/latex/hyperref/hyperref.sty
 Package: hyperref 2026-01-29 v7.01p Hypertext links for LaTeX
- (/usr/local/texlive/2026/texmf-dist/tex/latex/kvsetkeys/kvsetkeys.sty
-Package: kvsetkeys 2022-10-05 v1.19 Key value parser (HO)
-) (/usr/local/texlive/2026/texmf-dist/tex/generic/kvdefinekeys/kvdefinekeys.sty
+ (/usr/local/texlive/2026/texmf-dist/tex/generic/kvdefinekeys/kvdefinekeys.sty
 Package: kvdefinekeys 2019-12-19 v1.6 Define keys (HO)
 ) (/usr/local/texlive/2026/texmf-dist/tex/generic/pdfescape/pdfescape.sty
 Package: pdfescape 2019/12/09 v1.15 Implements pdfTeX's escape features (HO)
@@ -685,9 +695,7 @@ Package: nameref 2026-01-29 v2.58 Cross-referencing by name of section
 Package: refcount 2019/12/15 v3.6 Data extraction from label references (HO)
 ) (/usr/local/texlive/2026/texmf-dist/tex/generic/gettitlestring/gettitlestring.sty
 Package: gettitlestring 2019/12/15 v1.6 Cleanup title references (HO)
- (/usr/local/texlive/2026/texmf-dist/tex/latex/kvoptions/kvoptions.sty
-Package: kvoptions 2022-06-15 v3.15 Key value format for package options (HO)
-))
+)
 \c@section@level=\count377
 ) (/usr/local/texlive/2026/texmf-dist/tex/generic/stringenc/stringenc.sty
 Package: stringenc 2019/11/29 v1.12 Convert strings between diff. encodings (HO)
@@ -791,7 +799,50 @@ File: t1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 ) (/usr/local/texlive/2026/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def
 File: l3backend-pdftex.def 2025-10-09 L3 backend support: PDF output (pdfTeX)
 \l__color_backend_stack_int=\count388
-) (./main.aux)
+) (./main.aux
+
+LaTeX Warning: Label `sec:layout' multiply defined.
+
+
+LaTeX Warning: Label `sec:layout@cref' multiply defined.
+
+
+LaTeX Warning: Label `cap:seriale' multiply defined.
+
+
+LaTeX Warning: Label `cap:seriale@cref' multiply defined.
+
+
+LaTeX Warning: Label `sec:tolleranza' multiply defined.
+
+
+LaTeX Warning: Label `sec:tolleranza@cref' multiply defined.
+
+
+LaTeX Warning: Label `eq:tolleranza' multiply defined.
+
+
+LaTeX Warning: Label `eq:tolleranza@cref' multiply defined.
+
+
+LaTeX Warning: Label `sec:validazione-indici' multiply defined.
+
+
+LaTeX Warning: Label `sec:validazione-indici@cref' multiply defined.
+
+
+LaTeX Warning: Label `tab:collaudo' multiply defined.
+
+
+LaTeX Warning: Label `tab:collaudo@cref' multiply defined.
+
+
+LaTeX Warning: Label `tab:esiti-validazione' multiply defined.
+
+
+LaTeX Warning: Label `tab:esiti-validazione@cref' multiply defined.
+
+)
 \openout1 = `main.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 23.
@@ -967,76 +1018,107 @@ Package cleveref Info: loaded `italian' language definitions on input line 2.
  [1
 
 
-{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-mathit.enc}{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-rm.enc}]
-Package cleveref Info: loaded `italian' language definitions on input line 111.
- [2])
+{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-mathit.enc}]
+Package cleveref Info: loaded `italian' language definitions on input line 109.
+ [2{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-rm.enc}])
 \tf@toc=\write5
 \openout5 = `main.toc'.
 
 Package cleveref Info: loaded `italian' language definitions on input line 29.
  [3] (./sezioni/01-introduzione.tex
 Capitolo 1.
-
+LaTeX Font Info:    Trying to load font information for TS1+lmr on input line 25.
+(/usr/local/texlive/2026/texmf-dist/tex/latex/lm/ts1lmr.fd
+File: ts1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
+)) (./sezioni/02-problema.tex
 pdfTeX warning (ext4): destination with the same identifier (name{page.1}) has been already used, duplicate ignored
 <to be read again> 
                    \relax 
-l.68 
-      [1
+l.1 \chapter
+            {Il nucleo di calcolo} [1
 
 
-{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-mathsy.enc}]
-LaTeX Font Info:    Trying to load font information for TS1+lmr on input line 77.
- (/usr/local/texlive/2026/texmf-dist/tex/latex/lm/ts1lmr.fd
-File: ts1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
-)
-Package cleveref Info: loaded `italian' language definitions on input line 144.
- [2{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-ts1.enc}]
-LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <9> on input line 156.
-) (./sezioni/02-problema.tex
-Package cleveref Info: loaded `italian' language definitions on input line 1.
- [3]
+{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-mathsy.enc}{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-ts1.enc}]
 Capitolo 2.
-(/usr/local/texlive/2026/texmf-dist/tex/latex/listings/lstlang1.sty
+
+LaTeX Warning: Reference `sec:metriche' on page 1 undefined on input line 56.
+
+[2
+
+{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-mathex.enc}]
+LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <10.95> not available
+(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 86.
+
+
+LaTeX Warning: Reference `app:interfaccia' on page 1 undefined on input line 96.
+
+
+LaTeX Warning: Reference `cap:kernel-cuda' on page 1 undefined on input line 112.
+
+Package cleveref Info: loaded `italian' language definitions on input line 130.
+[3] (/usr/local/texlive/2026/texmf-dist/tex/latex/listings/lstlang1.sty
 File: lstlang1.sty 2025/11/14 1.11b listings language file
 ) (/usr/local/texlive/2026/texmf-dist/tex/latex/listings/lstmisc.sty
 File: lstmisc.sty 2025/11/14 1.11b (Carsten Heinz)
 )
 LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <9> not available
-(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 43.
- [4
+(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 134.
 
-{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-mathex.enc}]
-Package cleveref Info: loaded `italian' language definitions on input line 154.
- [5]) (./sezioni/03-architettura.tex
+
+LaTeX Warning: Reference `sec:traffico' on page 1 undefined on input line 198.
+
+Package cleveref Info: loaded `italian' language definitions on input line 220.
+[4]
+Package cleveref Info: loaded `italian' language definitions on input line 287.
+ [5]
+
+LaTeX Warning: Reference `cap:validazione' on page 1 undefined on input line 290.
+
+
+LaTeX Warning: Reference `cap:validazione' on page 1 undefined on input line 336.
+
+
+LaTeX Warning: Reference `cap:validazione' on page 1 undefined on input line 350.
+
+) (./sezioni/09-validazione.tex
 Package cleveref Info: loaded `italian' language definitions on input line 1.
  [6]
 Capitolo 3.
-Package hyperref Info: bookmark level for unknown lstlisting defaults to 0 on input line 44.
+LaTeX Font Info:    External font `lmex10' loaded for size
+(Font)              <14.4> on input line 23.
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 23.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 23.
+
+LaTeX Font Info:    External font `lmex10' loaded for size
+(Font)              <9> on input line 55.
 [7
 
 ]
-Package cleveref Info: loaded `italian' language definitions on input line 133.
- [8]
-Package cleveref Info: loaded `italian' language definitions on input line 215.
- [9]) (./sezioni/04-mpi.tex
+Package cleveref Info: loaded `italian' language definitions on input line 137.
+ [8]) (./sezioni/03-nucleo.tex
+Package hyperref Info: bookmark level for unknown lstlisting defaults to 0 on input line 7.
+Package cleveref Info: loaded `italian' language definitions on input line 14.
+ [9]
+Package cleveref Info: loaded `italian' language definitions on input line 91.
+ [10]) (./sezioni/04-mpi.tex
 Package cleveref Info: loaded `italian' language definitions on input line 1.
- [10]
+ [11]
 Capitolo 4.
-[11
+[12
 
 ]
-LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <10.95> not available
-(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 146.
-Package cleveref Info: loaded `italian' language definitions on input line 158.
- [12]
-Package cleveref Info: loaded `italian' language definitions on input line 230.
- [13]) (./sezioni/05-kernel-cpu.tex
+Package cleveref Info: loaded `italian' language definitions on input line 165.
+ [13]
+Package cleveref Info: loaded `italian' language definitions on input line 231.
+ [14]) (./sezioni/05-kernel-cpu.tex
 Package cleveref Info: loaded `italian' language definitions on input line 1.
- [14]
+ [15]
 Capitolo 5.
-LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <14.4> on input line 10.
 
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 (hyperref)                removing `math shift' on input line 10.
@@ -1045,13 +1127,15 @@ Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 (hyperref)                removing `math shift' on input line 10.
 
-[15
+[16
 
 ]
+
+LaTeX Warning: Reference `sec:build' on page 1 undefined on input line 59.
+
 LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <14.4> not available
 (Font)              Font shape `T1/lmtt/b/n' tried instead on input line 68.
 
-
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 (hyperref)                removing `math shift' on input line 68.
 
@@ -1067,22 +1151,25 @@ Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 (hyperref)                removing `math shift' on input line 111.
 
-Package cleveref Info: loaded `italian' language definitions on input line 125.
-[16]) (./sezioni/06-kernel-cuda.tex
+Package cleveref Info: loaded `italian' language definitions on input line 119.
+[17]) (./sezioni/06-kernel-cuda.tex
 Package cleveref Info: loaded `italian' language definitions on input line 1.
- [17]
+ [18]
 Capitolo 6.
-[18
+[19
 
 ]
+
+LaTeX Warning: Reference `sec:tempi-esclusi' on page 1 undefined on input line 85.
+
 Package cleveref Info: loaded `italian' language definitions on input line 147.
- [19]
+[20]
 LaTeX Font Info:    External font `lmex10' loaded for size
 (Font)              <12> on input line 193.
 LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <12> not available
 (Font)              Font shape `T1/lmtt/b/n' tried instead on input line 193.
-Package cleveref Info: loaded `italian' language definitions on input line 222.
- [20]
+Package cleveref Info: loaded `italian' language definitions on input line 214.
+ [21]
 
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 (hyperref)                removing `math shift' on input line 238.
@@ -1099,96 +1186,108 @@ Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 (hyperref)                removing `math shift' on input line 276.
 
-
+Package cleveref Info: loaded `italian' language definitions on input line 283.
+[22]
 Overfull \hbox (4.84473pt too wide) in paragraph at lines 285--293
  [] 
  []
 
-Package cleveref Info: loaded `italian' language definitions on input line 293.
-[21]
-Package cleveref Info: loaded `italian' language definitions on input line 362.
- [22]
-Package cleveref Info: loaded `italian' language definitions on input line 428.
- [23]) (./sezioni/07-roofline.tex
+
+LaTeX Warning: Reference `tab:binari' on page 1 undefined on input line 299.
+
+Package cleveref Info: loaded `italian' language definitions on input line 354.
+[23]
+Package cleveref Info: loaded `italian' language definitions on input line 417.
+ [24]) (./sezioni/07-roofline.tex
 Package cleveref Info: loaded `italian' language definitions on input line 1.
- [24]
+ [25]
+Package cleveref Info: loaded `italian' language definitions on input line 1.
+ [26]
 Capitolo 7.
-[25
+[27
 
 ]
+
+LaTeX Warning: Reference `sec:c7' on page 1 undefined on input line 102.
+
 Package pgfplots info on input line 117: Using 'lua backend=false' for axis: xmode=log unsupported (yet).
 Package pgfplots info on input line 117: Using 'lua backend=false' for axis: ymode=log unsupported (yet).
 Package cleveref Info: loaded `italian' language definitions on input line 146.
- [26]
+[28]
 Overfull \hbox (5.66777pt too wide) in paragraph at lines 178--192
  [][] 
  []
 
 ) (./sezioni/08-metodologia.tex
 Package cleveref Info: loaded `italian' language definitions on input line 1.
- [27]
+ [29]
 Capitolo 8.
-[28
+[30
 
 ]
-Package cleveref Info: loaded `italian' language definitions on input line 144.
- [29]
-Package cleveref Info: loaded `italian' language definitions on input line 213.
- [30]
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 214.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 214.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 252.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 252.
-
-Package cleveref Info: loaded `italian' language definitions on input line 290.
-[31]
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 309.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 309.
-
-Package cleveref Info: loaded `italian' language definitions on input line 369.
-[32]) (./sezioni/09-validazione.tex
-Package cleveref Info: loaded `italian' language definitions on input line 1.
+Package cleveref Info: loaded `italian' language definitions on input line 123.
+ [31]
+Package cleveref Info: loaded `italian' language definitions on input line 208.
+ [32]
+Package cleveref Info: loaded `italian' language definitions on input line 300.
  [33]
+Package cleveref Info: loaded `italian' language definitions on input line 373.
+ [34]
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 452.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 452.
+
+Package cleveref Info: loaded `italian' language definitions on input line 458.
+[35]
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 477.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 477.
+
+Package cleveref Info: loaded `italian' language definitions on input line 531.
+[36]
+Package cleveref Info: loaded `italian' language definitions on input line 606.
+ [37]
+Overfull \hbox (4.36143pt too wide) in paragraph at lines 674--717
+ [][] 
+ []
+
+) (./sezioni/09-validazione.tex
+Package cleveref Info: loaded `italian' language definitions on input line 1.
+ [38]
+Package cleveref Info: loaded `italian' language definitions on input line 1.
+ [39]
 Capitolo 9.
 
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 24.
+(hyperref)                removing `math shift' on input line 23.
 
 
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 24.
+(hyperref)                removing `math shift' on input line 23.
 
-[34
+[40
 
 ]
-Package cleveref Info: loaded `italian' language definitions on input line 138.
- [35]) (./sezioni/10-risultati.tex
+Package cleveref Info: loaded `italian' language definitions on input line 137.
+ [41]) (./sezioni/10-risultati.tex
 Package cleveref Info: loaded `italian' language definitions on input line 1.
- [36]
+ [42]
 Capitolo 10.
-[37
+[43
 
 ]
 Package cleveref Info: loaded `italian' language definitions on input line 135.
- [38]
+ [44]
 Package cleveref Info: loaded `italian' language definitions on input line 203.
- [39]
+ [45]
 
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 (hyperref)                removing `math shift' on input line 226.
@@ -1198,9 +1297,9 @@ Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 (hyperref)                removing `math shift' on input line 226.
 
 Package cleveref Info: loaded `italian' language definitions on input line 268.
-[40]
+[46]
 Package cleveref Info: loaded `italian' language definitions on input line 325.
- [41]
+ [47]
 
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 (hyperref)                removing `math shift' on input line 326.
@@ -1208,46 +1307,71 @@ Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 (hyperref)                removing `math shift' on input line 326.
+
+
+LaTeX Warning: Reference `tab:c1-punti' on page 1 undefined on input line 331.
 
 Package cleveref Info: loaded `italian' language definitions on input line 379.
-[42]
+[48]
 Package cleveref Info: loaded `italian' language definitions on input line 443.
- [43]
-Package cleveref Info: loaded `italian' language definitions on input line 496.
- [44]
+ [49]
+Package cleveref Info: loaded `italian' language definitions on input line 495.
+ [50]
+
+LaTeX Warning: Reference `eq:speedup-precisione' on page 1 undefined on input line 503.
+
 Package cleveref Info: loaded `italian' language definitions on input line 566.
- [45]
+[51]
+
+LaTeX Warning: Reference `tab:tempi-esclusi' on page 1 undefined on input line 619.
+
 Package cleveref Info: loaded `italian' language definitions on input line 645.
- [46]) (./sezioni/11-conclusioni.tex
+[52]) (./sezioni/11-conclusioni.tex
 Package cleveref Info: loaded `italian' language definitions on input line 1.
- [47]
+ [53]
 Capitolo 11.
 
 LaTeX Warning: Reference `tab:requisiti' on page 1 undefined on input line 10.
 
-[48
+
+LaTeX Warning: Reference `sec:tempi-esclusi' on page 1 undefined on input line 31.
+
+[54
 
 ]) (./sezioni/A-interfaccia.tex
 Package cleveref Info: loaded `italian' language definitions on input line 1.
- [49]
+ [55]
 Appendice A.
-[50
 
-]) (./sezioni/B-riproducibilita.tex
+LaTeX Warning: Reference `eq:t-official' on page 1 undefined on input line 64.
+
+
+LaTeX Warning: Reference `sec:metriche' on page 1 undefined on input line 72.
+
+
+LaTeX Warning: Reference `sec:tempi-esclusi' on page 1 undefined on input line 80.
+
+[56
+
+]
+
+LaTeX Warning: Reference `tab:binari' on page 1 undefined on input line 111.
+
+) (./sezioni/B-riproducibilita.tex
 Package cleveref Info: loaded `italian' language definitions on input line 1.
- [51]
+ [57]
 Package cleveref Info: loaded `italian' language definitions on input line 1.
- [52]
+ [58]
 Appendice B.
-[53
+[59
 
 ]
 Package cleveref Info: loaded `italian' language definitions on input line 115.
- [54])
-Package cleveref Info: loaded `italian' language definitions on input line 48.
- [55] (./main.aux
-Package cleveref Info: loaded `italian' language definitions on input line 7.
+ [60])
+Package cleveref Info: loaded `italian' language definitions on input line 49.
+ [61] (./main.aux
 Package cleveref Info: loaded `italian' language definitions on input line 8.
+Package cleveref Info: loaded `italian' language definitions on input line 9.
 )
  ***********
 LaTeX2e <2025-11-01>
@@ -1257,22 +1381,25 @@ L3 programming layer <2026-01-19>
 
 LaTeX Warning: There were undefined references.
 
+
+LaTeX Warning: There were multiply-defined labels.
+
 Package rerunfilecheck Info: File `main.out' has not changed.
-(rerunfilecheck)             Checksum: E7C73C9663B507867B6AE2D78467270C;20745.
+(rerunfilecheck)             Checksum: 688F7DB00F2A42BCF883C9D02CD6782F;22475.
  ) 
 Here is how much of TeX's memory you used:
- 48524 strings out of 467525
- 1115162 string characters out of 5418982
- 1935130 words of memory out of 5000000
- 75928 multiletter control sequences out of 15000+600000
- 773727 words of font info for 335 fonts, out of 8000000 for 9000
+ 48625 strings out of 467525
+ 1117676 string characters out of 5418982
+ 1933365 words of memory out of 5000000
+ 76004 multiletter control sequences out of 15000+600000
+ 773557 words of font info for 333 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 103i,19n,111p,1082b,2696s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 103i,19n,111p,1082b,2678s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmcsc10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmex10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi6.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr6.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy6.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtk10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtt10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtt8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtt9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtti10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/symbols/msam10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on main.pdf (59 pages, 819445 bytes).
+Output written on main.pdf (65 pages, 829642 bytes).
 PDF statistics:
- 1417 PDF objects out of 1440 (max. 8388607)
- 1273 compressed objects within 13 object streams
- 397 named destinations out of 1000 (max. 500000)
- 87349 words of extra memory for PDF output out of 89155 (max. 10000000)
+ 1442 PDF objects out of 1728 (max. 8388607)
+ 1292 compressed objects within 13 object streams
+ 414 named destinations out of 1000 (max. 500000)
+ 87405 words of extra memory for PDF output out of 89155 (max. 10000000)
 
