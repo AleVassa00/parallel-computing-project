@@ -1,17 +1,54 @@
-# Campagna VAS 7 - robustezza dei kernel rispetto alla forma di A.
+# Campagna VAS 7 - crescita dimensionale e forma della matrice A.
 #
-# I due rettangoli hanno M*N circa uguale al quadrato 16384x16384 gia'
-# misurato nella Campagna 6. Non si ripete il caso quadrato: in analisi si
-# affiancano le sue righe a queste per ottenere i rapporti 1:1, 2:1 e 1:2.
+# Disegno fattoriale con due variabili controllate:
+# - scala nominale S = 4096, 8192, 16384;
+# - forma M=N, N=2M, M=3N.
+#
+# Per ogni S i rettangoli mantengono M*N vicino a S^2: il caso N=2M ha
+# circa l'1.12% di elementi in meno e il caso M=3N circa lo 0.27% in piu'.
+# Questo consente di separare l'effetto della forma da quello della scala.
+# Ogni punto usa i quattro backend con le configurazioni fissate nella Fase 1
+# e misura k = 3, 6, 8, 20, 32 in FP64 con un solo processo.
+# Totale: 3 scale x 3 forme x 4 kernel x 5 k = 180 configurazioni.
 #
 # Esecuzione:
 #   ./script/run_cuda_experiments.sh --suite experiments/fase_2_caratterizzazione_dimensionale/campagna_VAS_7_shape_robustness.txt
 
-campagna_VAS_7_shape_robustness/m2n_cuda_naive.conf
-campagna_VAS_7_shape_robustness/m2n_cuda_warp_column.conf
-campagna_VAS_7_shape_robustness/m2n_cuda_warp_smem.conf
-campagna_VAS_7_shape_robustness/m2n_cublas.conf
-campagna_VAS_7_shape_robustness/n2m_cuda_naive.conf
-campagna_VAS_7_shape_robustness/n2m_cuda_warp_column.conf
-campagna_VAS_7_shape_robustness/n2m_cuda_warp_smem.conf
-campagna_VAS_7_shape_robustness/n2m_cublas.conf
+campagna_VAS_7_shape_robustness/s4096_square_cuda_naive.conf
+campagna_VAS_7_shape_robustness/s4096_square_cuda_warp_column.conf
+campagna_VAS_7_shape_robustness/s4096_square_cuda_warp_smem.conf
+campagna_VAS_7_shape_robustness/s4096_square_cublas.conf
+campagna_VAS_7_shape_robustness/s4096_n2m_cuda_naive.conf
+campagna_VAS_7_shape_robustness/s4096_n2m_cuda_warp_column.conf
+campagna_VAS_7_shape_robustness/s4096_n2m_cuda_warp_smem.conf
+campagna_VAS_7_shape_robustness/s4096_n2m_cublas.conf
+campagna_VAS_7_shape_robustness/s4096_m3n_cuda_naive.conf
+campagna_VAS_7_shape_robustness/s4096_m3n_cuda_warp_column.conf
+campagna_VAS_7_shape_robustness/s4096_m3n_cuda_warp_smem.conf
+campagna_VAS_7_shape_robustness/s4096_m3n_cublas.conf
+
+campagna_VAS_7_shape_robustness/s8192_square_cuda_naive.conf
+campagna_VAS_7_shape_robustness/s8192_square_cuda_warp_column.conf
+campagna_VAS_7_shape_robustness/s8192_square_cuda_warp_smem.conf
+campagna_VAS_7_shape_robustness/s8192_square_cublas.conf
+campagna_VAS_7_shape_robustness/s8192_n2m_cuda_naive.conf
+campagna_VAS_7_shape_robustness/s8192_n2m_cuda_warp_column.conf
+campagna_VAS_7_shape_robustness/s8192_n2m_cuda_warp_smem.conf
+campagna_VAS_7_shape_robustness/s8192_n2m_cublas.conf
+campagna_VAS_7_shape_robustness/s8192_m3n_cuda_naive.conf
+campagna_VAS_7_shape_robustness/s8192_m3n_cuda_warp_column.conf
+campagna_VAS_7_shape_robustness/s8192_m3n_cuda_warp_smem.conf
+campagna_VAS_7_shape_robustness/s8192_m3n_cublas.conf
+
+campagna_VAS_7_shape_robustness/s16384_square_cuda_naive.conf
+campagna_VAS_7_shape_robustness/s16384_square_cuda_warp_column.conf
+campagna_VAS_7_shape_robustness/s16384_square_cuda_warp_smem.conf
+campagna_VAS_7_shape_robustness/s16384_square_cublas.conf
+campagna_VAS_7_shape_robustness/s16384_n2m_cuda_naive.conf
+campagna_VAS_7_shape_robustness/s16384_n2m_cuda_warp_column.conf
+campagna_VAS_7_shape_robustness/s16384_n2m_cuda_warp_smem.conf
+campagna_VAS_7_shape_robustness/s16384_n2m_cublas.conf
+campagna_VAS_7_shape_robustness/s16384_m3n_cuda_naive.conf
+campagna_VAS_7_shape_robustness/s16384_m3n_cuda_warp_column.conf
+campagna_VAS_7_shape_robustness/s16384_m3n_cuda_warp_smem.conf
+campagna_VAS_7_shape_robustness/s16384_m3n_cublas.conf
