@@ -4,6 +4,8 @@
 
 Ogni backend implementa tre operazioni fondamentali per la gestione e l'esecuzione del kernel locale, oltre ad alcune funzioni ausiliarie utilizzate per la raccolta delle metriche sperimentali.
 
+\subsection{Ciclo di vita del kernel}\label{sec:tre-fasi}
+
 \begin{lstlisting}[language=C,caption={Interfaccia di \file{src/kernel/kernel.h}.}]
 /* esecuzione */
 local_gemm_t *local_gemm_create(int m, int n, int k,
@@ -12,23 +14,25 @@ local_gemm_t *local_gemm_create(int m, int n, int k,
 void local_gemm(local_gemm_t *ctx,
                 const scalar_t *RESTRICT X, int ldx,
                 scalar_t *RESTRICT Y, int ldy);
+
 void local_gemm_destroy(local_gemm_t *ctx);
 
 \end{lstlisting}
-\color{red}
+
 L'interfaccia segue un ciclo di vita composto da tre fasi rappresentate da altrettante funzioni che definiscono il ciclo di vita del kernel locale:
-\code{local\_gemm\_create} ne inizializza il contesto,
-\code{local\_gemm} esegue il calcolo e
-\code{local\_gemm\_destroy} rilascia le risorse associate.
+\begin{itemize}
+    \item \code{local\_gemm\_create} ne inizializza il contesto,
+    \item \code{local\_gemm} esegue il calcolo e
+    \item \code{local\_gemm\_destroy} rilascia le risorse associate.
+\end{itemize}
+
+
 \color{black}
 
 
 Inoltre l'interfaccia espone alcune funzioni di introspezione utilizzate dal driver di
 benchmark per raccogliere separatamente tempi di calcolo, trasferimenti, costi di
 inizializzazione e parametri di esecuzione del backend. Tali metriche vengono descritte nella sezione dedicata alla metodologia sperimentale.
-
-\subsection{Ciclo di vita del kernel}
-\label{sec:tre-fasi}
 
 La separazione tra \code{local\_gemm\_create}, \code{local\_gemm} e
 \code{local\_gemm\_destroy} deriva dal diverso ciclo di vita dei dati
@@ -45,12 +49,9 @@ volta da quelle necessarie a ogni invocazione.
     Viene creato il contesto del backend e vengono predisposte le
     risorse riutilizzabili durante le successive esecuzioni.
     
-    Nei backend CPU vengono memorizzate le informazioni necessarie
-    all'esecuzione, tra cui le dimensioni del problema e il riferimento
-    al blocco locale di $A$.
-    
-    Nei backend CUDA vengono inoltre allocati i buffer sul device e
+    Nei backend CUDA vengono allocati i buffer sul device e
     $A$ viene trasferita una sola volta nella memoria della GPU.
+        
 
     \item \textbf{Esecuzione (\code{local\_gemm}).}
     Questa fase viene ripetuta per ogni invocazione del prodotto
@@ -85,8 +86,7 @@ informazioni differenti senza modificare l'interfaccia comune.
 Ad esempio, un backend CPU può memorizzare le dimensioni del problema
 e il riferimento ad $A$, mentre un backend CUDA mantiene anche i
 puntatori alla memoria del device e le risorse necessarie
-all'esecuzione. I dettagli interni del backend rimangono così
-nascosti al resto dell'applicazione.
+all'esecuzione.
 
 \subsection{Configurazione delle build}
 

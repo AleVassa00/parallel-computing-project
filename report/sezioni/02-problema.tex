@@ -1,4 +1,4 @@
-\chapter{Il nucleo di calcolo}
+\chapter{Il kernel di calcolo}
 \label{cap:problema}
 
 Questo capitolo fissa tre cose che il resto della relazione dà per acquisite:
@@ -34,8 +34,9 @@ Il conteggio si costruisce in due passi.
 prodotti: servono $N$ moltiplicazioni e $N-1$ addizioni, ma la convenzione
 standard, e quella imposta dalla traccia, arrotonda a $2$ FLOP per termine.
 
-\emph{Passo 2 - tutta la matrice.} Gli elementi di $Y$ sono $M \cdot k$,
-quindi:
+\emph{Passo 2 - tutta la matrice.} Gli elementi di $Y$ sono $M \cdot k$.
+
+Quindi:
 \begin{equation}
   \mathrm{FLOP}(M,N,k) = 2\,M\,N\,k ,
   \qquad
@@ -182,9 +183,8 @@ compilazione: è il motivo delle specializzazioni su $k$ descritte in
 Si potrebbe obiettare che le riletture dello schema~B le assorbe la cache, e in
 parte è così, ma solo finché la dimensione della riga è contenibile nella cache.
 Una riga di $A$ occupa $N s$
-byte, dove la dimensione in
-byte dello scalare $s$ è la dimensione in
-byte di ogni elemento della matrice, e $N$ è la dimensione che la traccia chiede di far crescere: il caso
+byte, dove  $s$ è la dimensione in byte di ogni elemento della matrice
+e $N$ è la dimensione che la traccia chiede di far crescere: il caso
 interessante è proprio quello in cui la riga eccede i livelli di cache vicini
 al calcolo o, sulla GPU, quello in cui la riga eccede la shared memory di un blocco. Il modello che segue
 conta perciò il traffico verso la memoria principale, che è il livello che
@@ -242,7 +242,7 @@ con il microbenchmark che lo misura, è in \cref{sec:specializzazione}.
 \subsection{Una proprietà che conta sull'hardware reale}
 
 Nello schema~A entrambi i flussi di lettura sono a \textbf{passo unitario}. La
-riga di $A$ è contigua per costruzione; la riga di $X$ lo è perché $X$ è
+riga di $A$ è contigua per costruzione e la riga di $X$ lo è perché $X$ è
 row-major con le $k$ colonne adiacenti (\cref{sec:layout}). Nessuno dei due
 accessi ha stride, quindi i prefetcher hardware lavorano nelle condizioni
 migliori e, sulla GPU, gli accessi delle lane di uno stesso warp sono
@@ -302,17 +302,17 @@ Il generatore è \code{splitmix64}, un mixer a 64 bit \textbf{senza stato}. La
 differenza rispetto a un generatore pseudocasuale ordinario è tutta qui: un
 generatore con stato produce una \emph{sequenza}, e per ottenere l'elemento in
 posizione $p$ bisogna averlo fatto avanzare $p$ volte. Un mixer stateless va
-da $(\text{seme}, \text{chiave})$ al valore in un passo solo.
+da $(\text{seed}, \text{chiave})$ al valore in un passo solo. La chiave scelta è
+l'\textbf{indice lineare globale} dell'elemento:
 
-La chiave scelta è l'\textbf{indice lineare globale} dell'elemento:
 \begin{equation}
   A[i][j] \;=\; g\bigl(\text{seed},\ \Sigma_A,\ i \cdot N + j \bigr),
   \qquad
   X[j][c] \;=\; g\bigl(\text{seed},\ \Sigma_X,\ j \cdot k + c \bigr),
   \label{eq:gen}
 \end{equation}
-dove $\Sigma_A$ e $\Sigma_X$ sono due identificatori di stream distinti, che
-servono a evitare che $A$ e $X$ abbiano lo stesso pattern di valori. Il seme
+dove $\Sigma_A$ e $\Sigma_X$ sono due identificatori di \emph{stream} distinti, che
+servono a evitare che $A$ e $X$ abbiano lo stesso pattern di valori. Il seed
 viene mescolato prima con lo stream e poi con la chiave: due passaggi, perché
 uno solo lascerebbe correlati i valori di chiavi vicine. Dei $64$ bit
 prodotti si usano i $53$ alti, che danno un \code{double} esatto in $[0,1)$,
