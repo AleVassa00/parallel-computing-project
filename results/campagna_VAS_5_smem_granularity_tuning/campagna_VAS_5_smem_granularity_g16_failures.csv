@@ -1,0 +1,3 @@
+experiment,kernel,M,N,k,block,smem_pad,np,pr,pc,exit_code
+block-sweep,cuda_warp_smem,16384,16384,20,1024,1,1,1,1,1
+block-sweep,cuda_warp_smem,16384,16384,32,1024,1,1,1,1,1
