@@ -1,16 +1,23 @@
-# Campagna VAS 3 - cuda_warp row-major con padding device di X.
+# Campagna VAS 3 - sweep del padding device di X in row-major.
 #
-# Completa il confronto sul layout di X senza ripetere misure gia' presenti:
+# Verifica X_PAD da 1 a 8 senza ripetere la configurazione senza padding:
 # - Campagna 1: column-major, da filtrare a BLOCK=128;
 # - Campagna 2: row-major con X_PAD=0;
-# - Campagna 3: row-major con X_PAD=1.
+# - Campagna 3: row-major con X_PAD=1,...,8.
 #
-# X_PAD aggiunge uno scalare allo stride di ogni riga del solo buffer GPU di X;
-# i dati utili trasferiti e tutti gli altri parametri restano invariati. Il
-# column-major rimane compatto, perche' il codice non ammette padding con quel
-# layout.
+# X_PAD aggiunge il numero indicato di scalari allo stride di ogni riga del solo
+# buffer GPU di X. I dati utili trasferiti e tutti gli altri parametri restano
+# invariati. Il column-major rimane compatto, perche' il codice non ammette
+# padding con quel layout. Totale: 8 padding x 5 k = 40 configurazioni.
 #
 # Esecuzione:
 #   ./script/run_cuda_experiments.sh --suite experiments/fase_1_tuning/campagna_VAS_3_row_major_padding.txt
 
-campagna_VAS_3_row_major_padding/cuda_warp_row_padded.conf
+campagna_VAS_3_row_major_padding/x_pad_1.conf
+campagna_VAS_3_row_major_padding/x_pad_2.conf
+campagna_VAS_3_row_major_padding/x_pad_3.conf
+campagna_VAS_3_row_major_padding/x_pad_4.conf
+campagna_VAS_3_row_major_padding/x_pad_5.conf
+campagna_VAS_3_row_major_padding/x_pad_6.conf
+campagna_VAS_3_row_major_padding/x_pad_7.conf
+campagna_VAS_3_row_major_padding/x_pad_8.conf
