@@ -1,0 +1,56 @@
+command=./script/run_cuda_experiments.sh --config /home/avassallo/parallel-computing-project/experiments/campagna_VAS_4_smem_pad_tuning/cuda_warp_smem.conf 
+timestamp=20260915_031142
+name=campagna_VAS_4_smem_pad_tuning_cuda_warp_smem
+experiment=smem-pad-sweep
+config_file=/home/avassallo/parallel-computing-project/experiments/campagna_VAS_4_smem_pad_tuning/cuda_warp_smem.conf
+M=16384
+N=16384
+reps=20
+warmup=5
+seed=20252026
+check=0
+group_timing=0
+a_mode=local
+x_mode=local
+x_layout=row
+x_pad=0
+kernel=cuda_warp_smem
+kernels=cuda_naive cuda_warp cuda_warp_smem
+k_sweep=3 6 8 20 32
+block_sweep_k=3 6 8 20 32
+compare_k=3 6 8 20 32
+block=256
+blocks=64 128 192 256 384 512 1024
+prec=double
+smem_pad=1
+smem_pads=0 1
+warp_col_tile=8
+warp_col_tiles=4 8 16 32
+force_generic_k=0
+test_a_padding=0
+nvcc_arch=sm_75
+all_grids=no
+btl=self,sm
+bind_to=core
+map_by=core
+report_bindings=0
+grids:
+  np=1 pr=1 pc=1
+
+git_commit=eda12f3fc1e58587f7eeb5c6376d5a3a845732ad
+git_status:
+ M script/run_cuda_experiments.sh
+?? results/campagna_VAS_4_smem_pad_tuning/
+
+nvcc:
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2025 NVIDIA Corporation
+Built on Wed_Jan_15_19:20:09_PST_2025
+Cuda compilation tools, release 12.8, V12.8.61
+Build cuda_12.8.r12.8/compiler.35404655_0
+
+mpirun:
+mpirun (Open MPI) 5.0.9
+
+
+gpu:

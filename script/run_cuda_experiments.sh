@@ -85,6 +85,7 @@ BLOCKS=(64 128 192 256 384 512 1024)
 PREC="double"
 SMEM_PAD=1
 SMEM_PADS=(0 1)
+TILE_GRANULARITY=32
 WARP_COL_TILE=8
 WARP_COL_TILES=(4 8 16 32)
 FORCE_GENERIC_K=0
@@ -218,6 +219,7 @@ FLAG CUDA / BUILD
   --prec double|float         Precisione                 [default double]
   --smem-pad N                Padding shared             [default 1]
   --smem-pads "0 1"           Lista padding per smem-pad-sweep
+  --tile-granularity N        Arrotondamento righe/tile smem [default 32]
   --warp-col-tile N           Colonne per warp (cuda_warp_tiled) [default 8]
   --warp-col-tiles "4 8 16 32" Lista tile per warp-tile-sweep
   --force-generic-k 0|1       FORCE_GENERIC_K            [default 0]
@@ -376,6 +378,7 @@ apply_config_kv() {
         smem_pads|smem-pads)
             read -r -a SMEM_PADS <<< "$value"
             ;;
+        tile_granularity|tile-granularity) TILE_GRANULARITY="$value" ;;
         warp_col_tile|warp-col-tile) WARP_COL_TILE="$value" ;;
         warp_col_tiles|warp-col-tiles)
             read -r -a WARP_COL_TILES <<< "$value"
@@ -670,6 +673,8 @@ while [[ $# -gt 0 ]]; do
             read -r -a SMEM_PADS <<< "$2"
             shift 2
             ;;
+        --tile-granularity)
+            need_value "$@"; TILE_GRANULARITY="$2"; shift 2 ;;
         --force-generic-k)
             need_value "$@"; FORCE_GENERIC_K="$2"; shift 2 ;;
         --warp-col-tile)
@@ -749,6 +754,10 @@ validate_block() {
 }
 
 validate_common() {
+    if ! is_pos_int "$TILE_GRANULARITY"; then
+        echo "Errore: TILE_GRANULARITY deve essere un intero positivo." >&2
+        exit 1
+    fi
     if ! is_pos_int "$WARP_COL_TILE"; then
         echo "Errore: WARP_COL_TILE deve essere un intero positivo." >&2
         exit 1
@@ -1031,6 +1040,9 @@ config_suffix() {
     if [[ "$kernel" == "cuda_warp_tiled" && "$WARP_COL_TILE" != "8" ]]; then
         suffix="${suffix}-tile${WARP_COL_TILE}"
     fi
+    if [[ "$kernel" == "cuda_warp_smem" && "$TILE_GRANULARITY" != "32" ]]; then
+        suffix="${suffix}-g${TILE_GRANULARITY}"
+    fi
     if [[ "$X_LAYOUT" == "column" ]]; then
         suffix="${suffix}-xcol"
     fi
@@ -1059,11 +1071,14 @@ build_kernel() {
     if [[ "$kernel" == "cuda_warp_tiled" ]]; then
         tile_args+=(WARP_COL_TILE="$WARP_COL_TILE")
     fi
+    if [[ "$kernel" == "cuda_warp_smem" ]]; then
+        tile_args+=(TILE_GRANULARITY="$TILE_GRANULARITY")
+    fi
 
     validate_block "$block"
 
     if [[ "$kernel" == "cuda_warp_smem" ]]; then
-        log "BUILD kernel=$kernel BLOCK=$block SMEM_PAD=$smem_pad PREC=$PREC"
+        log "BUILD kernel=$kernel BLOCK=$block SMEM_PAD=$smem_pad TILE_GRANULARITY=$TILE_GRANULARITY PREC=$PREC"
     elif [[ "$kernel" == "cuda_warp" ]]; then
         log "BUILD kernel=$kernel BLOCK=$block PREC=$PREC X_LAYOUT=$X_LAYOUT X_PAD=$X_PAD"
     else
@@ -1219,6 +1234,7 @@ write_metadata() {
         echo "prec=$PREC"
         echo "smem_pad=$SMEM_PAD"
         echo "smem_pads=${SMEM_PADS[*]}"
+        echo "tile_granularity=$TILE_GRANULARITY"
         echo "warp_col_tile=$WARP_COL_TILE"
         echo "warp_col_tiles=${WARP_COL_TILES[*]}"
         echo "force_generic_k=$FORCE_GENERIC_K"
@@ -1411,6 +1427,10 @@ experiment_registers() {
         if [[ "$kernel" == "cuda_warp_tiled" ]]; then
             tile_args+=(WARP_COL_TILE="$WARP_COL_TILE")
             label="${kernel}_tile${WARP_COL_TILE}"
+        fi
+        if [[ "$kernel" == "cuda_warp_smem" ]]; then
+            tile_args+=(TILE_GRANULARITY="$TILE_GRANULARITY")
+            label="${kernel}_g${TILE_GRANULARITY}"
         fi
         local txt="$(result_path "ptxas_${label}" "txt")"
         local regs="$(result_path "ptxas_${label}_registers" "txt")"
