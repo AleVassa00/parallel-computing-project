@@ -135,13 +135,6 @@ endif
 endif
 endif
 
-ifeq ($(KERNEL),cuda_warp_tiled)
-WARP_COL_TILE   ?= 8
-ifeq ($(shell printf '%s\n' '$(WARP_COL_TILE)' | grep -E '^[1-9][0-9]*$$'),)
-$(error WARP_COL_TILE deve essere un intero positivo)
-endif
-endif
-
 # Thread per blocco dei kernel CUDA. 256 e' il default: 8 warp, e un divisore di
 # 1024, che su Turing e' il massimo di thread residenti per SM. Uno sweep su
 # 64/128/192/256/384/512/1024 misura quanto il kernel dipenda davvero da questo
@@ -188,11 +181,6 @@ CONFIG := $(CONFIG)-smempad$(SMEM_PAD)
 endif
 ifneq ($(BLOCK),256)
 CONFIG := $(CONFIG)-blk$(BLOCK)
-endif
-ifeq ($(KERNEL),cuda_warp_tiled)
-ifneq ($(WARP_COL_TILE),8)
-CONFIG := $(CONFIG)-tile$(WARP_COL_TILE)
-endif
 endif
 # Solo cuda_warp_smem legge questi due: entrano nel nome della configurazione
 # soltanto li', altrimenti si otterrebbero binari con nomi diversi e contenuto
@@ -295,9 +283,6 @@ NVCCFLAGS := -O3 -std=c++14 -arch=$(NVCC_ARCH) -Isrc $(PRECDEF) -lineinfo \
 	-Xcompiler -Wall -Xcompiler -Wextra $(EXTRA_NVCCFLAGS)
 ifeq ($(KERNEL),cuda_warp)
 NVCCFLAGS += -DX_PAD=$(X_PAD)
-endif
-ifeq ($(KERNEL),cuda_warp_tiled)
-NVCCFLAGS += -DWARP_COL_TILE=$(WARP_COL_TILE)
 endif
 ifeq ($(KERNEL),cuda_warp_smem)
 NVCCFLAGS += -DTILE_GRANULARITY=$(TILE_GRANULARITY)

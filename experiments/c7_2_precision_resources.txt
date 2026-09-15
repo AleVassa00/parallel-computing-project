@@ -12,5 +12,3 @@ c7_2_precision_resources/cuda_warp_double.conf
 c7_2_precision_resources/cuda_warp_float.conf
 c7_2_precision_resources/cuda_warp_smem_double.conf
 c7_2_precision_resources/cuda_warp_smem_float.conf
-c7_2_precision_resources/cuda_warp_tiled_double.conf
-c7_2_precision_resources/cuda_warp_tiled_float.conf

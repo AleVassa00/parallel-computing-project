@@ -1,30 +1,30 @@
-command=./script/run_cuda_experiments.sh --config /home/avassallo/parallel-computing-project/experiments/c7_1_precision_k/cuda_warp_tiled_float.conf 
-timestamp=20260914_141419
-name=c7_1_cuda_warp_tiled_float
+command=./script/run_cuda_experiments.sh --config /home/avassallo/parallel-computing-project/experiments/campagna_VAS_6_kernel_comparison/cuda_warp_column.conf 
+timestamp=20260915_125011
+name=campagna_VAS_6_kernel_comparison_cuda_warp_column_xcolumn
 experiment=k-sweep
-config_file=/home/avassallo/parallel-computing-project/experiments/c7_1_precision_k/cuda_warp_tiled_float.conf
-M=10000
-N=10000
+config_file=/home/avassallo/parallel-computing-project/experiments/campagna_VAS_6_kernel_comparison/cuda_warp_column.conf
+M=16384
+N=16384
 reps=20
 warmup=5
 seed=20252026
 check=0
+group_timing=0
 a_mode=local
 x_mode=local
-x_layout=row
+x_layout=column
 x_pad=0
-kernel=cuda_warp_tiled
+kernel=cuda_warp
 kernels=cuda_naive cuda_warp cuda_warp_smem
 k_sweep=3 6 8 20 32
 block_sweep_k=3 6 8 20 32
 compare_k=3 6 8 20 32
-block=256
+block=128
 blocks=64 128 192 256 384 512 1024
-prec=float
+prec=double
 smem_pad=1
 smem_pads=0 1
-warp_col_tile=8
-warp_col_tiles=4 8 16 32
+tile_granularity=32
 force_generic_k=0
 test_a_padding=0
 nvcc_arch=sm_75
@@ -36,9 +36,10 @@ report_bindings=0
 grids:
   np=1 pr=1 pc=1
 
-git_commit=5f5d58a589922a31f71c9d836ee0f19d0ad0cd67
+git_commit=e5eac6f1bcfb1f2a324c1e9203041c62a738f78c
 git_status:
  M script/run_cuda_experiments.sh
+?? results/campagna_VAS_6_kernel_comparison/
 
 nvcc:
 nvcc: NVIDIA (R) Cuda compiler driver

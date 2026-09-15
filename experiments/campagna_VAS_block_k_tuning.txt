@@ -15,4 +15,3 @@
 campagna_VAS_block_k_tuning/cuda_naive.conf
 campagna_VAS_block_k_tuning/cuda_warp_column.conf
 campagna_VAS_block_k_tuning/cuda_warp_smem.conf
-campagna_VAS_block_k_tuning/cuda_warp_tiled.conf

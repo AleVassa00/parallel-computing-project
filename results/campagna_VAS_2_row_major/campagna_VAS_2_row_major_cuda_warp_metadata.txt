@@ -24,8 +24,6 @@ blocks=64 128 192 256 384 512 1024
 prec=double
 smem_pad=1
 smem_pads=0 1
-warp_col_tile=8
-warp_col_tiles=4 8 16 32
 force_generic_k=0
 test_a_padding=0
 nvcc_arch=sm_75
@@ -42,7 +40,6 @@ git_status:
  M script/run_cuda_experiments.sh
 ?? results/c8_block_k_tuning/c8_block_k_tuning_cuda_naive_metadata.txt
 ?? results/c8_block_k_tuning/c8_block_k_tuning_cuda_warp_smem_metadata.txt
-?? results/c8_block_k_tuning/c8_block_k_tuning_cuda_warp_tiled_metadata.txt
 ?? results/c8_block_k_tuning/c8_block_k_tuning_cuda_warp_xcolumn_metadata.txt
 ?? results/campagna_VAS_2_row_major/
 

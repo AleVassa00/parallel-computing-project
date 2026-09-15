@@ -9,6 +9,5 @@
 
 campagna_VAS_6_kernel_comparison/cuda_naive.conf
 campagna_VAS_6_kernel_comparison/cuda_warp_column.conf
-campagna_VAS_6_kernel_comparison/cuda_warp_tiled.conf
 campagna_VAS_6_kernel_comparison/cuda_warp_smem.conf
 campagna_VAS_6_kernel_comparison/cublas.conf

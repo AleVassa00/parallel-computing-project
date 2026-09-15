@@ -25,7 +25,7 @@ RATIO_LABEL = {"1x1": "1:1 (M=N)", "3x1": "3:1 (M=3N)", "1x2": "1:2 (N=2M)"}
 STEP_ORDER = ["1x1", "3x1", "1x2"]
 
 CPU_KERNELS = "scheme_a scheme_a_jblock scheme_a_jblock_rb"
-GPU_KERNELS = "cuda_naive cuda_warp cuda_warp_smem cuda_warp_tiled cublas"
+GPU_KERNELS = "cuda_naive cuda_warp cuda_warp_smem cublas"
 
 HEADER = """\
 # C1 - campagna obbligatoria: taglie x rapporto M:N x k x kernel
@@ -99,13 +99,12 @@ VARIANTS = {
         gpu_keys="""\
 block=256
 smem_pad=1
-warp_col_tile=8
 """,
         mpi_keys="",
         variant_notes="""\
 #
-# Cinque backend CUDA: cuda_naive (baseline), cuda_warp, cuda_warp_smem,
-# cuda_warp_tiled (candidati) e cublas (riferimento esterno, misurato con
+# Quattro backend CUDA: cuda_naive (baseline), cuda_warp, cuda_warp_smem
+# (candidati) e cublas (riferimento esterno, misurato con
 # la stessa pipeline e lo stesso cronometro). La colonna da leggere e'
 # gflops_kernel; t_h2d_X / t_d2h_Y restano a parte come chiede la traccia.
 #
@@ -208,7 +207,7 @@ SUITE_HEADER = {
     "gpu": """\
 # C1 - campagna obbligatoria, variante GPU a np=1
 #     taglie s1..s4 x rapporti 1:1, 3:1, 1:2 x k = 3 6 8 20 32
-#     kernel: cuda_naive, cuda_warp, cuda_warp_smem, cuda_warp_tiled, cublas
+#     kernel: cuda_naive, cuda_warp, cuda_warp_smem, cublas
 #
 #   ./script/run_cuda_experiments.sh --suite experiments/c1_size_ratio_gpu.txt
 #

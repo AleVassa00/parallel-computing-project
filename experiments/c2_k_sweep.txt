@@ -9,5 +9,4 @@ c2_k_sweep/scheme_a.conf
 c2_k_sweep/cuda_naive.conf
 c2_k_sweep/cuda_warp.conf
 c2_k_sweep/cuda_warp_smem.conf
-c2_k_sweep/cuda_warp_tiled.conf
 c2_k_sweep/cublas.conf

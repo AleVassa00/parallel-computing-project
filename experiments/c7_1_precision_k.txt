@@ -1,6 +1,6 @@
-# C7.1 - FP32/FP64 x k: 10 configurazioni, 50 righe aggregate.
+# C7.1 - FP32/FP64 x k: 8 configurazioni, 40 righe aggregate.
 # ./script/run_cuda_experiments.sh --suite experiments/c7_1_precision_k.txt
-# M=N=10000, P=1, BLOCK=256; tiled mantiene WARP_COL_TILE=8.
+# M=N=10000, P=1, BLOCK=256.
 # Coppie double/float adiacenti: tutti gli altri parametri sono identici.
 # S32/64 = t_kernel_mean_s(double) / t_kernel_mean_s(float), per (kernel,k).
 # Non mescolare tempi kernel, local e total nello stesso rapporto.
@@ -14,7 +14,5 @@ c7_1_precision_k/cuda_warp_double.conf
 c7_1_precision_k/cuda_warp_float.conf
 c7_1_precision_k/cuda_warp_smem_double.conf
 c7_1_precision_k/cuda_warp_smem_float.conf
-c7_1_precision_k/cuda_warp_tiled_double.conf
-c7_1_precision_k/cuda_warp_tiled_float.conf
 c7_1_precision_k/cublas_double.conf
 c7_1_precision_k/cublas_float.conf

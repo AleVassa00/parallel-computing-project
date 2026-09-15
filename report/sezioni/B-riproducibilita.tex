@@ -14,8 +14,6 @@ make KERNEL=cuda_warp_smem
 make KERNEL=cuda_warp_smem SMEM_PAD=0
 make KERNEL=cuda_warp_smem TILE_GRANULARITY=8
 make KERNEL=cuda_warp_smem SMEM_BUDGET_BYTES=16384
-make KERNEL=cuda_warp_tiled
-make KERNEL=cuda_warp_tiled WARP_COL_TILE=4
 make KERNEL=cublas                    # aggiunge -lcublas da solo
 \end{lstlisting}
 

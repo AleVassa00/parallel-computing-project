@@ -58,10 +58,10 @@ ogni kernel. Gli assi, dall'esterno all'interno:
 | griglia (solo `mpi20`) | 1x20, 2x10, 4x5, 5x4, 10x2, 20x1 | `all_grids=20` nel `.conf` |
 
 Per suite: `cpu` = `scheme_a`, `scheme_a_jblock`, `scheme_a_jblock_rb` a
-`np=1`; `gpu` = `cuda_naive`, `cuda_warp`, `cuda_warp_smem`,
-`cuda_warp_tiled`, `cublas` a `np=1`; `mpi20` = gli stessi tre kernel di CPU
+`np=1`; `gpu` = `cuda_naive`, `cuda_warp`, `cuda_warp_smem`, `cublas` a
+`np=1`; `mpi20` = gli stessi tre kernel di CPU
 a P=20 su tutte le forme di griglia. Ogni `.conf` produce **un** CSV con una
-riga per (kernel, k[, griglia]): 15 righe per i file CPU, 25 per quelli GPU,
+riga per (kernel, k[, griglia]): 15 righe per i file CPU, 20 per quelli GPU,
 90 per quelli MPI (le colonne `pr`,`pc` distinguono le forme).
 
 Tutto in double. I k **senza** specializzazione (1, 7, 17, 40, 64) restano in
@@ -133,8 +133,8 @@ differenza fra le due famiglie di righe e' la misura di quanto vale la
 specializzazione. Su `scheme_a`, k=40 e k=64 costano anche una rilettura di A
 (gli accumulatori sono bloccati a `KB=32`).
 
-Sei backend: `scheme_a`, `cuda_naive`, `cuda_warp`, `cuda_warp_smem`,
-`cuda_warp_tiled`, `cublas`. `cublas` non e' una proposta ma il **riferimento
+Cinque backend: `scheme_a`, `cuda_naive`, `cuda_warp`, `cuda_warp_smem`,
+`cublas`. `cublas` non e' una proposta ma il **riferimento
 esterno**: misurato sulla stessa macchina, con la stessa pipeline e lo stesso
 cronometro, risponde con un numero a "perche' non avete chiamato una
 libreria".
