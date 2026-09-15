@@ -13,7 +13,6 @@
 #   make KERNEL=scheme_a_jblock_rb RB_ROWS=<1|2|4> forza le righe per blocco
 #   make KERNEL=cuda_warp  backend CUDA warp-per-row con dispatch su k
 #   make KERNEL=cuda_warp X_LAYOUT=column  X compatta per colonne (default row)
-#   make KERNEL=cuda_warp X_PAD=1  padding di X solo sulla GPU (row-major)
 #   make KERNEL=cuda_warp_smem  come sopra, ma con il tile di X in shared
 #   make KERNEL=cuda_warp_smem SMEM_PAD=0  la stessa cosa senza il padding k+1
 #   make KERNEL=cuda_warp_smem TILE_GRANULARITY=<n>   arrotondamento righe/tile
@@ -65,23 +64,6 @@ ifneq ($(KERNEL),cuda_warp)
 $(error X_LAYOUT=column e' supportato soltanto da cuda_warp)
 endif
 X_LAYOUT_DEF := -DX_COLUMN_MAJOR=1
-endif
-
-# Padding fisico del buffer GPU di X; il buffer host/MPI resta compatto.
-X_PAD ?= 0
-ifeq ($(shell printf '%s\n' '$(X_PAD)' | grep -E '^(0|[1-9][0-9]*)$$'),)
-$(error X_PAD deve essere un intero decimale non negativo, senza zeri iniziali)
-endif
-ifneq ($(shell test '$(X_PAD)' -le 2147483647 2>/dev/null && echo yes),yes)
-$(error X_PAD deve essere <= 2147483647)
-endif
-ifneq ($(X_PAD),0)
-ifneq ($(KERNEL),cuda_warp)
-$(error X_PAD>0 e' supportato soltanto da cuda_warp)
-endif
-ifneq ($(X_LAYOUT),row)
-$(error X_PAD>0 richiede X_LAYOUT=row)
-endif
 endif
 
 # Scalari di padding aggiunti a ogni riga del tile di X in shared memory dal
@@ -196,9 +178,6 @@ endif
 ifeq ($(X_LAYOUT),column)
 CONFIG := $(CONFIG)-xcol
 endif
-ifneq ($(X_PAD),0)
-CONFIG := $(CONFIG)-xpad$(X_PAD)
-endif
 ifneq ($(filter $(KERNEL),$(JBLOCK_KERNELS)),)
 ifneq ($(JBLOCK_BYTES),65536)
 CONFIG := $(CONFIG)-jb$(JBLOCK_BYTES)
@@ -281,9 +260,6 @@ NVCCFLAGS := -O3 -std=c++14 -arch=$(NVCC_ARCH) -Isrc $(PRECDEF) -lineinfo \
 	-DSMEM_PAD=$(SMEM_PAD) -DBLOCK_THREADS=$(BLOCK) \
 	-Xptxas -v \
 	-Xcompiler -Wall -Xcompiler -Wextra $(EXTRA_NVCCFLAGS)
-ifeq ($(KERNEL),cuda_warp)
-NVCCFLAGS += -DX_PAD=$(X_PAD)
-endif
 ifeq ($(KERNEL),cuda_warp_smem)
 NVCCFLAGS += -DTILE_GRANULARITY=$(TILE_GRANULARITY)
 ifneq ($(SMEM_BUDGET_BYTES),)
@@ -326,7 +302,7 @@ TESTBIN := bin/test_index
 .PHONY: all test check check-mpi check-cxx check-padding padding-run clean
 
 all: $(BIN)
-	@echo "built $(BIN)  [PREC=$(PREC) KERNEL=$(KERNEL) ($(KERNEL_SRC)) FORCE_GENERIC_K=$(FORCE_GENERIC_K) TEST_A_PADDING=$(TEST_A_PADDING) SMEM_PAD=$(SMEM_PAD) BLOCK=$(BLOCK) TILE_GRANULARITY=$(TILE_GRANULARITY) SMEM_BUDGET_BYTES=$(if $(SMEM_BUDGET_BYTES),$(SMEM_BUDGET_BYTES),derivato)$(if $(filter cuda_warp,$(KERNEL)), X_LAYOUT=$(X_LAYOUT) X_PAD=$(X_PAD))]"
+	@echo "built $(BIN)  [PREC=$(PREC) KERNEL=$(KERNEL) ($(KERNEL_SRC)) FORCE_GENERIC_K=$(FORCE_GENERIC_K) TEST_A_PADDING=$(TEST_A_PADDING) SMEM_PAD=$(SMEM_PAD) BLOCK=$(BLOCK) TILE_GRANULARITY=$(TILE_GRANULARITY) SMEM_BUDGET_BYTES=$(if $(SMEM_BUDGET_BYTES),$(SMEM_BUDGET_BYTES),derivato)$(if $(filter cuda_warp,$(KERNEL)), X_LAYOUT=$(X_LAYOUT))]"
 
 $(OBJDIR)/%.o: src/%.c
 	@mkdir -p $(dir $@)

@@ -7,8 +7,7 @@
 #
 # cuda_warp usa X column-major: e' la versione candidata perche' rende
 # contigue fra le lane le letture di X. A BLOCK=128 queste misure sono il
-# riferimento per i confronti con row-major senza padding (Campagna 2) e con
-# una colonna di padding device (Campagna 3).
+# riferimento per il confronto con row-major della Campagna 2.
 #
 # Esecuzione:
 #   ./script/run_cuda_experiments.sh --suite experiments/fase_1_tuning/campagna_VAS_block_k_tuning.txt

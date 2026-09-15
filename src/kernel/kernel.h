@@ -78,10 +78,7 @@ local_gemm_t *local_gemm_create(int m, int n, int k, const scalar_t *A_loc, int 
  *   X: n x k, riga j a partire da X + j*ldx        row-major, k contiguo
  *      Con X_LAYOUT=column (solo cuda_warp): X[j,c] = X[c*n+j], compatta.
  *      In questa build ldx deve essere k: descrive la capienza n*ldx del
- *      buffer, non lo stride fra colonne, che e' n. Non e' ammesso padding X.
- *      Con cuda_warp row-major e X_PAD>0, ldx resta lo stride HOST:
- *      la copia H2D legge k elementi per riga e li deposita con stride
- *      device k+X_PAD. Il padding device non cambia l'interfaccia host/MPI.
+ *      buffer, non lo stride fra colonne, che e' n.
  *   Y: m x k, riga i a partire da Y + i*ldy        row-major, k contiguo
  *
  * m, n, k, lda, ldx e ldy sono fissati da local_gemm_create. ldx e ldy
@@ -96,8 +93,7 @@ local_gemm_t *local_gemm_create(int m, int n, int k, const scalar_t *A_loc, int 
  * descrivere uno stride richiederebbe di costruire un datatype derivato a
  * ogni invocazione, dentro la regione cronometrata. L'unico padding che il
  * percorso distribuito puo' avere nei buffer HOST e' quindi quello di A,
- * cioe' lda, perche' A non attraversa nessuna collettiva. Il padding device
- * X_PAD di cuda_warp resta interno al backend e non attraversa MPI. */
+ * cioe' lda, perche' A non attraversa nessuna collettiva. */
 void local_gemm(local_gemm_t *local_gemm_context, const scalar_t *RESTRICT X, int ldx, scalar_t *RESTRICT Y, int ldy);
 
 /* Rilascia le risorse del backend (per CUDA: la copia di A in VRAM).

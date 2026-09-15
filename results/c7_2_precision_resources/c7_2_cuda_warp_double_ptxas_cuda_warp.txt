@@ -7,7 +7,7 @@ mpicc -std=c11 -O3 -march=native -ffp-contract=fast -Wall -Wextra -Wpedantic -Is
 mpicc -std=c11 -O3 -march=native -ffp-contract=fast -Wall -Wextra -Wpedantic -Isrc -MMD -MP    -c src/mpi/matmul_mpi.c -o obj/matmul_mpi-cuda_warp/mpi/matmul_mpi.o
 mpicc -std=c11 -O3 -march=native -ffp-contract=fast -Wall -Wextra -Wpedantic -Isrc -MMD -MP    -c src/bench/check.c -o obj/matmul_mpi-cuda_warp/bench/check.o
 mpicc -std=c11 -O3 -march=native -ffp-contract=fast -Wall -Wextra -Wpedantic -Isrc -MMD -MP    -c src/bench/main.c -o obj/matmul_mpi-cuda_warp/bench/main.o
-nvcc -O3 -std=c++14 -arch=sm_75 -Isrc  -lineinfo  -DSMEM_PAD=1 -DBLOCK_THREADS=256 -Xptxas -v -Xcompiler -Wall -Xcompiler -Wextra -Xptxas -v -DX_PAD=0 -Xcompiler -march=native -c src/kernel/cuda_warp.cu -o obj/matmul_mpi-cuda_warp/kernel/cuda_warp.o
+nvcc -O3 -std=c++14 -arch=sm_75 -Isrc  -lineinfo  -DSMEM_PAD=1 -DBLOCK_THREADS=256 -Xptxas -v -Xcompiler -Wall -Xcompiler -Wextra -Xptxas -v -Xcompiler -march=native -c src/kernel/cuda_warp.cu -o obj/matmul_mpi-cuda_warp/kernel/cuda_warp.o
 ptxas info    : 0 bytes gmem
 ptxas info    : Compiling entry function '_Z17warp_kernel_fixedILi32EEviiPKdiS1_iPdi' for 'sm_75'
 ptxas info    : Function properties for _Z17warp_kernel_fixedILi32EEviiPKdiS1_iPdi
@@ -40,4 +40,4 @@ ptxas info    : Function properties for _Z19warp_kernel_runtimeiiiPKdiS0_iPdi
 ptxas info    : Used 62 registers, used 0 barriers, 412 bytes cmem[0]
 ptxas info    : Compile time = 22.086 ms
 mpicc -std=c11 -O3 -march=native -ffp-contract=fast -Wall -Wextra -Wpedantic -Isrc -MMD -MP    obj/matmul_mpi-cuda_warp/common/util.o obj/matmul_mpi-cuda_warp/index/index.o obj/matmul_mpi-cuda_warp/gen/gen.o obj/matmul_mpi-cuda_warp/serial/serial.o obj/matmul_mpi-cuda_warp/mpi/grid.o obj/matmul_mpi-cuda_warp/mpi/distrib.o obj/matmul_mpi-cuda_warp/mpi/matmul_mpi.o obj/matmul_mpi-cuda_warp/bench/check.o obj/matmul_mpi-cuda_warp/bench/main.o obj/matmul_mpi-cuda_warp/kernel/cuda_warp.o -o bin/matmul_mpi-cuda_warp -L/opt/cuda/12.8/lib64 -lm -lcudart -lstdc++
-built bin/matmul_mpi-cuda_warp  [PREC=double KERNEL=cuda_warp (src/kernel/cuda_warp.cu) FORCE_GENERIC_K=0 TEST_A_PADDING=0 SMEM_PAD=1 BLOCK=256 TILE_GRANULARITY=32 SMEM_BUDGET_BYTES=derivato X_LAYOUT=row X_PAD=0]
+built bin/matmul_mpi-cuda_warp  [PREC=double KERNEL=cuda_warp (src/kernel/cuda_warp.cu) FORCE_GENERIC_K=0 TEST_A_PADDING=0 SMEM_PAD=1 BLOCK=256 TILE_GRANULARITY=32 SMEM_BUDGET_BYTES=derivato X_LAYOUT=row]

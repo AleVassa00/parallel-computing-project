@@ -55,7 +55,6 @@ SEED=""
 A_MODE="local"
 X_MODE="local"
 X_LAYOUT="row"
-X_PAD=0
 CHECK=0
 GROUP_TIMING=0
 
@@ -177,9 +176,6 @@ FLAG DEL PROBLEMA
   --x-layout row|column       Layout di X (column solo cuda_warp) [default row]
                               Conversione una volta nel preprocessing.
                               Column aggiunge _xcolumn ai nomi dei risultati.
-  --x-pad N                   Padding GPU di X (solo cuda_warp row) [default 0]
-                              H2D con cudaMemcpy2D, buffer MPI invariato.
-                              N>0 aggiunge _xpadN ai nomi dei risultati.
 
 FLAG MPI / GRIGLIA
   --np P                      Numero processi MPI        [default 1]
@@ -328,7 +324,6 @@ apply_config_kv() {
         a_mode|a-mode) A_MODE="$value" ;;
         x_mode|x-mode) X_MODE="$value" ;;
         x_layout|x-layout) X_LAYOUT="$value" ;;
-        x_pad|x-pad) X_PAD="$value" ;;
 
         np)
             NP="$value"
@@ -578,8 +573,6 @@ while [[ $# -gt 0 ]]; do
             need_value "$@"; X_MODE="$2"; shift 2 ;;
         --x-layout)
             need_value "$@"; X_LAYOUT="$2"; shift 2 ;;
-        --x-pad)
-            need_value "$@"; X_PAD="$2"; shift 2 ;;
 
         --np)
             need_value "$@"
@@ -754,18 +747,8 @@ validate_common() {
     case "$X_LAYOUT" in row|column) ;; *)
         echo "Errore: --x-layout deve essere row o column." >&2; exit 1 ;;
     esac
-    if [[ ! "$X_PAD" =~ ^(0|[1-9][0-9]*)$ ]] ||
-       [[ "${#X_PAD}" -gt 10 ]] || (( X_PAD > 2147483647 )); then
-        echo "Errore: --x-pad deve essere un intero da 0 a 2147483647, senza zeri iniziali." >&2
-        exit 1
-    fi
-    if [[ "$X_PAD" != "0" && "$X_LAYOUT" != "row" ]]; then
-        echo "Errore: --x-pad > 0 richiede --x-layout row." >&2
-        exit 1
-    fi
-    if [[ "$X_LAYOUT" == "column" || "$X_PAD" != "0" ]]; then
+    if [[ "$X_LAYOUT" == "column" ]]; then
         local x_option="--x-layout column"
-        [[ "$X_PAD" == "0" ]] || x_option="--x-pad $X_PAD"
         local layout_kernels=("$KERNEL")
         case "$EXPERIMENT" in
             compare) layout_kernels=("${KERNELS[@]}") ;;
@@ -923,9 +906,6 @@ finalize_output_dir() {
     if [[ "$X_LAYOUT" == "column" ]]; then
         EXPERIMENT_NAME="${EXPERIMENT_NAME}_xcolumn"
     fi
-    if [[ "$X_PAD" != "0" ]]; then
-        EXPERIMENT_NAME="${EXPERIMENT_NAME}_xpad${X_PAD}"
-    fi
 
     if [[ "$OUTDIR_EXPLICIT" -eq 0 ]]; then
         OUTDIR="results/${EXPERIMENT_NAME}"
@@ -1000,9 +980,6 @@ config_suffix() {
     if [[ "$X_LAYOUT" == "column" ]]; then
         suffix="${suffix}-xcol"
     fi
-    if [[ "$X_PAD" != "0" ]]; then
-        suffix="${suffix}-xpad${X_PAD}"
-    fi
 
     echo "$suffix"
 }
@@ -1031,7 +1008,7 @@ build_kernel() {
     if [[ "$kernel" == "cuda_warp_smem" ]]; then
         log "BUILD kernel=$kernel BLOCK=$block SMEM_PAD=$smem_pad TILE_GRANULARITY=$TILE_GRANULARITY PREC=$PREC"
     elif [[ "$kernel" == "cuda_warp" ]]; then
-        log "BUILD kernel=$kernel BLOCK=$block PREC=$PREC X_LAYOUT=$X_LAYOUT X_PAD=$X_PAD"
+        log "BUILD kernel=$kernel BLOCK=$block PREC=$PREC X_LAYOUT=$X_LAYOUT"
     else
         log "BUILD kernel=$kernel BLOCK=$block PREC=$PREC"
     fi
@@ -1039,7 +1016,6 @@ build_kernel() {
     make \
         KERNEL="$kernel" \
         X_LAYOUT="$X_LAYOUT" \
-        X_PAD="$X_PAD" \
         BLOCK="$block" \
         PREC="$PREC" \
         SMEM_PAD="$smem_pad" \
@@ -1082,9 +1058,6 @@ handle_failure() {
 
     if [[ "$X_LAYOUT" == "column" ]]; then
         kernel="${kernel}(xcol)"
-    fi
-    if [[ "$X_PAD" != "0" ]]; then
-        kernel="${kernel}(xpad${X_PAD})"
     fi
 
     init_failure_file
@@ -1171,7 +1144,6 @@ write_metadata() {
         echo "a_mode=$A_MODE"
         echo "x_mode=$X_MODE"
         echo "x_layout=$X_LAYOUT"
-        echo "x_pad=$X_PAD"
         echo "kernel=$KERNEL"
         echo "kernels=${KERNELS[*]}"
         echo "k_sweep=${K_SWEEP_KS[*]}"
@@ -1384,7 +1356,6 @@ experiment_registers() {
         make -B \
             KERNEL="$kernel" \
             X_LAYOUT="$X_LAYOUT" \
-            X_PAD="$X_PAD" \
             BLOCK="$BLOCK" \
             PREC="$PREC" \
             SMEM_PAD="$SMEM_PAD" \

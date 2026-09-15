@@ -12,7 +12,6 @@ check=0
 a_mode=local
 x_mode=local
 x_layout=row
-x_pad=0
 kernel=cuda_warp
 kernels=cuda_naive cuda_warp cuda_warp_smem
 k_sweep=3 6 8 20 32
