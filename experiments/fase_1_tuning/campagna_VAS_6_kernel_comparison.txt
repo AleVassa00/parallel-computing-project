@@ -1,0 +1,13 @@
+# Campagna VAS 6 - confronto fra kernel GPU dopo il tuning.
+#
+# Ogni backend usa la propria configurazione selezionata nelle campagne
+# precedenti. M, N, k, precisione, processo e protocollo di misura restano
+# identici, cosi' i risultati possono essere confrontati direttamente.
+#
+# Esecuzione:
+#   ./script/run_cuda_experiments.sh --suite experiments/fase_1_tuning/campagna_VAS_6_kernel_comparison.txt
+
+campagna_VAS_6_kernel_comparison/cuda_naive.conf
+campagna_VAS_6_kernel_comparison/cuda_warp_column.conf
+campagna_VAS_6_kernel_comparison/cuda_warp_smem.conf
+campagna_VAS_6_kernel_comparison/cublas.conf

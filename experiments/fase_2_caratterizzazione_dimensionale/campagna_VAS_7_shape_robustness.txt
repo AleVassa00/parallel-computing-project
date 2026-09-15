@@ -1,0 +1,17 @@
+# Campagna VAS 7 - robustezza dei kernel rispetto alla forma di A.
+#
+# I due rettangoli hanno M*N circa uguale al quadrato 16384x16384 gia'
+# misurato nella Campagna 6. Non si ripete il caso quadrato: in analisi si
+# affiancano le sue righe a queste per ottenere i rapporti 1:1, 2:1 e 1:2.
+#
+# Esecuzione:
+#   ./script/run_cuda_experiments.sh --suite experiments/fase_2_caratterizzazione_dimensionale/campagna_VAS_7_shape_robustness.txt
+
+campagna_VAS_7_shape_robustness/m2n_cuda_naive.conf
+campagna_VAS_7_shape_robustness/m2n_cuda_warp_column.conf
+campagna_VAS_7_shape_robustness/m2n_cuda_warp_smem.conf
+campagna_VAS_7_shape_robustness/m2n_cublas.conf
+campagna_VAS_7_shape_robustness/n2m_cuda_naive.conf
+campagna_VAS_7_shape_robustness/n2m_cuda_warp_column.conf
+campagna_VAS_7_shape_robustness/n2m_cuda_warp_smem.conf
+campagna_VAS_7_shape_robustness/n2m_cublas.conf
