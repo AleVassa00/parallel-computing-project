@@ -1,5 +1,5 @@
 command=./script/run_cuda_experiments.sh --config /home/avassallo/parallel-computing-project/experiments/fase_2_caratterizzazione_dimensionale/campagna_VAS_7_shape_robustness/s16384_n2m_cuda_warp_column.conf 
-timestamp=20260915_164753
+timestamp=20260915_174011
 name=campagna_VAS_7_s16384_n2m_cuda_warp_column_xcolumn
 experiment=k-sweep
 config_file=/home/avassallo/parallel-computing-project/experiments/fase_2_caratterizzazione_dimensionale/campagna_VAS_7_shape_robustness/s16384_n2m_cuda_warp_column.conf

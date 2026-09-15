@@ -1,10 +1,10 @@
-command=./script/run_cuda_experiments.sh --config /home/avassallo/parallel-computing-project/experiments/fase_1_tuning/campagna_VAS_3_l2_stress/cuda_warp_smem_b256.conf 
-timestamp=20260915_145146
-name=campagna_VAS_3_l2_stress_cuda_warp_smem_b256
+command=./script/run_cuda_experiments.sh --config /home/avassallo/parallel-computing-project/experiments/fase_2_caratterizzazione_dimensionale/campagna_VAS_7_shape_robustness/s8192_square_cublas.conf 
+timestamp=20260915_164558
+name=campagna_VAS_7_s8192_square_cublas
 experiment=k-sweep
-config_file=/home/avassallo/parallel-computing-project/experiments/fase_1_tuning/campagna_VAS_3_l2_stress/cuda_warp_smem_b256.conf
-M=2048
-N=262144
+config_file=/home/avassallo/parallel-computing-project/experiments/fase_2_caratterizzazione_dimensionale/campagna_VAS_7_shape_robustness/s8192_square_cublas.conf
+M=8192
+N=8192
 reps=20
 warmup=5
 seed=20252026
@@ -13,7 +13,7 @@ group_timing=0
 a_mode=local
 x_mode=local
 x_layout=row
-kernel=cuda_warp_smem
+kernel=cublas
 kernels=cuda_naive cuda_warp cuda_warp_smem
 k_sweep=3 6 8 20 32
 block_sweep_k=3 6 8 20 32
@@ -35,12 +35,12 @@ report_bindings=0
 grids:
   np=1 pr=1 pc=1
 
-git_commit=464b1d0e1b0c600b0724a33aa446cef865c74078
+git_commit=adba324ae9992c9272661f7ca4f259de1f368cd9
 git_status:
  M script/run_cuda_experiments.sh
 ?? results/campagna_VAS_6_kernel_comparison/
-?? results/fase_1_tuning/campagna_VAS_3_l2_stress/
 ?? results/fase_1_tuning/campagna_VAS_3_row_major_padding/
+?? results/fase_2_caratterizzazione_dimensionale/
 
 nvcc:
 nvcc: NVIDIA (R) Cuda compiler driver

@@ -1,5 +1,5 @@
 command=./script/run_cuda_experiments.sh --config /home/avassallo/parallel-computing-project/experiments/fase_2_caratterizzazione_dimensionale/campagna_VAS_7_shape_robustness/s16384_square_cuda_naive.conf 
-timestamp=20260915_164648
+timestamp=20260915_173905
 name=campagna_VAS_7_s16384_square_cuda_naive
 experiment=k-sweep
 config_file=/home/avassallo/parallel-computing-project/experiments/fase_2_caratterizzazione_dimensionale/campagna_VAS_7_shape_robustness/s16384_square_cuda_naive.conf

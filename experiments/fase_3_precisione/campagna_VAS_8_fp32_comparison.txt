@@ -1,0 +1,21 @@
+# Campagna VAS 8 - confronto FP32/FP64 sul caso quadrato massimo.
+#
+# Questa suite raccoglie soltanto le nuove misure FP32. Il riferimento FP64
+# corrispondente e' gia' disponibile nella seconda esecuzione della campagna 7
+# per M=N=16384, gli stessi cinque k e le stesse configurazioni dei kernel.
+#
+# Ogni kernel usa la configurazione fissata nella Fase 1:
+# - cuda_naive: BLOCK=128;
+# - cuda_warp: BLOCK=128 e X column-major;
+# - cuda_warp_smem: BLOCK=256, SMEM_PAD=1, TILE_GRANULARITY=32;
+# - cublas: backend di riferimento.
+#
+# Totale: 4 kernel x 5 k = 20 configurazioni FP32.
+#
+# Esecuzione:
+#   ./script/run_cuda_experiments.sh --suite experiments/fase_3_precisione/campagna_VAS_8_fp32_comparison.txt
+
+campagna_VAS_8_fp32_comparison/cuda_naive.conf
+campagna_VAS_8_fp32_comparison/cuda_warp_column.conf
+campagna_VAS_8_fp32_comparison/cuda_warp_smem.conf
+campagna_VAS_8_fp32_comparison/cublas.conf
