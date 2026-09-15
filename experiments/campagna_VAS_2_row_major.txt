@@ -1,0 +1,11 @@
+# Campagna VAS 2 - cuda_warp con X row-major.
+#
+# Confronto controllato con la variante column-major misurata nella campagna
+# precedente: restano invariati problema, precisione, topologia MPI, valori di
+# k e protocollo di misura; BLOCK viene fissato al valore robusto selezionato
+# per cuda_warp. L'unica differenza algoritmica e' il layout di X.
+#
+# Esecuzione:
+#   ./script/run_cuda_experiments.sh --suite experiments/campagna_VAS_2_row_major.txt
+
+campagna_VAS_2_row_major/cuda_warp_row.conf
