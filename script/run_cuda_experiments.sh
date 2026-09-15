@@ -874,7 +874,28 @@ build_mpi_flags() {
 
 warn_multi_rank_gpu_contention() {
     local has_multi=0
+    local uses_cuda=0
     local g np pr pc
+
+    # Il runner gestisce anche i backend CPU scheme_a*. L'avviso ha senso
+    # soltanto quando almeno uno dei kernel eseguiti usa davvero la GPU.
+    local kernels_to_check=("$KERNEL")
+    if [[ "$EXPERIMENT" == "compare" || "$EXPERIMENT" == "registers" || "$EXPERIMENT" == "full" ]]; then
+        kernels_to_check=("${KERNELS[@]}")
+    fi
+    local candidate
+    for candidate in "${kernels_to_check[@]}"; do
+        case "$candidate" in
+            cuda_*|cublas)
+                uses_cuda=1
+                break
+                ;;
+        esac
+    done
+
+    if [[ "$uses_cuda" -eq 0 ]]; then
+        return
+    fi
 
     for g in "${GRIDS[@]}"; do
         IFS=: read -r np pr pc <<< "$g"

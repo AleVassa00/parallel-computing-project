@@ -1,0 +1,33 @@
+# Campagna VAS 9 - strong scaling MPI puro su CPU.
+#
+# Il problema globale resta M=N=16384 e la precisione principale e' FP64.
+# Si confrontano i tre backend CPU per tutti i k specializzati, facendo
+# variare P = 1, 2, 4, 8. La griglia P x 1 realizza la decomposizione MPI
+# monodimensionale per righe: X viene propagata lungo la colonna della griglia
+# e ciascun rank produce una banda distinta di righe di Y.
+#
+# P=1 e' esclusivamente la baseline interna necessaria per calcolare
+# speedup S(P)=T(1)/T(P) ed efficienza E(P)=S(P)/P. I casi P>1 costituiscono
+# lo studio MPI vero e proprio.
+#
+# Configurazioni:
+#   3 kernel x 4 valori di P x 5 valori di k = 60.
+#
+# I backend jblock usano in questa prima campagna i parametri predefiniti del
+# codice: JBLOCK_BYTES=65536 e, per scheme_a_jblock_rb, RB_ROWS automatico.
+#
+# Esecuzione:
+#   ./script/run_cuda_experiments.sh --suite experiments/fase_4_mpi_cpu/campagna_VAS_9_mpi_cpu_scaling.txt
+
+campagna_VAS_9_mpi_cpu_scaling/scheme_a_p1.conf
+campagna_VAS_9_mpi_cpu_scaling/scheme_a_p2.conf
+campagna_VAS_9_mpi_cpu_scaling/scheme_a_p4.conf
+campagna_VAS_9_mpi_cpu_scaling/scheme_a_p8.conf
+campagna_VAS_9_mpi_cpu_scaling/scheme_a_jblock_p1.conf
+campagna_VAS_9_mpi_cpu_scaling/scheme_a_jblock_p2.conf
+campagna_VAS_9_mpi_cpu_scaling/scheme_a_jblock_p4.conf
+campagna_VAS_9_mpi_cpu_scaling/scheme_a_jblock_p8.conf
+campagna_VAS_9_mpi_cpu_scaling/scheme_a_jblock_rb_p1.conf
+campagna_VAS_9_mpi_cpu_scaling/scheme_a_jblock_rb_p2.conf
+campagna_VAS_9_mpi_cpu_scaling/scheme_a_jblock_rb_p4.conf
+campagna_VAS_9_mpi_cpu_scaling/scheme_a_jblock_rb_p8.conf
