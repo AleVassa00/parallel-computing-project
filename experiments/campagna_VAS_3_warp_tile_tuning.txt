@@ -1,0 +1,10 @@
+# Campagna VAS 3 - tuning di WARP_COL_TILE per cuda_warp_tiled.
+#
+# BLOCK resta fissato a 256, valore robusto selezionato nella campagna 1.
+# Si varia soltanto il numero di colonne assegnate a ciascun warp, mantenendo
+# invariati problema, precisione, topologia MPI e protocollo di misura.
+#
+# Esecuzione:
+#   ./script/run_cuda_experiments.sh --suite experiments/campagna_VAS_3_warp_tile_tuning.txt
+
+campagna_VAS_3_warp_tile_tuning/cuda_warp_tiled.conf
