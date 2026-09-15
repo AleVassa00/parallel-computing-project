@@ -52,102 +52,73 @@
 \contentsline {chapter}{\numberline {4}Il nucleo di CPU}{18}{chapter.4}%
 \contentsline {section}{\numberline {4.1}Tre backend, una sola idea}{18}{section.4.1}%
 \contentsline {section}{\numberline {4.2}Il backend di riferimento}{18}{section.4.2}%
-\contentsline {subsection}{\numberline {4.2.1}Perché $k$ deve essere noto al compilatore}{18}{subsection.4.2.1}%
+\contentsline {subsection}{\numberline {4.2.1}Perché specializzare $k$ a compile-time}{18}{subsection.4.2.1}%
 \contentsline {subsection}{\numberline {4.2.2}Il fallback generico, e perché la traccia lo richiede}{19}{subsection.4.2.2}%
-\contentsline {subsection}{\numberline {4.2.3}Il microbenchmark che isola la specializzazione}{19}{subsection.4.2.3}%
 \contentsline {section}{\numberline {4.3}Perché $\texttt {KB} = 32$}{20}{section.4.3}%
 \contentsline {section}{\numberline {4.4}Ciò che il compilatore vede}{20}{section.4.4}%
-\contentsline {section}{\numberline {4.5}Il primo limite: la rilettura di $X$}{21}{section.4.5}%
+\contentsline {section}{\numberline {4.5}Il primo limite: la rilettura di $X$}{20}{section.4.5}%
 \contentsline {section}{\numberline {4.6}Secondo backend: $X$ mattonellata in cache}{21}{section.4.6}%
 \contentsline {paragraph}{Il prezzo.}{21}{section*.15}%
 \contentsline {paragraph}{Un principio già visto.}{21}{section*.16}%
-\contentsline {section}{\numberline {4.7}Terzo backend: register blocking sulle righe}{22}{section.4.7}%
+\contentsline {section}{\numberline {4.7}Terzo backend: register blocking sulle righe}{21}{section.4.7}%
 \contentsline {paragraph}{Chi sceglie RB.}{22}{section*.17}%
 \contentsline {chapter}{\numberline {5}I backend CUDA}{23}{chapter.5}%
-\contentsline {section}{\numberline {5.1}Struttura comune}{23}{section.5.1}%
-\contentsline {paragraph}{Perch\'e i \texttt {cudaEvent} e non l'orologio dell'host.}{23}{section*.20}%
-\contentsline {paragraph}{La fase locale \`e scomposta per intero.}{24}{section*.21}%
-\contentsline {paragraph}{Dai tempi alla banda.}{24}{section*.22}%
-\contentsline {paragraph}{Anche il preprocessing \`e scomposto.}{24}{section*.23}%
-\contentsline {paragraph}{Capienza della VRAM.}{24}{section*.25}%
-\contentsline {paragraph}{Un solo device.}{24}{section*.26}%
-\contentsline {section}{\numberline {5.2}\texttt {cuda\_naive}: la baseline}{25}{section.5.2}%
-\contentsline {section}{\numberline {5.3}\texttt {cuda\_warp}: un warp per riga}{25}{section.5.3}%
-\contentsline {subsection}{\numberline {5.3.1}Un secondo layout per $X$: \texttt {X\_LAYOUT=column}}{25}{subsection.5.3.1}%
-\contentsline {section}{\numberline {5.4}\texttt {cuda\_warp\_smem}: la fetta di $X$ in shared memory}{26}{section.5.4}%
-\contentsline {paragraph}{Il difetto attaccato.}{26}{section*.27}%
-\contentsline {paragraph}{Il rimedio.}{26}{section*.28}%
-\contentsline {subsection}{\numberline {5.4.1}Il conflitto sui banchi e il padding a $k+1$}{27}{subsection.5.4.1}%
-\contentsline {subsection}{\numberline {5.4.2}Che cosa il tile cambia davvero, e che cosa no}{27}{subsection.5.4.2}%
-\contentsline {paragraph}{Il budget non si sceglie in assoluto.}{27}{section*.29}%
-\contentsline {paragraph}{La granularit\`a \`e un compromesso, non un requisito.}{28}{section*.30}%
-\contentsline {subsection}{\numberline {5.4.3}Perch\'e non ci sono uscite anticipate}{28}{subsection.5.4.3}%
-\contentsline {section}{\numberline {5.5}\texttt {cuda\_warp\_tiled}: meno accumulatori per lane}{28}{section.5.5}%
-\contentsline {section}{\numberline {5.6}\texttt {cublas}: il riferimento esterno}{28}{section.5.6}%
-\contentsline {subsection}{\numberline {5.6.1}Riga contro colonna: nessuna trasposizione}{29}{subsection.5.6.1}%
-\contentsline {subsection}{\numberline {5.6.2}L'attesa \`e che vada male}{29}{subsection.5.6.2}%
-\contentsline {section}{\numberline {5.7}Pi\`u rank MPI sulla stessa GPU}{29}{section.5.7}%
-\contentsline {chapter}{\numberline {6}Modello roofline}{31}{chapter.6}%
-\contentsline {section}{\numberline {6.1}Roofline della GPU}{31}{section.6.1}%
-\contentsline {subsection}{\numberline {6.1.1}Che cosa il modello non dice}{33}{subsection.6.1.1}%
-\contentsline {section}{\numberline {6.2}Roofline della CPU}{33}{section.6.2}%
-\contentsline {chapter}{\numberline {7}Metodologia sperimentale}{34}{chapter.7}%
-\contentsline {section}{\numberline {7.1}Ambiente sperimentale}{34}{section.7.1}%
-\contentsline {section}{\numberline {7.2}Protocollo di misura}{35}{section.7.2}%
-\contentsline {paragraph}{Misura della fase CUDA.}{36}{section*.36}%
-\contentsline {section}{\numberline {7.3}Definizione della metrica di prestazione}{36}{section.7.3}%
-\contentsline {paragraph}{Metriche ausiliarie.}{37}{section*.37}%
-\contentsline {section}{\numberline {7.4}Costi esclusi dalla metrica ufficiale}{38}{section.7.4}%
-\contentsline {section}{\numberline {7.5}Ripetizioni e stabilità statistica}{38}{section.7.5}%
-\contentsline {section}{\numberline {7.6}Disegno delle campagne sperimentali}{39}{section.7.6}%
-\contentsline {subsection}{\numberline {7.6.1}C1 --- Dimensione del problema e rapporto $M{:}N$}{40}{subsection.7.6.1}%
-\contentsline {subsection}{\numberline {7.6.2}C2 --- Sweep su $k$ e confronto dei backend}{40}{subsection.7.6.2}%
-\contentsline {subsection}{\numberline {7.6.3}C4 --- Strong scaling}{40}{subsection.7.6.3}%
-\contentsline {subsection}{\numberline {7.6.4}C5 --- Weak scaling}{41}{subsection.7.6.4}%
-\contentsline {subsection}{\numberline {7.6.5}C6 --- Forma della griglia MPI}{41}{subsection.7.6.5}%
-\contentsline {subsection}{\numberline {7.6.6}C7 --- Precisione numerica}{42}{subsection.7.6.6}%
-\contentsline {paragraph}{C7.1 --- Prestazioni FP32 e FP64.}{42}{section*.38}%
-\contentsline {paragraph}{C7.2 --- Utilizzo delle risorse CUDA.}{42}{section*.39}%
-\contentsline {chapter}{\numberline {8}Implementazione seriale, correttezza e validazione}{44}{chapter.8}%
-\contentsline {section}{\numberline {8.1}L'oracolo seriale}{44}{section.8.1}%
-\contentsline {section}{\numberline {8.2}Una tolleranza che dipende da $N$}{44}{section.8.2}%
-\contentsline {section}{\numberline {8.3}Il test delle funzioni indice}{45}{section.8.3}%
-\contentsline {section}{\numberline {8.4}La matrice di collaudo}{46}{section.8.4}%
-\contentsline {chapter}{\numberline {9}Risultati}{47}{chapter.9}%
-\contentsline {section}{\numberline {9.1}Stato della raccolta dati}{47}{section.9.1}%
-\contentsline {section}{\numberline {9.2}C3 --- baseline di CPU}{47}{section.9.2}%
-\contentsline {subsection}{\numberline {9.2.1}Lettura: due regimi separati da una soglia di cache}{48}{subsection.9.2.1}%
-\contentsline {subsection}{\numberline {9.2.2}Conseguenza pratica}{49}{subsection.9.2.2}%
-\contentsline {subsection}{\numberline {9.2.3}Specializzazione contro fallback}{50}{subsection.9.2.3}%
-\contentsline {section}{\numberline {9.3}C2 --- confronto fra backend al variare di $k$}{50}{section.9.3}%
-\contentsline {subsection}{\numberline {9.3.1}Sweep sul padding della shared memory}{51}{subsection.9.3.1}%
-\contentsline {subsection}{\numberline {9.3.2}Sweep sulla dimensione del blocco}{52}{subsection.9.3.2}%
-\contentsline {section}{\numberline {9.4}C1 --- taglia e rapporto $M{:}N$}{52}{section.9.4}%
-\contentsline {section}{\numberline {9.5}C6 --- perch\'e la griglia \`e bidimensionale}{53}{section.9.5}%
-\contentsline {section}{\numberline {9.6}C4 --- strong scaling}{53}{section.9.6}%
-\contentsline {section}{\numberline {9.7}C5 --- weak scaling}{54}{section.9.7}%
-\contentsline {section}{\numberline {9.8}C7.1 --- quanto rende la singola precisione}{55}{section.9.8}%
-\contentsline {section}{\numberline {9.9}C7.2 --- perch\'e: registri, spill e shared memory}{56}{section.9.9}%
-\contentsline {section}{\numberline {9.10}Il costo dei dati: trasferimenti e preprocessing}{56}{section.9.10}%
-\contentsline {section}{\numberline {9.11}Sintesi}{57}{section.9.11}%
-\contentsline {chapter}{\numberline {10}Conclusioni}{58}{chapter.10}%
-\contentsline {section}{\numberline {10.1}Che cosa \`e stato realizzato}{58}{section.10.1}%
-\contentsline {section}{\numberline {10.2}Che cosa dicono i dati finora}{58}{section.10.2}%
-\contentsline {section}{\numberline {10.3}Lavori futuri}{59}{section.10.3}%
-\contentsline {paragraph}{Blocking del ciclo su $j$ sul nucleo di CPU.}{59}{section*.65}%
-\contentsline {paragraph}{Parallelizzazione OpenMP interna al processo.}{59}{section*.66}%
-\contentsline {paragraph}{MPI CUDA-aware.}{59}{section*.67}%
-\contentsline {paragraph}{MPS per la condivisione della GPU.}{59}{section*.68}%
-\contentsline {paragraph}{Profilazione con \texttt {ncu}.}{59}{section*.69}%
-\contentsline {chapter}{\numberline {A}Interfaccia a riga di comando e formato dei dati}{60}{appendix.Alph1}%
-\contentsline {section}{\numberline {A.1}Opzioni del driver}{60}{section.Alph1.1}%
-\contentsline {section}{\numberline {A.2}Colonne del CSV}{60}{section.Alph1.2}%
-\contentsline {section}{\numberline {A.3}Opzioni di build}{61}{section.Alph1.3}%
-\contentsline {chapter}{\numberline {B}Riproduzione dei risultati}{63}{appendix.Alph2}%
-\contentsline {section}{\numberline {B.1}Build}{63}{section.Alph2.1}%
-\contentsline {section}{\numberline {B.2}Validazione}{63}{section.Alph2.2}%
-\contentsline {section}{\numberline {B.3}Esecuzione singola}{64}{section.Alph2.3}%
-\contentsline {section}{\numberline {B.4}Campagne}{64}{section.Alph2.4}%
-\contentsline {section}{\numberline {B.5}Unione dei CSV di una campagna}{64}{section.Alph2.5}%
-\contentsline {section}{\numberline {B.6}Note operative sul server}{64}{section.Alph2.6}%
-\contentsline {section}{\numberline {B.7}Compilazione di questa relazione}{65}{section.Alph2.7}%
+\contentsline {section}{\numberline {5.1}Struttura comune}{24}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Misurazione del backend CUDA}{25}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Preprocessing e occupazione della GPU}{26}{section.5.3}%
+\contentsline {subsection}{\numberline {5.3.1}Gestione della memoria disponibile}{26}{subsection.5.3.1}%
+\contentsline {section}{\numberline {5.4}\texttt {cuda\_naive}}{26}{section.5.4}%
+\contentsline {section}{\numberline {5.5}\texttt {cuda\_warp}: un warp per riga}{28}{section.5.5}%
+\contentsline {subsection}{\numberline {5.5.1}Gestione di $k$}{29}{subsection.5.5.1}%
+\contentsline {subsection}{\numberline {5.5.2}La maschera dello shuffle}{29}{subsection.5.5.2}%
+\contentsline {subsection}{\numberline {5.5.3}Il problema residuo: gli accessi a $X$}{29}{subsection.5.5.3}%
+\contentsline {section}{\numberline {5.6}Primo rimedio: cambio di layout di $X$}{30}{section.5.6}%
+\contentsline {section}{\numberline {5.7}\texttt {cuda\_warp\_smem}: staging di $X$ in shared memory}{30}{section.5.7}%
+\contentsline {subsection}{\numberline {5.7.1}Caricamento cooperativo di $X$}{31}{subsection.5.7.1}%
+\contentsline {subsection}{\numberline {5.7.2}Riuso del tile fra i warp del blocco}{31}{subsection.5.7.2}%
+\contentsline {subsection}{\numberline {5.7.3}Bank conflict e padding della shared memory}{32}{subsection.5.7.3}%
+\contentsline {subsection}{\numberline {5.7.4}Scelta della dimensione del tile}{33}{subsection.5.7.4}%
+\contentsline {subsection}{\numberline {5.7.5}Sincronizzazione e warp inattivi}{34}{subsection.5.7.5}%
+\contentsline {section}{\numberline {5.8}Due rimedi allo stesso problema}{34}{section.5.8}%
+\contentsline {section}{\numberline {5.9}\texttt {cublas}: il riferimento esterno}{35}{section.5.9}%
+\contentsline {subsection}{\numberline {5.9.1}Adattamento fra row-major e column-major}{35}{subsection.5.9.1}%
+\contentsline {subsection}{\numberline {5.9.2}Significato del confronto}{36}{subsection.5.9.2}%
+\contentsline {section}{\numberline {5.10}Più rank MPI sulla stessa GPU}{36}{section.5.10}%
+\contentsline {chapter}{\numberline {6}Risultati}{38}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Stato della raccolta dati}{38}{section.6.1}%
+\contentsline {section}{\numberline {6.2}C3 --- baseline di CPU}{38}{section.6.2}%
+\contentsline {subsection}{\numberline {6.2.1}Lettura: due regimi separati da una soglia di cache}{39}{subsection.6.2.1}%
+\contentsline {subsection}{\numberline {6.2.2}Conseguenza pratica}{40}{subsection.6.2.2}%
+\contentsline {subsection}{\numberline {6.2.3}Specializzazione contro fallback}{41}{subsection.6.2.3}%
+\contentsline {section}{\numberline {6.3}C2 --- confronto fra backend al variare di $k$}{41}{section.6.3}%
+\contentsline {subsection}{\numberline {6.3.1}Sweep sul padding della shared memory}{42}{subsection.6.3.1}%
+\contentsline {subsection}{\numberline {6.3.2}Sweep sulla dimensione del blocco}{42}{subsection.6.3.2}%
+\contentsline {section}{\numberline {6.4}C1 --- taglia e rapporto $M{:}N$}{43}{section.6.4}%
+\contentsline {section}{\numberline {6.5}C6 --- perch\'e la griglia \`e bidimensionale}{43}{section.6.5}%
+\contentsline {section}{\numberline {6.6}C4 --- strong scaling}{44}{section.6.6}%
+\contentsline {section}{\numberline {6.7}C5 --- weak scaling}{45}{section.6.7}%
+\contentsline {section}{\numberline {6.8}C7.1 --- quanto rende la singola precisione}{45}{section.6.8}%
+\contentsline {section}{\numberline {6.9}C7.2 --- perch\'e: registri, spill e shared memory}{46}{section.6.9}%
+\contentsline {section}{\numberline {6.10}Il costo dei dati: trasferimenti e preprocessing}{47}{section.6.10}%
+\contentsline {section}{\numberline {6.11}Sintesi}{48}{section.6.11}%
+\contentsline {chapter}{\numberline {7}Conclusioni}{49}{chapter.7}%
+\contentsline {section}{\numberline {7.1}Che cosa \`e stato realizzato}{49}{section.7.1}%
+\contentsline {section}{\numberline {7.2}Che cosa dicono i dati finora}{49}{section.7.2}%
+\contentsline {section}{\numberline {7.3}Lavori futuri}{50}{section.7.3}%
+\contentsline {paragraph}{Blocking del ciclo su $j$ sul nucleo di CPU.}{50}{section*.39}%
+\contentsline {paragraph}{Parallelizzazione OpenMP interna al processo.}{50}{section*.40}%
+\contentsline {paragraph}{MPI CUDA-aware.}{50}{section*.41}%
+\contentsline {paragraph}{MPS per la condivisione della GPU.}{50}{section*.42}%
+\contentsline {paragraph}{Profilazione con \texttt {ncu}.}{50}{section*.43}%
+\contentsline {chapter}{\numberline {A}Interfaccia a riga di comando e formato dei dati}{51}{appendix.Alph1}%
+\contentsline {section}{\numberline {A.1}Opzioni del driver}{51}{section.Alph1.1}%
+\contentsline {section}{\numberline {A.2}Colonne del CSV}{51}{section.Alph1.2}%
+\contentsline {section}{\numberline {A.3}Opzioni di build}{52}{section.Alph1.3}%
+\contentsline {chapter}{\numberline {B}Riproduzione dei risultati}{54}{appendix.Alph2}%
+\contentsline {section}{\numberline {B.1}Build}{54}{section.Alph2.1}%
+\contentsline {section}{\numberline {B.2}Validazione}{54}{section.Alph2.2}%
+\contentsline {section}{\numberline {B.3}Esecuzione singola}{54}{section.Alph2.3}%
+\contentsline {section}{\numberline {B.4}Campagne}{55}{section.Alph2.4}%
+\contentsline {section}{\numberline {B.5}Unione dei CSV di una campagna}{55}{section.Alph2.5}%
+\contentsline {section}{\numberline {B.6}Note operative sul server}{55}{section.Alph2.6}%
+\contentsline {section}{\numberline {B.7}Compilazione di questa relazione}{56}{section.Alph2.7}%
