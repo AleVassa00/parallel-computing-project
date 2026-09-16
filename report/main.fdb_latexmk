@@ -1,5 +1,5 @@
 # Fdb version 4
-["pdflatex"] 1789598299.84039 "/Users/andreagalluzzi/Desktop/00-progetto-scpa/parallel-computing-project/report/main.tex" "main.pdf" "main" 1789598306.48599 0
+["pdflatex"] 1789598442.45082 "/Users/andreagalluzzi/Desktop/00-progetto-scpa/parallel-computing-project/report/main.tex" "main.pdf" "main" 1789598447.72609 0
   "/Users/andreagalluzzi/Desktop/00-progetto-scpa/parallel-computing-project/report/main.tex" 1789598086.07179 1583 8091643e75b16390a47e15219256d870 ""
   "/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-ec.enc" 1254269338 2375 baa924870cfb487815765f9094cf3728 ""
   "/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-mathex.enc" 1202520719 3486 c7eadf5dcc57b3b2d11736679f6636ba ""
@@ -303,16 +303,16 @@
   "img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_joint_tuning_summary.pdf" 1789508829.33482 40076 4c64f512273fbb20dba866881b5f1c12 ""
   "img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_naive.png" 1789508829.34094 484096 dd52fd9a25faaee55c77dbf81a4134bb ""
   "img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_warp_xcolumn.png" 1789508829.34883 482509 ead821e16eaa6e286c5fc2bc6560c768 ""
-  "main.aux" 1789598306.24698 54328 fe3df8d216832fa01cf63635d396b583 "pdflatex"
-  "main.out" 1789598306.26975 23773 1a9d39bd49f15e370abbe9a18a761675 "pdflatex"
+  "main.aux" 1789598447.48228 54328 fe3df8d216832fa01cf63635d396b583 "pdflatex"
+  "main.out" 1789598447.50269 23773 1a9d39bd49f15e370abbe9a18a761675 "pdflatex"
   "main.tex" 1789598086.07179 1583 8091643e75b16390a47e15219256d870 ""
-  "main.toc" 1789598306.27016 11959 3233d9a7999e647e3f8601008aa19447 "pdflatex"
+  "main.toc" 1789598447.50305 11959 3233d9a7999e647e3f8601008aa19447 "pdflatex"
   "preambolo.tex" 1789594996.54623 6554 debb71c195360e1d8573a13fe428635e ""
   "sezioni/00-frontespizio.tex" 1789595050.54798 1251 e9bea7067ecd3dc13057c563105367e3 ""
   "sezioni/01-introduzione.tex" 1789548732.0118 3644 57df190394408d2425dc2259f92b8847 ""
   "sezioni/02-problema.tex" 1789598293.46426 21422 53b648014e4c76a031724050e81e6333 ""
   "sezioni/03-nucleo.tex" 1789553772.65144 0 d41d8cd98f00b204e9800998ecf8427e ""
-  "sezioni/04-mpi.tex" 1789598228.79274 26180 6a8e6e6fa8b708b442d0cd000ac12ed6 ""
+  "sezioni/04-mpi.tex" 1789598442.08746 26176 699c00656d26c4e44394f68071d435b8 ""
   "sezioni/05-kernel-cpu.tex" 1789597961.03462 3451 4e1a8fb55770954a392467d6021588f7 ""
   "sezioni/06-kernel-cuda.tex" 1789574859.4808 42709 4d47385c9ef0237cc14ea64a87193b3d ""
   "sezioni/08-metodologia.tex" 1789595163.82765 36491 4965a98ad469afd09e34a52188719f3b ""
