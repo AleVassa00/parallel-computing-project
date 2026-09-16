@@ -49,6 +49,8 @@ a_mode=global
 x_mode=global
 x_layout=row
 check=0
+# Sui backend CPU t_local viene gia' ridotto con MPI_MAX fra tutti i rank.
+# Le barriere diagnostiche di group_timing altererebbero invece t_total.
 group_timing=0
 continue_on_error=1
 """
@@ -62,6 +64,9 @@ def size_suite_text(size: int, relative_configs: list[str]) -> str:
 # P=1: 1x1; P=2: 1x2, 2x1;
 # P=4: 1x4, 2x2, 4x1; P=8: 1x8, 2x4, 4x2, 8x1.
 # Input globali distribuiti con MPI (a_mode=global, x_mode=global).
+# group_timing resta disattivato: per il calcolo puro si usa t_local, gia'
+# aggregato come massimo fra i rank; t_total misura il percorso MPI completo
+# senza introdurre le due barriere diagnostiche attorno a local_gemm.
 # Sono 12 file di configurazione e 150 casi aggregati (kernel x k x griglia).
 
 {entries}
@@ -82,6 +87,13 @@ def master_suite_text(relative_configs: list[str]) -> str:
 #
 # P=1 fornisce la baseline della stessa taglia per calcolare:
 #   speedup S(P)=T(1)/T(P) ed efficienza E(P)=S(P)/P.
+#
+# Metriche da usare:
+#   - t_local / gflops_compute per confrontare il calcolo locale dei kernel;
+#   - t_total / gflops per strong scaling ed efficienza end-to-end.
+# t_local e t_total sono gia' ridotti con MPI_MAX fra i rank. Per questo
+# group_timing=0: abilitarlo inserirebbe due barriere aggiuntive dentro ogni
+# invocazione e modificherebbe il percorso MPI che vogliamo misurare.
 #
 # In totale: 36 file di configurazione e 450 casi aggregati.
 # JBLOCK_BYTES=65536 e RB_ROWS automatico restano ai default del codice.

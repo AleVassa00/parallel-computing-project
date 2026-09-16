@@ -4,6 +4,9 @@
 # P=1: 1x1; P=2: 1x2, 2x1;
 # P=4: 1x4, 2x2, 4x1; P=8: 1x8, 2x4, 4x2, 8x1.
 # Input globali distribuiti con MPI (a_mode=global, x_mode=global).
+# group_timing resta disattivato: per il calcolo puro si usa t_local, gia'
+# aggregato come massimo fra i rank; t_total misura il percorso MPI completo
+# senza introdurre le due barriere diagnostiche attorno a local_gemm.
 # Sono 12 file di configurazione e 150 casi aggregati (kernel x k x griglia).
 
 campagna_VAS_9_mpi_cpu_scaling/s16384/scheme_a_p1.conf

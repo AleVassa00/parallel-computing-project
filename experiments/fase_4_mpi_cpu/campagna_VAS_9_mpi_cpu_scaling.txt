@@ -11,6 +11,13 @@
 # P=1 fornisce la baseline della stessa taglia per calcolare:
 #   speedup S(P)=T(1)/T(P) ed efficienza E(P)=S(P)/P.
 #
+# Metriche da usare:
+#   - t_local / gflops_compute per confrontare il calcolo locale dei kernel;
+#   - t_total / gflops per strong scaling ed efficienza end-to-end.
+# t_local e t_total sono gia' ridotti con MPI_MAX fra i rank. Per questo
+# group_timing=0: abilitarlo inserirebbe due barriere aggiuntive dentro ogni
+# invocazione e modificherebbe il percorso MPI che vogliamo misurare.
+#
 # In totale: 36 file di configurazione e 450 casi aggregati.
 # JBLOCK_BYTES=65536 e RB_ROWS automatico restano ai default del codice.
 #
