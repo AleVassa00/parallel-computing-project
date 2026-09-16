@@ -1,293 +1,60 @@
-\chapter{Il nucleo di CPU}
-\label{cap:kernel-cpu}
+\section{Backend CPU di riferimento}
+\label{sec:backend-cpu}
 
-Il nucleo di CPU non è la parte più veloce del progetto, ma è quella di cui
-tutto il resto ha bisogno per essere giudicato: è il denominatore di ogni
-speedup, ed è l'unica implementazione che gira ovunque, anche su una macchina
-senza \code{nvcc}. Merita quindi lo stesso lavoro dei backend CUDA, e per le
-stesse ragioni.
+Nulla di quanto descritto finora in questo capitolo - la griglia, il
+partizionamento degli indici, il broadcast di $X$ e la reduce di $Y$ - nomina
+mai la GPU. Il livello distribuito conosce soltanto l'interfaccia comune dei
+backend locali (\cref{sec:interfaccia-locale}) e la invoca su un contesto
+opaco: quale implementazione ci sia dietro è deciso a tempo di compilazione. Il
+backend di CPU rende verificabile questa separazione, ed è per questo che viene
+descritto qui, a chiusura del livello MPI. Il suo ruolo nel progetto è essere un
+\textbf{riferimento di correttezza} con cui il prodotto distribuito viene
+confrontato con l'oracolo seriale (\cref{app:oracolo}), senza che nel confronto
+entri alcuna variabile legata al device ed è la \textbf{prova che l'interfaccia
+MPI non dipende da CUDA}, perché l'intero algoritmo distribuito si compila e si
+esegue senza una sola riga di codice CUDA.
 
-\section{Tre backend, una sola idea}
-\label{sec:tre-backend}
+Va detto subito, perché condiziona la lettura del seguito: i backend di CPU
+\textbf{non entrano nelle campagne sperimentali}. Le fasi di misura progettate
+in \cref{sec:disegno-fasi} e i risultati di \cref{cap:risultati} riguardano
+esclusivamente i backend GPU, perché l'oggetto dello studio è il comportamento
+del nucleo sul device e il modello che lo prevede. Questa sezione è quindi una
+\emph{baseline tecnica}: documenta come il nucleo è realizzato,
+senza che da essa dipenda alcun risultato sperimentale.
 
-Tutti e tre i backend di CPU implementano lo schema~A di \cref{sec:schemi}:
-cambia come il lavoro viene organizzato attorno a quell'ordine dei cicli, non
-l'ordine. Si scelgono a tempo di compilazione con la variabile \code{KERNEL}
-del \code{Makefile}, espongono la stessa interfaccia (\cref{app:interfaccia}) e
-i binari coesistono, così un confronto è una sola campagna sugli stessi dati.
+\paragraph{Lo schema~A.}
+Nello schema~A (\cref{sec:schemi}) i
+$k$ accumulatori sono variabili locali del ciclo su $j$, e tutto il vantaggio
+dello schema dipende dal fatto che vivano nei registri: è lì che $A[i][j]$,
+letto una volta sola, viene riusato $k$ volte. Affinché il compilatore possa
+tenerceli deve conoscerne il numero mentre compila: se $k$ è noto solo a
+runtime, \code{acc} diventa un array in memoria e ogni aggiornamento un accesso
+a quella memoria, cioè il traffico che lo schema~A serviva a evitare. Il codice
+risolve generando via macro, da una sola definizione, una funzione
+specializzata per ciascuno dei $k$ richiesti dalla traccia:
 
-\begin{itemize}[nosep,left=0pt]
-  \item \textbf{\kernelname{scheme\_a}}: l'implementazione di riferimento, quella che
-        corrisponde alla consegna;
-  \item \textbf{\kernelname{scheme\_a\_jblock}}: l'implementazione di riferimento è la stessa del caso precedente, ma con $X$ in cui è stato applicato un meccanismo di \emph{tiling} in
-        cache;
-  \item \textbf{\kernelname{scheme\_a\_jblock\_rb}}: come sopra, ma all'implementazione è stato aggiunto il
-        \emph{register blocking} sulle righe di $A$.
-\end{itemize}
-
-I tre non sono tre implementazioni alternative, ma riflettono la \textbf{catena} di sviluppo: ciascuno
-rimuove il collo di bottiglia che il precedente lascia scoperto. Il capitolo li
-presenta in quest'ordine, e ogni sezione si apre con il limite che motiva il
-backend successivo.
-
-\section{Il backend di riferimento}
-
-\subsection{Perché specializzare $k$ a compile-time}
-\label{sec:specializzazione}
-
-Nello schema~A i $k$ accumulatori sono variabili locali del ciclo su $j$, e
-tutto il vantaggio dello schema dipende dal fatto che questi accumulatori vivano nei
-\textbf{registri}: è lì che il valore $A[i][j]$, letto una volta sola, può essere
-riutilizzato $k$ volte.
-
-Affinché il compilatore possa rappresentare gli accumulatori come un insieme fisso di
-valori scalari candidati a vivere nei registri, 
-il numero di accumulatori deve essere \emph{noto a compile-time}\.
-Con un array dimensionato dinamicamente, invece,
-l'accesso \code{acc[c]} conserva un indice runtime e il compilatore
-non dispone della stessa struttura esplicita.
-
-Se il numero di accumulatori è noto solo quando il programma parte,
-la variabile \code{acc} diventa un array in memoria e ogni operazione di accumulazione 
-(\code{acc[c] += \ldots}) è un accesso a quella memoria: esattamente il traffico
-che lo schema~A serviva a evitare.
-
-Il codice risolve generando \textbf{cinque funzioni specializzate}, per $k\in{3,6,8,20,32}$, cioè per i cinque valori richiesti dalla traccia,
-a partire da una sola definizione via
-macro:
-
-\begin{lstlisting}[language=C,caption={Generazione delle specializzazioni
-(estratto di \file{src/kernel/scheme\_a.c}).}]
-#define COLS_8(M)  COLS_6(M) M(6) M(7)
+\begin{lstlisting}[language=C,caption={Generazione delle specializzazioni su
+$k$ (estratto di \file{src/kernel/scheme\_a.c}).}]
 #define DECLARE_ACC(c) scalar_t acc##c = (scalar_t)0;
 #define UPDATE_ACC(c)  acc##c += a * xrow[c];
 #define STORE_ACC(c)   yrow[c] = acc##c;
 
-/* per ogni riga i: */
-COLS(DECLARE_ACC)
+COLS(DECLARE_ACC)                     /* k variabili distinte, non un array */
 for (j = 0; j < n_loc; j++) {
-    const scalar_t a = arow[j];          /* letto UNA volta */
+    const scalar_t a = arow[j];       /* letto UNA volta */
     const scalar_t *restrict xrow = X_loc + (size_t)j * ldx;
-    COLS(UPDATE_ACC)                     /* k aggiornamenti espliciti */
+    COLS(UPDATE_ACC)                  /* k aggiornamenti scritti per esteso */
 }
 COLS(STORE_ACC)
 \end{lstlisting}
 
-Vale la pena leggere che cosa producono queste righe: \code{COLS\_8} è un
-elenco di indici, applicarlo a \code{DECLARE\_ACC} genera 8 dichiarazioni di
-variabili scalari \emph{distinte} (\code{acc0}, \code{acc1}, \ldots), non un
-array, mentre applicarlo a \code{UPDATE\_ACC} genera 8 aggiornamenti scritti per
-esteso, senza alcun ciclo interno con estremo runtime.
-
-L'hot path che il
-compilatore vede non contiene quindi nessuna indicizzazione su $c$: contiene
-$k$ istruzioni indipendenti su $k$ variabili indipendenti, che fornisce al compilatore
-una forma particolarmente favorevole all'allocazione degli accumulatori nei registri e
-alla successiva vettorizzazione.
-
-La generazione effettiva di codice vettoriale e l'eventuale uso di FMA sono proprietà
-del codice macchina prodotto dal compilatore e vengono quindi verificate separatamente
-tramite profilazione.
-
-In questo contesto, vettorizzare un ciclo significa che il compilatore riesce a
-trasformare le $k$ istruzioni indipendenti in un'unica istruzione vettoriale,
-che opera su $W$ scalari per volta, dove $W$ è la larghezza del registro vettoriale della CPU,
-utilizzando istruzioni SIMD.
-Se $k$ è minore di $W$, il compilatore può comunque generare un'istruzione vettoriale,
-ma non sarà completamente utilizzata.
-Se $k$ è maggiore di $W$, il compilatore genererà più istruzioni vettoriali per coprire tutti
-gli accumulatori.
-
-\subsection{Il fallback generico, e perché la traccia lo richiede}
-
-La traccia chiede però che il codice funzioni per $k$ \emph{generico}, e cinque
-specializzazioni non possono coprire tutti i valori possibili. Per ogni altro
-$k$ interviene un \textbf{fallback generico}, che non tenta di tenere $k$
-accumulatori distinti, perché sarebbero troppi e finirebbero in memoria, ma lavora a
-gruppi di al più $\code{KB} = 32$ colonne per volta. Ogni gruppo richiede una
-passata completa su $A$, con un numero di passaggi pari a:
-\begin{equation}
-  \text{passaggi su } A \;=\; \Bigl\lceil \frac{k}{\code{KB}} \Bigr\rceil .
-  \label{eq:passaggi}
-\end{equation}
-
-Per $k \le \code{KB}$ il ciclo esterno sui gruppi è \emph{degenere}: esiste nel
-codice ma gira una volta sola, $A$ viene letta una volta sola e il fallback si
-differenzia dalle specializzazioni soltanto per l'array di accumulatori invece
-delle variabili distinte.
-Per $k>32$ il numero di passaggi cresce secondo $\lceil k/32\rceil$,
-ad esempio tra 33 e 64 sono necessari due passaggi, tra 65 e 96 tre, e così via.
-
-La conseguenza va tenuta presente leggendo i risultati: le righe dei $k$ oltre
-la soglia e quelle dei $k$ entro la soglia \textbf{non sono direttamente
-confrontabili}, perché non stanno facendo la stessa quantità di lavoro di
-memoria.
-
-\section{Perché $\code{KB} = 32$}
-
-Il valore copre tutti i $k$ del collaudo, ma questa da sola non è una ragione
-sufficiente. La ragione vera è un budget di registri.
-
-Infatti con $\code{KB}$ accumulatori il compilatore deve tenere $\code{KB}$ valori vivi
-attraverso l'intero ciclo su $j$. Vettorizzati, occupano
-$\code{KB}/W$ registri vettoriali, dove $W$ è il numero di scalari che entrano
-in un registro, a fronte di 16 registri vettoriali sulle configurazioni AVX2 e 32 sulle configurazioni AVX-512.
-Al crescere di
-$\code{KB}$ il riuso di $A$ migliora, perché i passaggi della
-\cref{eq:passaggi} diminuiscono, ma cresce la pressione sui registri fino al
-fenomeno del \emph{register spilling}, cioè fino al punto in cui il compilatore è costretto a
-parcheggiare in memoria gli accumulatori che non stanno più nei registri e
-a quel punto si va a perdere più di quanto si guadagni.
-
-Il valore $32$ è quindi il compromesso scelto dall'implementazione:
-è sufficiente a coprire in un solo passaggio tutti i 5 $k$ richiesti dalla traccia,
-ma mantiene il numero di accumulatori entro una dimensione compatibile con un'implementazione
-a registri.
-Il fatto che tale scelta eviti effettivamente lo spilling e sia ottimale sulla macchina di
-riferimento non è assunto come proprietà teorica: viene verificato sperimentalmente nella
-campagna C3 (\cref{sec:c3}).
-
-\section{Ciò che il compilatore vede}
-
-Affinché questo basti, il codice deve rispondere da sé alle tre domande che un
-compilatore si pone prima di vettorizzare un ciclo.
-
-\begin{itemize}[nosep,left=0pt]
-  \item \textbf{«Questi puntatori possono riferirsi alla stessa memoria?»}
-        No: $A$, $X$ e $Y$ sono dichiarati \code{restrict}. La garanzia va però
-        \emph{ripristinata} dentro \code{local\_gemm}, con copie locali dei
-        puntatori: il contesto opaco tiene il puntatore ad $A$ come membro di
-        una struttura, e senza quella copia i kernel specializzati perderebbero
-        l'informazione di non aliasing che avevano quando $A$ era un parametro.
-        Se l'aliasing fosse possibile, ogni scrittura su $Y$ potrebbe
-        invalidare $A$ e il ciclo andrebbe eseguito in ordine.
-  \item \textbf{«Le iterazioni dipendono l'una dall'altra?»} No: i $k$
-        aggiornamenti \code{acc[c] += a * X[j][c]} riguardano accumulatori
-        distinti e sono indipendenti fra loro. Essendo già srotolati dalle
-        macro, si presentano come catene di moltiplicazione-accumulo
-        indipendenti, che è la forma che una unità FMA può eseguire in
-        parallelo.
-  \item \textbf{«Gli accessi sono regolari?»} Sì, e a passo unitario: come
-        osservato in \cref{sec:schemi}, sia la riga di $A$ sia la riga di $X$
-        sono contigue in memoria.
-\end{itemize}
-
-\section{Il primo limite: la rilettura di $X$}
-\label{sec:rilettura-x}
-
-Lo schema~A legge $A$ una volta sola, ed è il suo pregio. Ma per ogni riga $i$
-di $A$ percorre \textbf{tutta} $X$, e questo è il suo prezzo: il traffico in
-lettura su $X$ vale
-\begin{equation}
-  \text{elementi di } X \text{ letti} \;=\; \mloc \cdot \nloc \cdot k,
-  \label{eq:traffico-x}
-\end{equation}
-cioè $k$ volte il traffico su $A$.
-
-Finché $X$ resta in una cache vicina al calcolo questo traffico non raggiunge
-la memoria centrale e semplicemente non si vede. Quando $X$ non ci sta più,
-viene ristreamata da un livello più lontano una volta per ogni riga di $A$, e
-il tempo per elemento smette di essere governato dal calcolo per essere
-governato dalla banda di quel livello.
-
-La soglia è esplicita e dipende da entrambi i parametri del problema: il blocco
-locale $X_{\text{loc}}$ occupa $\nloc \cdot k \cdot s$ byte. A parità di
-matrice, quindi, \textbf{è $k$ che decide da che parte della soglia ci si
-trova}, ed è per questo che l'effetto si manifesta come un calo dei GFLOPS al
-crescere di $k$ --- cioè nella direzione opposta a quella che l'intensità
-aritmetica della \cref{eq:intensita} lascerebbe prevedere. È la chiave di
-lettura dei risultati di \cref{sec:c3}, ed è il limite che il backend
-successivo rimuove.
-
-\section{Secondo backend: $X$ mattonellata in cache}
-\label{sec:jblock}
-
-L'idea di \kernelname{scheme\_a\_jblock} è di non percorrere più tutta $X$ per
-ogni riga di $A$, ma di prenderne un \textbf{tile} --- un blocco di righe
-consecutive --- e di applicarlo a tutte le righe di $A$ prima di passare al
-successivo:
-
-\begin{lstlisting}[language=C,caption={Struttura di \file{src/kernel/scheme\_a\_jblock.c}.}]
-for j0 (tile di X di BJ righe):
-  for i (TUTTE le righe di A):
-    acc = (primo tile) ? 0 : Y[i][*]
-    for j nel tile:  a = A[i][j];  acc[c] += a * X[j][c]
-    Y[i][*] = acc
-\end{lstlisting}
-
-Il tile viene caricato dalla memoria una volta e riusato $\mloc$ volte
-restando in cache. $A$ continua a essere letta \emph{una volta sola}: ogni sua
-riga viene semplicemente consumata a segmenti, uno per tile, invece che tutta
-di seguito.
-
-\paragraph{Il prezzo.} Y non può più vivere nei registri per tutta la durata
-di una riga, perché ci si torna sopra a ogni tile: va riletta e riscritta ogni
-volta. Il traffico aggiuntivo vale $2k$ scalari per riga e per tile, cioè un
-rapporto $2k/\text{BJ}$ rispetto al traffico su $A$. Il tile va quindi scelto
-\emph{grande} abbastanza da rendere questo termine trascurabile e
-\emph{piccolo} abbastanza da stare in cache: le due richieste tirano in
-direzioni opposte, e il punto di equilibrio non è deducibile a priori.
-
-Per questo la dimensione del tile è un parametro di build,
-\code{JBLOCK\_BYTES}, e non una costante scelta una volta per tutte: il codice
-ne ricava il numero di righe per tile dividendo per $k \cdot s$, il default
-è un valore che sta nella cache di secondo livello di qualunque core x86
-recente, e quale sia il valore migliore è oggetto di misura.
-
-\paragraph{Un principio già visto.} È esattamente la stessa mossa del backend
-CUDA con tile in shared memory (\cref{cap:kernel-cuda}): portare un blocco di
-$X$ in una memoria vicina al calcolo e riusarlo per molte righe prima di
-passare al blocco successivo. Cambia il nome della memoria vicina --- lì la
-shared memory, qui la cache --- non il ragionamento.
-
-\section{Terzo backend: register blocking sulle righe}
-\label{sec:jblock-rb}
-
-Tolto il limite di banda, ne resta scoperto un altro, che si manifesta ai $k$
-\emph{piccoli}: in tutti i backend visti finora ogni \code{acc[c]} è una catena
-\emph{seriale} di moltiplicazioni-accumulo lungo $j$ --- ogni aggiornamento
-deve attendere il precedente --- e l'unico parallelismo a livello di istruzione
-disponibile è quello fra le $k$ colonne. Poiché una unità FMA ha una latenza di
-diversi cicli e la CPU ne ha più di una, per tenerle occupate servono più
-catene indipendenti di quante $k$ piccolo ne offra: il processore aspetta, e i
-GFLOPS crescono con $k$ invece di essere costanti.
-
-\kernelname{scheme\_a\_jblock\_rb} risolve lavorando su $\text{RB}$ righe di
-$A$ per volta:
-
-\begin{lstlisting}[language=C,caption={Struttura di \file{src/kernel/scheme\_a\_jblock\_rb.c}.}]
-for j0 (tile di X, come in scheme_a_jblock):
-  for i a passi di RB:
-    acc[r][c] = (primo tile) ? 0 : Y[i+r][c]
-    for j nel tile:
-      x[c] = X[j][c]                          /* caricato UNA volta */
-      for r: a = A[i+r][j];  acc[r][c] += a * x[c]   /* riusato RB volte */
-    Y[i+r][c] = acc[r][c]
-\end{lstlisting}
-
-Le righe di $A$ sono indipendenti per costruzione --- nessun elemento di $Y$
-dipende da un'altra riga --- quindi il numero di catene indipendenti passa da
-$\lceil k/W \rceil$ a $\text{RB} \cdot \lceil k/W \rceil$. In più, ogni valore
-di $X$ caricato viene riusato $\text{RB}$ volte direttamente dai registri,
-quindi anche il traffico su $X$ --- già in cache grazie al tile --- si riduce
-dello stesso fattore.
-
-\paragraph{Chi sceglie RB.} Anche qui il limite sono i registri:
-$\text{RB} \cdot \lceil k/W \rceil$ accumulatori più $\text{RB}$ valori di $A$
-devono starci tutti, altrimenti si torna allo spill e si perde più di quanto si
-guadagni. Il codice sceglie perciò $\text{RB}$ \emph{a tempo di compilazione e
-per ogni $k$}, dal numero di registri vettoriali e dalla loro ampiezza
-dell'architettura di destinazione (\code{VEC\_NREGS} e \code{VEC\_W}, fissati
-dalle macro del compilatore), prendendo il più grande fra i valori ammessi che
-soddisfi il vincolo; la variabile di build \code{RB\_ROWS} permette di forzarlo
-per misurarne l'effetto. Le righe che avanzano quando $\mloc$ non è multiplo di
-$\text{RB}$ sono chiuse dal kernel a una riga, che è il caso $\text{RB} = 1$
-dello stesso schema.
-
-\medskip
-
-I tre backend rispondono quindi a tre limiti diversi e successivi: il traffico
-su $A$, risolto dallo schema~A stesso; la banda verso $X$, risolta dal tile in
-cache; il parallelismo di istruzione, risolto dal blocco di righe. Quanto
-ciascuno dei tre passi valga davvero sulla macchina di misura è ciò che la
-campagna riportata in \cref{cap:risultati} quantifica.
+L'hot path non contiene quindi alcuna indicizzazione su $c$, ma $k$ catene di
+moltiplicazione-accumulo indipendenti su $k$ variabili distinte. Le tre
+condizioni che rendono vettorizzabile quel ciclo sono garantite dal sorgente: i
+puntatori a $A$, $X$ e $Y$ sono dichiarati \code{restrict} (garanzia da
+\emph{ripristinare} con copie locali dentro \code{local\_gemm}, dove il
+contesto opaco li conserva come membri di una struttura), gli aggiornamenti
+sono indipendenti per costruzione e gli accessi a passo unitario. Per i $k$ non
+specializzati, che la traccia richiede, interviene un fallback a gruppi di al
+più \code{KB} colonne, al prezzo di $\lceil k/\code{KB} \rceil$ passate
+complete su $A$.

@@ -53,7 +53,7 @@ quest'ordine:
         il \emph{broadcast}, in cui un processo possiede un dato e al termine
         lo possiedono tutti; e la \emph{reduce}, in cui ogni processo possiede
         un array della stessa forma, gli array vengono combinati elemento per
-        elemento con un operatore associativo --- qui la somma --- e il
+        elemento con un operatore associativo - qui la somma - e il
         risultato finisce su un solo processo.
   \item Il \textbf{root} è quel processo designato: la sorgente nel broadcast,
         il destinatario nella reduce.
@@ -65,7 +65,7 @@ quest'ordine:
 \subsection{Che cosa tagliare}
 
 La prima decisione riguarda quale delle tre matrici vada distribuita. La
-risposta viene da \cref{sec:traffico}: $A$ ha $MN$ elementi, $X$ e $Y$ ne
+risposta viene da diverse osservazioni: $A$ ha $MN$ elementi, $X$ e $Y$ ne
 hanno rispettivamente $Nk$ e $Mk$, e con $k$ piccolo per definizione $A$ è più
 grande delle altre due di un fattore che cresce con la taglia del problema.
 
@@ -110,19 +110,14 @@ più numerosi.
 
 La terza possibilità taglia $A$ in entrambe le direzioni: ogni processo
 possiede un \emph{rettangolo} della matrice. Le due necessità di prima
-compaiono ora entrambe --- servono le righe di $X$ corrispondenti alle proprie
-colonne di $A$, e il proprio contributo a $Y$ è parziale e va sommato --- ma
+compaiono ora entrambe - servono le righe di $X$ corrispondenti alle proprie
+colonne di $A$, e il proprio contributo a $Y$ è parziale e va sommato - ma
 ciascuna coinvolge soltanto un \textbf{sottoinsieme} dei processi: quelli che
 condividono le stesse colonne di $A$ per la prima, quelli che condividono le
 stesse righe per la seconda. Nessuna delle due comunicazioni è più globale.
 
 È questa la decomposizione richiesta dalla traccia, ed è quella che il progetto
-implementa. Che sia effettivamente superiore alle due monodimensionali non è
-però qualcosa da accettare sulla fiducia: è una proprietà quantificabile, e la
-\cref{sec:modello-comunicazione} la dimostra con un modello di costo,
-mostrando che le due decomposizioni 1D ne sono i casi degeneri. Il confronto
-viene poi misurato direttamente in \cref{cap:risultati}.
-
+implementa.
 
 % ---------------------------------------------------------------------------
 % Figura: taglio bidimensionale di A, con X e Y tagliate lungo una sola
@@ -219,8 +214,7 @@ La forma della griglia può essere imposta dall'utente con i flag \code{--pr} e
 fattorizzazione più vicina alla forma quadrata, prendendo come $\Prow$ il più
 grande divisore di $P$ non superiore a $\sqrt{P}$; ne segue
 $\Prow \le \Pcol$, e nel caso limite di $P$ primo la griglia degenera in
-$1 \times P$. La ragione per cui il quadrato è un buon default, e i casi in cui
-non lo è, sono in \cref{sec:modello-comunicazione}.
+$1 \times P$.
 
 
 \subsection{I due sotto-comunicatori}
@@ -316,8 +310,8 @@ risultati errati senza segnalare nulla.
 
 Decidere la forma della griglia non basta: bisogna ancora stabilire, per
 ciascuna delle due dimensioni, quali indici globali finiscano su quale parte.
-La regola è una sola e viene applicata due volte --- alle righe di $A$ fra le
-$\Prow$ righe della griglia, alle colonne fra le $\Pcol$ colonne --- ed è una
+La regola è una sola e viene applicata due volte - alle righe di $A$ fra le
+$\Prow$ righe della griglia, alle colonne fra le $\Pcol$ colonne - ed è una
 partizione \textbf{a blocchi}: ogni parte riceve un intervallo contiguo di
 indici, e il resto della divisione viene distribuito un elemento per volta
 sulle prime parti.
@@ -325,7 +319,7 @@ sulle prime parti.
 Il blocco contiguo non è una scelta di comodo. L'alternativa naturale sarebbe
 una distribuzione ciclica, che assegna gli indici a turno; ma qui il lavoro per
 elemento è uniforme, quindi il ciclico non bilancerebbe nulla che il blocco già
-non bilanci, e in cambio distruggerebbe la contiguità --- cioè proprio la
+non bilanci, e in cambio distruggerebbe la contiguità - cioè proprio la
 proprietà da cui dipendono sia il datatype derivato della distribuzione
 (\cref{sec:distribuzione-a}) sia il passo unitario degli accessi dello schema~A
 (\cref{sec:schemi}).
@@ -352,8 +346,7 @@ dove vale $n$: una sentinella che rende l'ultima parte un caso come gli altri.
 Lo sbilanciamento massimo è di un elemento per dimensione: fra due blocchi
 locali qualsiasi c'è al più una riga e una colonna di differenza.
 
-\section{Layout dei blocchi locali}
-\label{sec:layout}
+\section{Layout dei blocchi locali}\label{sec:layout}
 
 Applicando la partizione alle due dimensioni si ottiene la forma dei tre
 blocchi che ogni processo possiede:
@@ -386,8 +379,8 @@ comune.
 
 \subsection{Chi contiene che cosa, e quando}
 
-Il buffer $X_{\text{loc}}$ esiste su \emph{tutti} i processi --- il broadcast
-deve avere dove scrivere --- ma prima del broadcast contiene dati significativi
+Il buffer $X_{\text{loc}}$ esiste su \emph{tutti} i processi - il broadcast
+deve avere dove scrivere - ma prima del broadcast contiene dati significativi
 soltanto sui processi della riga $0$. Dopo il prodotto locale ogni processo
 possiede un contributo \emph{parziale} a $Y$, che riguarda le proprie righe ma
 soltanto le proprie colonne di $A$; la \code{MPI\_Reduce} lungo
@@ -420,8 +413,7 @@ peso:
 Le modalit\`a di inizializzazione di $A$ e $X$ sono indipendenti
 (\code{--a-mode}, \code{--x-mode}), e tutte e quattro le combinazioni sono
 valide. Le due modalità di ciascuna matrice producono gli stessi elementi
-globali a parità di seed, per la proprietà del generatore discussa in
-\cref{sec:generazione}.
+globali a parità di seed.
 
 \paragraph{\code{--a-mode global}.} Il grid rank $0$ materializza $A$ completa e
 la distribuisce. È il caso interessante dal punto di vista MPI: i sottoblocchi

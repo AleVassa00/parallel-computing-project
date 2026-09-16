@@ -61,7 +61,7 @@ di una campagna si possono concatenare senza rischio.
   deviazione standard \\
 \code{t\_total\_*} & tempo end-to-end reale: media, mediana, minimo, deviazione,
   CV\% \\
-\code{t\_official\_*} & metrica ufficiale della \cref{eq:t-official}, stesse
+\code{t\_official\_*} & metrica ufficiale, stesse
   statistiche \\
 \code{t\_kernel\_*} & solo kernel, misurato con \code{cudaEvent}; vale $-1$ sui
   backend di CPU \\
@@ -76,7 +76,7 @@ di una campagna si possono concatenare senza rischio.
   \code{--check} \\
 \midrule
 \multicolumn{2}{@{}p{0.94\linewidth}@{}}{\footnotesize\itshape da qui in poi:
-  voci ESCLUSE dalla metrica ufficiale (\cref{sec:tempi-esclusi}), in coda
+  voci ESCLUSE dalla metrica ufficiale, in coda
   cos\`i che le colonne storiche non si spostino}\\
 \midrule
 \code{t\_setup\_device\_init\_s}, \code{t\_setup\_device\_alloc\_s},
@@ -95,9 +95,9 @@ di una campagna si possono concatenare senza rischio.
 \caption{Struttura dell'intestazione CSV.}
 \end{table}
 
-Il CSV \emph{raw} ha un'altra intestazione --- una riga per repetition, senza
+Il CSV \emph{raw} ha un'altra intestazione - una riga per repetition, senza
 statistiche, con \code{t\_h2d\_X\_s}, \code{t\_d2h\_Y\_s},
-\code{t\_launch\_overhead\_s} e \code{x\_layout} --- e va unito separatamente da
+\code{t\_launch\_overhead\_s} e \code{x\_layout} - e va unito separatamente da
 quello aggregato. Il driver rifiuta di appendere a un file la cui intestazione
 non coincide con la propria: un CSV misto fra due build sarebbe ambiguo senza
 dare alcun errore.
@@ -107,8 +107,7 @@ dare alcun errore.
 Alcune scelte non sono opzioni di riga di comando ma di \emph{compilazione},
 perch\'e cambiano il codice generato: metterle a runtime introdurrebbe rami nel
 percorso caldo e renderebbe impossibile sapere, guardando un binario, che cosa
-stia misurando. Ognuna entra nel nome del binario e in \code{kernel\_name()}
-(\cref{tab:binari}).
+stia misurando. Ognuna entra nel nome del binario e in \code{kernel\_name()}.
 
 \begin{table}[H]
 \centering
