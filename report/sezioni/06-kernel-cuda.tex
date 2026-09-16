@@ -460,9 +460,11 @@ uniformemente sull'intero warp: se la riga assegnata non esiste, tutte le
 lane terminano prima; altrimenti tutte raggiungono la
 \code{\_\_shfl\_down\_sync}.
 
-Questo rimane vero anche quando $\nloc < 32$: le lane il cui indice non
-corrisponde ad alcun $j$ mantengono semplicemente accumulatori nulli, ma
-partecipano comunque alla riduzione.
+Questo rimane vero anche quando $\nloc < 32$. In questo caso alcune lane
+possono non avere alcun indice $j$ da elaborare, ma non terminano
+l'esecuzione: i loro accumulatori, inizializzati a zero, rimangono nulli
+e partecipano comunque alla riduzione con contributo nullo, senza
+alterare il risultato finale.
 
 \subsection{Il problema residuo: gli accessi a $X$}\label{sec:difetto-x}
 
@@ -523,8 +525,8 @@ row-major sono gli elementi che differiscono per l'indice di colonna $c$
 a essere contigui in memoria.
 
 Il primo rimedio consiste quindi nel modificare la rappresentazione di $X$
-senza cambiare la mappatura del kernel. Durante il preprocessing, il blocco
-locale del multivettore viene riscritto per colonne, in modo che
+senza cambiare la mappatura del kernel. Durante il preprocessing, il blocco locale del multivettore viene riscritto
+in layout \emph{column-major}, in modo che
 
 \begin{equation}
 X_{jc}
