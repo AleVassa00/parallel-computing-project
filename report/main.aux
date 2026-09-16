@@ -286,155 +286,186 @@
 \@writefile{lot}{\addvspace {10\p@ }}
 \newlabel{cap:risultati}{{7}{53}{Risultati}{chapter.7}{}}
 \newlabel{cap:risultati@cref}{{[chapter][7][]7}{[1][53][]53}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.1}Stato della raccolta dati}{53}{section.7.1}\protected@file@percent }
-\newlabel{sec:stato-dati}{{7.1}{53}{Stato della raccolta dati}{section.7.1}{}}
-\newlabel{sec:stato-dati@cref}{{[section][1][7]7.1}{[1][53][]53}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.1}{\ignorespaces Stato delle campagne al momento di questa versione della relazione.}}{53}{table.caption.15}\protected@file@percent }
-\newlabel{tab:stato-campagne}{{7.1}{53}{Stato delle campagne al momento di questa versione della relazione}{table.caption.15}{}}
-\newlabel{tab:stato-campagne@cref}{{[table][1][7]7.1}{[1][53][]53}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.2}Fase 1 --- Tuning dei backend CUDA}{53}{section.7.2}\protected@file@percent }
-\newlabel{sec:ris-fase1}{{7.2}{53}{Fase 1 --- Tuning dei backend CUDA}{section.7.2}{}}
-\newlabel{sec:ris-fase1@cref}{{[section][2][7]7.2}{[1][53][]53}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.2.1}Campagna 1.1 --- Dimensione del blocco}{54}{subsection.7.2.1}\protected@file@percent }
-\newlabel{sec:ris-block}{{7.2.1}{54}{Campagna 1.1 --- Dimensione del blocco}{subsection.7.2.1}{}}
-\newlabel{sec:ris-block@cref}{{[subsection][1][7,2]7.2.1}{[1][53][]54}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.2}{\ignorespaces Campagna 1.1: perdita rispetto al miglior \texttt  {BLOCK} per lo stesso $k$, in percentuale. In grassetto il valore selezionato per ciascun kernel.}}{54}{table.caption.16}\protected@file@percent }
-\newlabel{tab:ris-block-perdite}{{7.2}{54}{Campagna 1.1: perdita rispetto al miglior \code {BLOCK} per lo stesso $k$, in percentuale. In grassetto il valore selezionato per ciascun kernel}{table.caption.16}{}}
-\newlabel{tab:ris-block-perdite@cref}{{[table][2][7]7.2}{[1][53][]54}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.3}{\ignorespaces Campagna 1.1: \texttt  {gflops\_kernel} al \texttt  {BLOCK} selezionato.}}{54}{table.caption.17}\protected@file@percent }
-\newlabel{tab:ris-block-assolute}{{7.3}{54}{Campagna 1.1: \code {gflops\_kernel} al \code {BLOCK} selezionato}{table.caption.17}{}}
-\newlabel{tab:ris-block-assolute@cref}{{[table][3][7]7.3}{[1][54][]54}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.1}{\ignorespaces Campagna 1.1: prestazione normalizzata per $(\texttt  {BLOCK}, k)$ a sinistra, perdita media e massima sui cinque $k$ a destra. Le celle \texttt  {FAIL} sono i lanci non riusciti a \texttt  {BLOCK}$=1024$.}}{55}{figure.caption.18}\protected@file@percent }
-\newlabel{fig:ris-block}{{7.1}{55}{Campagna 1.1: prestazione normalizzata per $(\code {BLOCK}, k)$ a sinistra, perdita media e massima sui cinque $k$ a destra. Le celle \code {FAIL} sono i lanci non riusciti a \code {BLOCK}$=1024$}{figure.caption.18}{}}
-\newlabel{fig:ris-block@cref}{{[figure][1][7]7.1}{[1][54][]55}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.2}{\ignorespaces Campagna 1.1: stessa lettura per \texttt  {cuda\_naive}, l'unico kernel che completa anche a \texttt  {BLOCK}$=1024$.}}{56}{figure.caption.19}\protected@file@percent }
-\newlabel{fig:ris-block-naive}{{7.2}{56}{Campagna 1.1: stessa lettura per \kernelname {cuda\_naive}, l'unico kernel che completa anche a \code {BLOCK}$=1024$}{figure.caption.19}{}}
-\newlabel{fig:ris-block-naive@cref}{{[figure][2][7]7.2}{[1][55][]56}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.2.2}Campagna 1.2 --- Layout in memoria di $X$}{57}{subsection.7.2.2}\protected@file@percent }
-\newlabel{sec:ris-layout}{{7.2.2}{57}{Campagna 1.2 --- Layout in memoria di $X$}{subsection.7.2.2}{}}
-\newlabel{sec:ris-layout@cref}{{[subsection][2][7,2]7.2.2}{[1][57][]57}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.4}{\ignorespaces Campagna 1.2: \texttt  {cuda\_warp} con $X$ row-major e column-major, \texttt  {BLOCK}$=128$. L'ultima colonna è il costo della conversione di $X$, che è preprocessing e non entra in $T$.}}{57}{table.caption.21}\protected@file@percent }
-\newlabel{tab:ris-layout}{{7.4}{57}{Campagna 1.2: \kernelname {cuda\_warp} con $X$ row-major e column-major, \code {BLOCK}$=128$. L'ultima colonna è il costo della conversione di $X$, che è preprocessing e non entra in $T$}{table.caption.21}{}}
-\newlabel{tab:ris-layout@cref}{{[table][4][7]7.4}{[1][57][]57}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.3}{\ignorespaces Campagna 1.2: prestazioni assolute (sinistra) e vantaggio del layout column-major (destra). CV massimo: $0{,}63\%$ row-major, $0{,}67\%$ column-major.}}{57}{figure.caption.22}\protected@file@percent }
-\newlabel{fig:ris-layout}{{7.3}{57}{Campagna 1.2: prestazioni assolute (sinistra) e vantaggio del layout column-major (destra). CV massimo: $0{,}63\%$ row-major, $0{,}67\%$ column-major}{figure.caption.22}{}}
-\newlabel{fig:ris-layout@cref}{{[figure][3][7]7.3}{[1][57][]57}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.2.3}Campagna 1.3 --- Padding del tile in shared memory}{58}{subsection.7.2.3}\protected@file@percent }
-\newlabel{sec:ris-pad}{{7.2.3}{58}{Campagna 1.3 --- Padding del tile in shared memory}{subsection.7.2.3}{}}
-\newlabel{sec:ris-pad@cref}{{[subsection][3][7,2]7.2.3}{[1][58][]58}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.5}{\ignorespaces Campagna 1.3: effetto di \texttt  {SMEM\_PAD} su \texttt  {cuda\_warp\_smem}, \texttt  {BLOCK}$=256$. \texttt  {x\_rows\_per\_tile} è il numero di righe di $X$ che il pianificatore fa entrare nel tile.}}{58}{table.caption.24}\protected@file@percent }
-\newlabel{tab:ris-pad}{{7.5}{58}{Campagna 1.3: effetto di \code {SMEM\_PAD} su \kernelname {cuda\_warp\_smem}, \code {BLOCK}$=256$. \code {x\_rows\_per\_tile} è il numero di righe di $X$ che il pianificatore fa entrare nel tile}{table.caption.24}{}}
-\newlabel{tab:ris-pad@cref}{{[table][5][7]7.5}{[1][58][]58}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.2.4}Campagna 1.4 --- Granularità del tile}{59}{subsection.7.2.4}\protected@file@percent }
-\newlabel{sec:ris-granularita}{{7.2.4}{59}{Campagna 1.4 --- Granularità del tile}{subsection.7.2.4}{}}
-\newlabel{sec:ris-granularita@cref}{{[subsection][4][7,2]7.2.4}{[1][59][]59}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.6}{\ignorespaces Campagna 1.4: prestazione normalizzata di \texttt  {cuda\_warp\_smem} per ogni coppia $(\texttt  {BLOCK}, g)$, in percentuale dell'ottimo per lo stesso $k$. Media sui cinque $k$ e caso peggiore. In grassetto la coppia selezionata.}}{59}{table.caption.26}\protected@file@percent }
-\newlabel{tab:ris-granularita}{{7.6}{59}{Campagna 1.4: prestazione normalizzata di \kernelname {cuda\_warp\_smem} per ogni coppia $(\code {BLOCK}, g)$, in percentuale dell'ottimo per lo stesso $k$. Media sui cinque $k$ e caso peggiore. In grassetto la coppia selezionata}{table.caption.26}{}}
-\newlabel{tab:ris-granularita@cref}{{[table][6][7]7.6}{[1][59][]59}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.4}{\ignorespaces Campagna 1.4: tuning congiunto di \texttt  {BLOCK} e granularità. A sinistra la prestazione normalizzata media sui cinque $k$, a destra il caso peggiore.}}{59}{figure.caption.27}\protected@file@percent }
-\newlabel{fig:ris-granularita}{{7.4}{59}{Campagna 1.4: tuning congiunto di \code {BLOCK} e granularità. A sinistra la prestazione normalizzata media sui cinque $k$, a destra il caso peggiore}{figure.caption.27}{}}
-\newlabel{fig:ris-granularita@cref}{{[figure][4][7]7.4}{[1][59][]59}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.5}{\ignorespaces Campagna 1.4: dettaglio a \texttt  {BLOCK}$=256$. A destra il piano di tiling effettivamente scelto a runtime, che dipende da $k$ e non da $g$ se non attraverso l'arrotondamento.}}{60}{figure.caption.28}\protected@file@percent }
-\newlabel{fig:ris-granularita-dettaglio}{{7.5}{60}{Campagna 1.4: dettaglio a \code {BLOCK}$=256$. A destra il piano di tiling effettivamente scelto a runtime, che dipende da $k$ e non da $g$ se non attraverso l'arrotondamento}{figure.caption.28}{}}
-\newlabel{fig:ris-granularita-dettaglio@cref}{{[figure][5][7]7.5}{[1][59][]60}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.2.5}Campagna 1.5 --- Confronto fra i kernel}{60}{subsection.7.2.5}\protected@file@percent }
-\newlabel{sec:ris-confronto-kernel}{{7.2.5}{60}{Campagna 1.5 --- Confronto fra i kernel}{subsection.7.2.5}{}}
-\newlabel{sec:ris-confronto-kernel@cref}{{[subsection][5][7,2]7.2.5}{[1][60][]60}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.7}{\ignorespaces Campagna 1.5: \texttt  {gflops\_kernel} e tempo di kernel, $M = N = \num {16384}$, FP64, $P = 1$. L'ultima riga è la percentuale del tetto FP64 nominale di \cref  {tab:picchi-gpu} raggiunta dal miglior kernel.}}{61}{table.caption.30}\protected@file@percent }
-\newlabel{tab:ris-confronto-kernel}{{7.7}{61}{Campagna 1.5: \code {gflops\_kernel} e tempo di kernel, $M = N = \num {16384}$, FP64, $P = 1$. L'ultima riga è la percentuale del tetto FP64 nominale di \cref {tab:picchi-gpu} raggiunta dal miglior kernel}{table.caption.30}{}}
-\newlabel{tab:ris-confronto-kernel@cref}{{[table][7][7]7.7}{[1][60][]61}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.6}{\ignorespaces Campagna 1.5: confronto fra backend in doppia precisione. La distanza dal tetto, non il valore assoluto, è il risultato.}}{61}{figure.caption.31}\protected@file@percent }
-\newlabel{fig:ris-confronto-kernel}{{7.6}{61}{Campagna 1.5: confronto fra backend in doppia precisione. La distanza dal tetto, non il valore assoluto, è il risultato}{figure.caption.31}{}}
-\newlabel{fig:ris-confronto-kernel@cref}{{[figure][6][7]7.6}{[1][61][]61}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.8}{\ignorespaces Configurazione selezionata per ciascun backend CUDA, usata invariata nelle fasi 2 e 3.}}{62}{table.caption.33}\protected@file@percent }
-\newlabel{tab:ris-fase1-sintesi}{{7.8}{62}{Configurazione selezionata per ciascun backend CUDA, usata invariata nelle fasi 2 e 3}{table.caption.33}{}}
-\newlabel{tab:ris-fase1-sintesi@cref}{{[table][8][7]7.8}{[1][62][]62}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.3}Fase 2 --- Scala del problema e forma di $A$}{62}{section.7.3}\protected@file@percent }
-\newlabel{sec:ris-fase2}{{7.3}{62}{Fase 2 --- Scala del problema e forma di $A$}{section.7.3}{}}
-\newlabel{sec:ris-fase2@cref}{{[section][3][7]7.3}{[1][62][]62}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.9}{\ignorespaces Fase 2: \texttt  {gflops\_kernel} di \texttt  {cuda\_warp} su tutti i nove punti.}}{62}{table.caption.34}\protected@file@percent }
-\newlabel{tab:ris-fase2-warp}{{7.9}{62}{Fase 2: \code {gflops\_kernel} di \kernelname {cuda\_warp} su tutti i nove punti}{table.caption.34}{}}
-\newlabel{tab:ris-fase2-warp@cref}{{[table][9][7]7.9}{[1][62][]62}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.10}{\ignorespaces Fase 2: effetto della sola scala, caso quadrato, tutti i backend.}}{63}{table.caption.35}\protected@file@percent }
-\newlabel{tab:ris-fase2-scala}{{7.10}{63}{Fase 2: effetto della sola scala, caso quadrato, tutti i backend}{table.caption.35}{}}
-\newlabel{tab:ris-fase2-scala@cref}{{[table][10][7]7.10}{[1][62][]63}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.11}{\ignorespaces Fase 2: effetto della sola forma a $k = 32$, a lavoro costante entro l'$1{,}2\%$.}}{63}{table.caption.36}\protected@file@percent }
-\newlabel{tab:ris-fase2-forma}{{7.11}{63}{Fase 2: effetto della sola forma a $k = 32$, a lavoro costante entro l'$1{,}2\%$}{table.caption.36}{}}
-\newlabel{tab:ris-fase2-forma@cref}{{[table][11][7]7.11}{[1][63][]63}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.7}{\ignorespaces Fase 2: \texttt  {cuda\_warp} sul caso quadrato alle tre scale. La linea tratteggiata è il tetto FP64 nominale. A $S = 4096$ la curva non arriva al tetto per nessun $k$.}}{63}{figure.caption.37}\protected@file@percent }
-\newlabel{fig:ris-fase2-scala}{{7.7}{63}{Fase 2: \kernelname {cuda\_warp} sul caso quadrato alle tre scale. La linea tratteggiata è il tetto FP64 nominale. A $S = 4096$ la curva non arriva al tetto per nessun $k$}{figure.caption.37}{}}
-\newlabel{fig:ris-fase2-scala@cref}{{[figure][7][7]7.7}{[1][63][]63}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.4}Fase 3 --- FP32 contro FP64}{64}{section.7.4}\protected@file@percent }
-\newlabel{sec:ris-fase3}{{7.4}{64}{Fase 3 --- FP32 contro FP64}{section.7.4}{}}
-\newlabel{sec:ris-fase3@cref}{{[section][4][7]7.4}{[1][64][]64}{}{}{}}
-\newlabel{sec:c7}{{7.4}{64}{Fase 3 --- FP32 contro FP64}{section.7.4}{}}
-\newlabel{sec:c7@cref}{{[section][4][7]7.4}{[1][64][]64}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.12}{\ignorespaces Fase 3: \texttt  {gflops\_kernel} nelle due precisioni e speedup $S_{32/64}$ della \cref  {eq:speedup-precisione}, $M = N = \num {16384}$, $P = 1$.}}{64}{table.caption.39}\protected@file@percent }
-\newlabel{tab:ris-fase3}{{7.12}{64}{Fase 3: \code {gflops\_kernel} nelle due precisioni e speedup $S_{32/64}$ della \cref {eq:speedup-precisione}, $M = N = \num {16384}$, $P = 1$}{table.caption.39}{}}
-\newlabel{tab:ris-fase3@cref}{{[table][12][7]7.12}{[1][64][]64}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.13}{\ignorespaces Fase 3: percentuale del tetto pertinente. In FP64 il tetto è \SI {350}{\giga \flop \per \second } e non dipende da $k$; in FP32 è $B \cdot k/2 = 224k$ \si {\giga \flop \per \second } e cresce con $k$ (\cref  {tab:picchi-gpu}).}}{65}{table.caption.40}\protected@file@percent }
-\newlabel{tab:ris-fase3-tetto}{{7.13}{65}{Fase 3: percentuale del tetto pertinente. In FP64 il tetto è \SI {350}{\giga \flop \per \second } e non dipende da $k$; in FP32 è $B \cdot k/2 = 224k$ \si {\giga \flop \per \second } e cresce con $k$ (\cref {tab:picchi-gpu})}{table.caption.40}{}}
-\newlabel{tab:ris-fase3-tetto@cref}{{[table][13][7]7.13}{[1][64][]65}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.8}{\ignorespaces Fase 3: guadagno della singola precisione al variare di $k$. La crescita con $k$ dei kernel custom è la previsione del roofline; la piattezza di \texttt  {cublas} intorno a 28 misura invece la lentezza del suo percorso FP64.}}{65}{figure.caption.41}\protected@file@percent }
-\newlabel{fig:ris-fase3}{{7.8}{65}{Fase 3: guadagno della singola precisione al variare di $k$. La crescita con $k$ dei kernel custom è la previsione del roofline; la piattezza di \kernelname {cublas} intorno a 28 misura invece la lentezza del suo percorso FP64}{figure.caption.41}{}}
-\newlabel{fig:ris-fase3@cref}{{[figure][8][7]7.8}{[1][65][]65}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.14}{\ignorespaces Fase 3: piano di tiling scelto a runtime da \texttt  {cuda\_warp\_smem} nelle due precisioni.}}{65}{table.caption.42}\protected@file@percent }
-\newlabel{tab:ris-fase3-piano}{{7.14}{65}{Fase 3: piano di tiling scelto a runtime da \kernelname {cuda\_warp\_smem} nelle due precisioni}{table.caption.42}{}}
-\newlabel{tab:ris-fase3-piano@cref}{{[table][14][7]7.14}{[1][65][]65}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.5}Fase 4 --- Strong scaling MPI sui backend di CPU}{66}{section.7.5}\protected@file@percent }
-\newlabel{sec:ris-fase4}{{7.5}{66}{Fase 4 --- Strong scaling MPI sui backend di CPU}{section.7.5}{}}
-\newlabel{sec:ris-fase4@cref}{{[section][5][7]7.5}{[1][66][]66}{}{}{}}
-\newlabel{sec:c3}{{7.5}{66}{Fase 4 --- Strong scaling MPI sui backend di CPU}{section.7.5}{}}
-\newlabel{sec:c3@cref}{{[section][5][7]7.5}{[1][66][]66}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.5.1}Il nucleo di CPU a rank singolo}{67}{subsection.7.5.1}\protected@file@percent }
-\newlabel{sec:ris-cpu-baseline}{{7.5.1}{67}{Il nucleo di CPU a rank singolo}{subsection.7.5.1}{}}
-\newlabel{sec:ris-cpu-baseline@cref}{{[subsection][1][7,5]7.5.1}{[1][66][]67}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.15}{\ignorespaces Fase 4, $P = 1$: tempo ufficiale, throughput e le due bande effettive derivate. $\tau = T/(MN)$ è il costo per elemento di $A$; $B_A = MNs/T$ e $B_X = MNks/T$ sono grandezze \emph  {derivate}, non misurate, definite come in \cref  {sec:rilettura-x}.}}{67}{table.caption.44}\protected@file@percent }
-\newlabel{tab:ris-cpu-baseline}{{7.15}{67}{Fase 4, $P = 1$: tempo ufficiale, throughput e le due bande effettive derivate. $\tau = T/(MN)$ è il costo per elemento di $A$; $B_A = MNs/T$ e $B_X = MNks/T$ sono grandezze \emph {derivate}, non misurate, definite come in \cref {sec:rilettura-x}}{table.caption.44}{}}
-\newlabel{tab:ris-cpu-baseline@cref}{{[table][15][7]7.15}{[1][66][]67}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.5.2}Scaling a problema fisso}{68}{subsection.7.5.2}\protected@file@percent }
-\newlabel{sec:ris-scaling}{{7.5.2}{68}{Scaling a problema fisso}{subsection.7.5.2}{}}
-\newlabel{sec:ris-scaling@cref}{{[subsection][2][7,5]7.5.2}{[1][68][]68}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.16}{\ignorespaces Fase 4: throughput ufficiale (\texttt  {gflops}) al variare di $P$.}}{68}{table.caption.46}\protected@file@percent }
-\newlabel{tab:ris-fase4-gflops}{{7.16}{68}{Fase 4: throughput ufficiale (\code {gflops}) al variare di $P$}{table.caption.46}{}}
-\newlabel{tab:ris-fase4-gflops@cref}{{[table][16][7]7.16}{[1][68][]68}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.17}{\ignorespaces Fase 4: efficienza parallela $E(P) = S(P)/P$ della \cref  {eq:speedup-efficienza}, rispetto alla baseline $P = 1$ dello stesso backend.}}{68}{table.caption.47}\protected@file@percent }
-\newlabel{tab:ris-fase4-efficienza}{{7.17}{68}{Fase 4: efficienza parallela $E(P) = S(P)/P$ della \cref {eq:speedup-efficienza}, rispetto alla baseline $P = 1$ dello stesso backend}{table.caption.47}{}}
-\newlabel{tab:ris-fase4-efficienza@cref}{{[table][17][7]7.17}{[1][68][]68}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.18}{\ignorespaces Fase 4: scomposizione del tempo a $k = 32$, in \si {\milli \second }. La reduce è degenere perché la griglia è $P \times 1$.}}{68}{table.caption.48}\protected@file@percent }
-\newlabel{tab:ris-fase4-composizione}{{7.18}{68}{Fase 4: scomposizione del tempo a $k = 32$, in \si {\milli \second }. La reduce è degenere perché la griglia è $P \times 1$}{table.caption.48}{}}
-\newlabel{tab:ris-fase4-composizione@cref}{{[table][18][7]7.18}{[1][68][]68}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.9}{\ignorespaces Fase 4: strong scaling a $k = 32$. Lo speedup è calcolato sulla baseline $P = 1$ dello stesso backend, quindi le tre curve non sono confrontabili in valore assoluto: \texttt  {scheme\_a\_jblock\_rb} scala bene perché parte da un tempo tre volte più alto.}}{69}{figure.caption.49}\protected@file@percent }
-\newlabel{fig:ris-fase4-speedup}{{7.9}{69}{Fase 4: strong scaling a $k = 32$. Lo speedup è calcolato sulla baseline $P = 1$ dello stesso backend, quindi le tre curve non sono confrontabili in valore assoluto: \kernelname {scheme\_a\_jblock\_rb} scala bene perché parte da un tempo tre volte più alto}{figure.caption.49}{}}
-\newlabel{fig:ris-fase4-speedup@cref}{{[figure][9][7]7.9}{[1][68][]69}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.6}Il costo dei dati: trasferimenti e preprocessing}{70}{section.7.6}\protected@file@percent }
-\newlabel{sec:ris-trasferimenti}{{7.6}{70}{Il costo dei dati: trasferimenti e preprocessing}{section.7.6}{}}
-\newlabel{sec:ris-trasferimenti@cref}{{[section][6][7]7.6}{[1][70][]70}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.19}{\ignorespaces Scomposizione della fase locale su GPU secondo la \cref  {eq:scomposizione-locale}, in percentuale di $t_{\text  {local}}$.}}{70}{table.caption.51}\protected@file@percent }
-\newlabel{tab:ris-scomposizione}{{7.19}{70}{Scomposizione della fase locale su GPU secondo la \cref {eq:scomposizione-locale}, in percentuale di $t_{\text {local}}$}{table.caption.51}{}}
-\newlabel{tab:ris-scomposizione@cref}{{[table][19][7]7.19}{[1][70][]70}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.20}{\ignorespaces Preprocessing e banda dei trasferimenti, \texttt  {cuda\_warp}, $M = N = \num {16384}$, FP64. Le voci di setup sono pagate una volta sola.}}{70}{table.caption.52}\protected@file@percent }
-\newlabel{tab:ris-prep}{{7.20}{70}{Preprocessing e banda dei trasferimenti, \kernelname {cuda\_warp}, $M = N = \num {16384}$, FP64. Le voci di setup sono pagate una volta sola}{table.caption.52}{}}
-\newlabel{tab:ris-prep@cref}{{[table][20][7]7.20}{[1][70][]70}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.7}Sintesi}{71}{section.7.7}\protected@file@percent }
-\newlabel{sec:ris-sintesi}{{7.7}{71}{Sintesi}{section.7.7}{}}
-\newlabel{sec:ris-sintesi@cref}{{[section][7][7]7.7}{[1][71][]71}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.21}{\ignorespaces Migliore configurazione misurata per ciascun regime, a $M = N = \num {16384}$.}}{71}{table.caption.54}\protected@file@percent }
-\newlabel{tab:ris-sintesi}{{7.21}{71}{Migliore configurazione misurata per ciascun regime, a $M = N = \num {16384}$}{table.caption.54}{}}
-\newlabel{tab:ris-sintesi@cref}{{[table][21][7]7.21}{[1][71][]71}{}{}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {8}Conclusioni}{72}{chapter.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7.1}Fase 1 - Configurazione dei backend CUDA}{53}{section.7.1}\protected@file@percent }
+\newlabel{sec:ris-fase1}{{7.1}{53}{Fase 1 - Configurazione dei backend CUDA}{section.7.1}{}}
+\newlabel{sec:ris-fase1@cref}{{[section][1][7]7.1}{[1][53][]53}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1.1}Campagna 1.1 - Dimensione del blocco}{53}{subsection.7.1.1}\protected@file@percent }
+\newlabel{sec:ris-block}{{7.1.1}{53}{Campagna 1.1 - Dimensione del blocco}{subsection.7.1.1}{}}
+\newlabel{sec:ris-block@cref}{{[subsection][1][7,1]7.1.1}{[1][53][]53}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.1}{\ignorespaces Campagna 1.1: perdita rispetto al miglior \texttt  {BLOCK} per lo stesso $k$, in percentuale. In grassetto il valore selezionato per ciascun kernel.}}{53}{table.caption.15}\protected@file@percent }
+\newlabel{tab:ris-block-perdite}{{7.1}{53}{Campagna 1.1: perdita rispetto al miglior \code {BLOCK} per lo stesso $k$, in percentuale. In grassetto il valore selezionato per ciascun kernel}{table.caption.15}{}}
+\newlabel{tab:ris-block-perdite@cref}{{[table][1][7]7.1}{[1][53][]53}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.2}{\ignorespaces Campagna 1.1: \texttt  {gflops\_kernel} al \texttt  {BLOCK} selezionato.}}{54}{table.caption.16}\protected@file@percent }
+\newlabel{tab:ris-block-assolute}{{7.2}{54}{Campagna 1.1: \code {gflops\_kernel} al \code {BLOCK} selezionato}{table.caption.16}{}}
+\newlabel{tab:ris-block-assolute@cref}{{[table][2][7]7.2}{[1][53][]54}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7.1}{\ignorespaces Campagna 1.1: prestazione normalizzata per $(\texttt  {BLOCK}, k)$ a sinistra, perdita media e massima sui cinque $k$ a destra. Le celle \texttt  {FAIL} sono i lanci non riusciti a \texttt  {BLOCK}$=1024$.}}{54}{figure.caption.17}\protected@file@percent }
+\newlabel{fig:ris-block}{{7.1}{54}{Campagna 1.1: prestazione normalizzata per $(\code {BLOCK}, k)$ a sinistra, perdita media e massima sui cinque $k$ a destra. Le celle \code {FAIL} sono i lanci non riusciti a \code {BLOCK}$=1024$}{figure.caption.17}{}}
+\newlabel{fig:ris-block@cref}{{[figure][1][7]7.1}{[1][54][]54}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7.2}{\ignorespaces Campagna 1.1: stessa lettura per \texttt  {cuda\_naive}, l'unico kernel che completa anche a \texttt  {BLOCK}$=1024$.}}{55}{figure.caption.18}\protected@file@percent }
+\newlabel{fig:ris-block-naive}{{7.2}{55}{Campagna 1.1: stessa lettura per \kernelname {cuda\_naive}, l'unico kernel che completa anche a \code {BLOCK}$=1024$}{figure.caption.18}{}}
+\newlabel{fig:ris-block-naive@cref}{{[figure][2][7]7.2}{[1][54][]55}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1.2}Campagna 1.2 - Layout in memoria di $X$}{56}{subsection.7.1.2}\protected@file@percent }
+\newlabel{sec:ris-layout}{{7.1.2}{56}{Campagna 1.2 - Layout in memoria di $X$}{subsection.7.1.2}{}}
+\newlabel{sec:ris-layout@cref}{{[subsection][2][7,1]7.1.2}{[1][56][]56}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.3}{\ignorespaces Campagna 1.2: \texttt  {cuda\_warp} con $X$ row-major e column-major, \texttt  {BLOCK}$=128$. L'ultima colonna è il costo della conversione di $X$, che è preprocessing e non entra in $T$.}}{56}{table.caption.20}\protected@file@percent }
+\newlabel{tab:ris-layout}{{7.3}{56}{Campagna 1.2: \kernelname {cuda\_warp} con $X$ row-major e column-major, \code {BLOCK}$=128$. L'ultima colonna è il costo della conversione di $X$, che è preprocessing e non entra in $T$}{table.caption.20}{}}
+\newlabel{tab:ris-layout@cref}{{[table][3][7]7.3}{[1][56][]56}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7.3}{\ignorespaces Campagna 1.2: prestazioni assolute (sinistra) e vantaggio del layout column-major (destra). CV massimo: $0{,}63\%$ row-major, $0{,}67\%$ column-major.}}{56}{figure.caption.21}\protected@file@percent }
+\newlabel{fig:ris-layout}{{7.3}{56}{Campagna 1.2: prestazioni assolute (sinistra) e vantaggio del layout column-major (destra). CV massimo: $0{,}63\%$ row-major, $0{,}67\%$ column-major}{figure.caption.21}{}}
+\newlabel{fig:ris-layout@cref}{{[figure][3][7]7.3}{[1][56][]56}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1.3}Campagna 1.3 - Padding del tile in shared memory}{57}{subsection.7.1.3}\protected@file@percent }
+\newlabel{sec:ris-pad}{{7.1.3}{57}{Campagna 1.3 - Padding del tile in shared memory}{subsection.7.1.3}{}}
+\newlabel{sec:ris-pad@cref}{{[subsection][3][7,1]7.1.3}{[1][57][]57}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.4}{\ignorespaces Campagna 1.3: effetto di \texttt  {SMEM\_PAD} su \texttt  {cuda\_warp\_smem}, \texttt  {BLOCK}$=256$. \texttt  {x\_rows\_per\_tile} è il numero di righe di $X$ che il pianificatore fa entrare nel tile.}}{57}{table.caption.23}\protected@file@percent }
+\newlabel{tab:ris-pad}{{7.4}{57}{Campagna 1.3: effetto di \code {SMEM\_PAD} su \kernelname {cuda\_warp\_smem}, \code {BLOCK}$=256$. \code {x\_rows\_per\_tile} è il numero di righe di $X$ che il pianificatore fa entrare nel tile}{table.caption.23}{}}
+\newlabel{tab:ris-pad@cref}{{[table][4][7]7.4}{[1][57][]57}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7.4}{\ignorespaces Campagna 1.3: confronto fra tile senza padding e con una colonna di padding. Il caso $k=32$ rende visibile la patologia che negli altri punti è parzialmente nascosta dal resto del lavoro del kernel.}}{58}{figure.caption.24}\protected@file@percent }
+\newlabel{fig:ris-pad}{{7.4}{58}{Campagna 1.3: confronto fra tile senza padding e con una colonna di padding. Il caso $k=32$ rende visibile la patologia che negli altri punti è parzialmente nascosta dal resto del lavoro del kernel}{figure.caption.24}{}}
+\newlabel{fig:ris-pad@cref}{{[figure][4][7]7.4}{[1][57][]58}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1.4}Campagna 1.4 - Granularità del tile}{59}{subsection.7.1.4}\protected@file@percent }
+\newlabel{sec:ris-granularita}{{7.1.4}{59}{Campagna 1.4 - Granularità del tile}{subsection.7.1.4}{}}
+\newlabel{sec:ris-granularita@cref}{{[subsection][4][7,1]7.1.4}{[1][58][]59}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.5}{\ignorespaces Campagna 1.4: prestazione normalizzata di \texttt  {cuda\_warp\_smem} per ogni coppia $(\texttt  {BLOCK}, g)$, in percentuale dell'ottimo per lo stesso $k$. Media sui cinque $k$ e caso peggiore. In grassetto la coppia selezionata.}}{59}{table.caption.26}\protected@file@percent }
+\newlabel{tab:ris-granularita}{{7.5}{59}{Campagna 1.4: prestazione normalizzata di \kernelname {cuda\_warp\_smem} per ogni coppia $(\code {BLOCK}, g)$, in percentuale dell'ottimo per lo stesso $k$. Media sui cinque $k$ e caso peggiore. In grassetto la coppia selezionata}{table.caption.26}{}}
+\newlabel{tab:ris-granularita@cref}{{[table][5][7]7.5}{[1][58][]59}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7.5}{\ignorespaces Campagna 1.4: tuning congiunto di \texttt  {BLOCK} e granularità. A sinistra la prestazione normalizzata media sui cinque $k$, a destra il caso peggiore.}}{59}{figure.caption.27}\protected@file@percent }
+\newlabel{fig:ris-granularita}{{7.5}{59}{Campagna 1.4: tuning congiunto di \code {BLOCK} e granularità. A sinistra la prestazione normalizzata media sui cinque $k$, a destra il caso peggiore}{figure.caption.27}{}}
+\newlabel{fig:ris-granularita@cref}{{[figure][5][7]7.5}{[1][59][]59}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7.6}{\ignorespaces Campagna 1.4: dettaglio a \texttt  {BLOCK}$=256$. A destra il piano di tiling effettivamente scelto a runtime, che dipende da $k$ e non da $g$ se non attraverso l'arrotondamento.}}{59}{figure.caption.28}\protected@file@percent }
+\newlabel{fig:ris-granularita-dettaglio}{{7.6}{59}{Campagna 1.4: dettaglio a \code {BLOCK}$=256$. A destra il piano di tiling effettivamente scelto a runtime, che dipende da $k$ e non da $g$ se non attraverso l'arrotondamento}{figure.caption.28}{}}
+\newlabel{fig:ris-granularita-dettaglio@cref}{{[figure][6][7]7.6}{[1][59][]59}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1.5}Esito della Fase 1 - Confronto fra i backend configurati}{60}{subsection.7.1.5}\protected@file@percent }
+\newlabel{sec:ris-confronto-kernel}{{7.1.5}{60}{Esito della Fase 1 - Confronto fra i backend configurati}{subsection.7.1.5}{}}
+\newlabel{sec:ris-confronto-kernel@cref}{{[subsection][5][7,1]7.1.5}{[1][60][]60}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.6}{\ignorespaces Confronto conclusivo della Fase 1: \texttt  {gflops\_kernel} e tempo di kernel, $M=N=\num {16384}$, FP64, $P=1$. L'ultima riga è la percentuale del tetto FP64 nominale raggiunta dal miglior kernel.}}{60}{table.caption.30}\protected@file@percent }
+\newlabel{tab:ris-confronto-kernel}{{7.6}{60}{Confronto conclusivo della Fase 1: \code {gflops\_kernel} e tempo di kernel, $M=N=\num {16384}$, FP64, $P=1$. L'ultima riga è la percentuale del tetto FP64 nominale raggiunta dal miglior kernel}{table.caption.30}{}}
+\newlabel{tab:ris-confronto-kernel@cref}{{[table][6][7]7.6}{[1][60][]60}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7.7}{\ignorespaces Confronto conclusivo della Fase 1 fra backend in doppia precisione. La distanza dal tetto, non il valore assoluto, è il risultato.}}{61}{figure.caption.31}\protected@file@percent }
+\newlabel{fig:ris-confronto-kernel}{{7.7}{61}{Confronto conclusivo della Fase 1 fra backend in doppia precisione. La distanza dal tetto, non il valore assoluto, è il risultato}{figure.caption.31}{}}
+\newlabel{fig:ris-confronto-kernel@cref}{{[figure][7][7]7.7}{[1][60][]61}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.7}{\ignorespaces Configurazione selezionata per ciascun backend CUDA, usata invariata nelle fasi 2, 3 e 4.}}{62}{table.caption.33}\protected@file@percent }
+\newlabel{tab:ris-fase1-sintesi}{{7.7}{62}{Configurazione selezionata per ciascun backend CUDA, usata invariata nelle fasi 2, 3 e 4}{table.caption.33}{}}
+\newlabel{tab:ris-fase1-sintesi@cref}{{[table][7][7]7.7}{[1][62][]62}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7.2}Fase 2 - Caratterizzazione dimensionale}{62}{section.7.2}\protected@file@percent }
+\newlabel{sec:ris-fase2}{{7.2}{62}{Fase 2 - Caratterizzazione dimensionale}{section.7.2}{}}
+\newlabel{sec:ris-fase2@cref}{{[section][2][7]7.2}{[1][62][]62}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.8}{\ignorespaces Fase 2: \texttt  {gflops\_kernel} di \texttt  {cuda\_warp} su tutti i nove punti.}}{62}{table.caption.34}\protected@file@percent }
+\newlabel{tab:ris-fase2-warp}{{7.8}{62}{Fase 2: \code {gflops\_kernel} di \kernelname {cuda\_warp} su tutti i nove punti}{table.caption.34}{}}
+\newlabel{tab:ris-fase2-warp@cref}{{[table][8][7]7.8}{[1][62][]62}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.9}{\ignorespaces Fase 2: effetto della sola scala, caso quadrato, tutti i backend.}}{62}{table.caption.35}\protected@file@percent }
+\newlabel{tab:ris-fase2-scala}{{7.9}{62}{Fase 2: effetto della sola scala, caso quadrato, tutti i backend}{table.caption.35}{}}
+\newlabel{tab:ris-fase2-scala@cref}{{[table][9][7]7.9}{[1][62][]62}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.10}{\ignorespaces Fase 2: effetto della sola forma a $k = 32$, a lavoro costante entro l'$1{,}2\%$.}}{62}{table.caption.36}\protected@file@percent }
+\newlabel{tab:ris-fase2-forma}{{7.10}{62}{Fase 2: effetto della sola forma a $k = 32$, a lavoro costante entro l'$1{,}2\%$}{table.caption.36}{}}
+\newlabel{tab:ris-fase2-forma@cref}{{[table][10][7]7.10}{[1][62][]62}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7.8}{\ignorespaces Fase 2: \texttt  {cuda\_warp} sul caso quadrato alle tre scale. La linea tratteggiata è il tetto FP64 nominale. A $S = 4096$ la curva non arriva al tetto per nessun $k$.}}{63}{figure.caption.37}\protected@file@percent }
+\newlabel{fig:ris-fase2-scala}{{7.8}{63}{Fase 2: \kernelname {cuda\_warp} sul caso quadrato alle tre scale. La linea tratteggiata è il tetto FP64 nominale. A $S = 4096$ la curva non arriva al tetto per nessun $k$}{figure.caption.37}{}}
+\newlabel{fig:ris-fase2-scala@cref}{{[figure][8][7]7.8}{[1][62][]63}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7.3}Fase 3 - Effetto della precisione numerica}{64}{section.7.3}\protected@file@percent }
+\newlabel{sec:ris-fase3}{{7.3}{64}{Fase 3 - Effetto della precisione numerica}{section.7.3}{}}
+\newlabel{sec:ris-fase3@cref}{{[section][3][7]7.3}{[1][63][]64}{}{}{}}
+\newlabel{sec:c7}{{7.3}{64}{Fase 3 - Effetto della precisione numerica}{section.7.3}{}}
+\newlabel{sec:c7@cref}{{[section][3][7]7.3}{[1][63][]64}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.11}{\ignorespaces Fase 3: \texttt  {gflops\_kernel} nelle due precisioni e speedup $S_{32/64}$ della \cref  {eq:speedup-precisione}, $M = N = \num {16384}$, $P = 1$.}}{64}{table.caption.39}\protected@file@percent }
+\newlabel{tab:ris-fase3}{{7.11}{64}{Fase 3: \code {gflops\_kernel} nelle due precisioni e speedup $S_{32/64}$ della \cref {eq:speedup-precisione}, $M = N = \num {16384}$, $P = 1$}{table.caption.39}{}}
+\newlabel{tab:ris-fase3@cref}{{[table][11][7]7.11}{[1][63][]64}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.12}{\ignorespaces Fase 3: percentuale del tetto pertinente. In FP64 il tetto è \SI {350}{\giga \flop \per \second } e non dipende da $k$, in FP32 è $B \cdot k/2 = 224k$ \si {\giga \flop \per \second } e cresce con $k$.}}{64}{table.caption.40}\protected@file@percent }
+\newlabel{tab:ris-fase3-tetto}{{7.12}{64}{Fase 3: percentuale del tetto pertinente. In FP64 il tetto è \SI {350}{\giga \flop \per \second } e non dipende da $k$, in FP32 è $B \cdot k/2 = 224k$ \si {\giga \flop \per \second } e cresce con $k$}{table.caption.40}{}}
+\newlabel{tab:ris-fase3-tetto@cref}{{[table][12][7]7.12}{[1][64][]64}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7.9}{\ignorespaces Fase 3: guadagno della singola precisione al variare di $k$. La crescita con $k$ dei kernel custom è la previsione del roofline, la piattezza di \texttt  {cublas} intorno a 28 misura invece la lentezza del suo percorso FP64.}}{64}{figure.caption.41}\protected@file@percent }
+\newlabel{fig:ris-fase3}{{7.9}{64}{Fase 3: guadagno della singola precisione al variare di $k$. La crescita con $k$ dei kernel custom è la previsione del roofline, la piattezza di \kernelname {cublas} intorno a 28 misura invece la lentezza del suo percorso FP64}{figure.caption.41}{}}
+\newlabel{fig:ris-fase3@cref}{{[figure][9][7]7.9}{[1][64][]64}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.13}{\ignorespaces Fase 3: piano di tiling scelto a runtime da \texttt  {cuda\_warp\_smem} nelle due precisioni.}}{65}{table.caption.42}\protected@file@percent }
+\newlabel{tab:ris-fase3-piano}{{7.13}{65}{Fase 3: piano di tiling scelto a runtime da \kernelname {cuda\_warp\_smem} nelle due precisioni}{table.caption.42}{}}
+\newlabel{tab:ris-fase3-piano@cref}{{[table][13][7]7.13}{[1][64][]65}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7.4}Fase 4 - Esecuzione distribuita MPI + CUDA}{66}{section.7.4}\protected@file@percent }
+\newlabel{sec:ris-fase4}{{7.4}{66}{Fase 4 - Esecuzione distribuita MPI + CUDA}{section.7.4}{}}
+\newlabel{sec:ris-fase4@cref}{{[section][4][7]7.4}{[1][66][]66}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.4.1}Metrica rank-local e tempo collettivo}{66}{subsection.7.4.1}\protected@file@percent }
+\newlabel{sec:ris-fase4-metrica}{{7.4.1}{66}{Metrica rank-local e tempo collettivo}{subsection.7.4.1}{}}
+\newlabel{sec:ris-fase4-metrica@cref}{{[subsection][1][7,4]7.4.1}{[1][66][]66}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.14}{\ignorespaces Fase 4: confronto fra throughput derivato dai tempi rank-local e throughput della fase locale collettiva per casi rappresentativi di \texttt  {cuda\_warp}.}}{66}{table.caption.44}\protected@file@percent }
+\newlabel{tab:ris-fase4-metrica}{{7.14}{66}{Fase 4: confronto fra throughput derivato dai tempi rank-local e throughput della fase locale collettiva per casi rappresentativi di \kernelname {cuda\_warp}}{table.caption.44}{}}
+\newlabel{tab:ris-fase4-metrica@cref}{{[table][14][7]7.14}{[1][66][]66}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.4.2}Effetto del numero di rank}{67}{subsection.7.4.2}\protected@file@percent }
+\newlabel{sec:ris-fase4-rank}{{7.4.2}{67}{Effetto del numero di rank}{subsection.7.4.2}{}}
+\newlabel{sec:ris-fase4-rank@cref}{{[subsection][2][7,4]7.4.2}{[1][66][]67}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.15}{\ignorespaces Fase 4: throughput collettivo di \texttt  {cuda\_warp}, in GFLOPS, al variare della scala e del numero di rank.}}{67}{table.caption.46}\protected@file@percent }
+\newlabel{tab:ris-fase4-rank}{{7.15}{67}{Fase 4: throughput collettivo di \kernelname {cuda\_warp}, in GFLOPS, al variare della scala e del numero di rank}{table.caption.46}{}}
+\newlabel{tab:ris-fase4-rank@cref}{{[table][15][7]7.15}{[1][66][]67}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7.10}{\ignorespaces Fase 4: throughput collettivo di \texttt  {cuda\_warp} a $S=16384$ per la famiglia di griglie della \cref  {tab:ris-fase4-rank}.}}{67}{figure.caption.47}\protected@file@percent }
+\newlabel{fig:ris-fase4-rank}{{7.10}{67}{Fase 4: throughput collettivo di \kernelname {cuda\_warp} a $S=16384$ per la famiglia di griglie della \cref {tab:ris-fase4-rank}}{figure.caption.47}{}}
+\newlabel{fig:ris-fase4-rank@cref}{{[figure][10][7]7.10}{[1][67][]67}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.4.3}Effetto della griglia MPI}{68}{subsection.7.4.3}\protected@file@percent }
+\newlabel{sec:ris-fase4-griglia}{{7.4.3}{68}{Effetto della griglia MPI}{subsection.7.4.3}{}}
+\newlabel{sec:ris-fase4-griglia@cref}{{[subsection][3][7,4]7.4.3}{[1][67][]68}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.16}{\ignorespaces Fase 4: scomposizione temporale di \texttt  {cuda\_warp} per le quattro griglie a $S=16384$, $P=8$, $k=32$. Tempi in millisecondi.}}{68}{table.caption.49}\protected@file@percent }
+\newlabel{tab:ris-fase4-griglia}{{7.16}{68}{Fase 4: scomposizione temporale di \kernelname {cuda\_warp} per le quattro griglie a $S=16384$, $P=8$, $k=32$. Tempi in millisecondi}{table.caption.49}{}}
+\newlabel{tab:ris-fase4-griglia@cref}{{[table][16][7]7.16}{[1][67][]68}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.4.4}Confronto fra backend nella composizione MPI + CUDA}{68}{subsection.7.4.4}\protected@file@percent }
+\newlabel{sec:ris-fase4-backend}{{7.4.4}{68}{Confronto fra backend nella composizione MPI + CUDA}{subsection.7.4.4}{}}
+\newlabel{sec:ris-fase4-backend@cref}{{[subsection][4][7,4]7.4.4}{[1][68][]68}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.17}{\ignorespaces Fase 4: \texttt  {gflops\_local\_group} a $S=16384$, con uno e otto rank. Per $P=8$ si usa la griglia $4\times 2$.}}{68}{table.caption.51}\protected@file@percent }
+\newlabel{tab:ris-fase4-backend}{{7.17}{68}{Fase 4: \code {gflops\_local\_group} a $S=16384$, con uno e otto rank. Per $P=8$ si usa la griglia $4\times 2$}{table.caption.51}{}}
+\newlabel{tab:ris-fase4-backend@cref}{{[table][17][7]7.17}{[1][68][]68}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7.5}Risultati complementari sul backend CPU}{69}{section.7.5}\protected@file@percent }
+\newlabel{sec:c3}{{7.5}{69}{Risultati complementari sul backend CPU}{section.7.5}{}}
+\newlabel{sec:c3@cref}{{[section][5][7]7.5}{[1][69][]69}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.5.1}Il nucleo di CPU a rank singolo}{69}{subsection.7.5.1}\protected@file@percent }
+\newlabel{sec:ris-cpu-baseline}{{7.5.1}{69}{Il nucleo di CPU a rank singolo}{subsection.7.5.1}{}}
+\newlabel{sec:ris-cpu-baseline@cref}{{[subsection][1][7,5]7.5.1}{[1][69][]69}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.18}{\ignorespaces Analisi CPU, $P=1$ e $S=16384$: tempo ufficiale, throughput e le due bande effettive derivate. $\tau = T/(MN)$ è il costo per elemento di $A$, $B_A = MNs/T$ e $B_X = MNks/T$ sono grandezze \emph  {derivate}, non misurate, definite come in \cref  {sec:rilettura-x}.}}{69}{table.caption.53}\protected@file@percent }
+\newlabel{tab:ris-cpu-baseline}{{7.18}{69}{Analisi CPU, $P=1$ e $S=16384$: tempo ufficiale, throughput e le due bande effettive derivate. $\tau = T/(MN)$ è il costo per elemento di $A$, $B_A = MNs/T$ e $B_X = MNks/T$ sono grandezze \emph {derivate}, non misurate, definite come in \cref {sec:rilettura-x}}{table.caption.53}{}}
+\newlabel{tab:ris-cpu-baseline@cref}{{[table][18][7]7.18}{[1][69][]69}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.5.2}Effetto del numero di rank e della scala}{70}{subsection.7.5.2}\protected@file@percent }
+\newlabel{sec:ris-scaling}{{7.5.2}{70}{Effetto del numero di rank e della scala}{subsection.7.5.2}{}}
+\newlabel{sec:ris-scaling@cref}{{[subsection][2][7,5]7.5.2}{[1][70][]70}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.19}{\ignorespaces Analisi CPU a $k=32$: migliore griglia a $P=8$ per ogni scala e backend. Speedup ed efficienza usano come baseline il corrispondente punto a $P=1$.}}{70}{table.caption.55}\protected@file@percent }
+\newlabel{tab:ris-fase4-gflops}{{7.19}{70}{Analisi CPU a $k=32$: migliore griglia a $P=8$ per ogni scala e backend. Speedup ed efficienza usano come baseline il corrispondente punto a $P=1$}{table.caption.55}{}}
+\newlabel{tab:ris-fase4-gflops@cref}{{[table][19][7]7.19}{[1][70][]70}{}{}{}}
+\newlabel{tab:ris-cpu-scaling}{{7.19}{70}{Analisi CPU a $k=32$: migliore griglia a $P=8$ per ogni scala e backend. Speedup ed efficienza usano come baseline il corrispondente punto a $P=1$}{table.caption.55}{}}
+\newlabel{tab:ris-cpu-scaling@cref}{{[table][19][7]7.19}{[1][70][]70}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.20}{\ignorespaces Analisi CPU a $S=16384$, $P=8$ e $k=32$: throughput ufficiale in GFLOPS per tutte le griglie.}}{70}{table.caption.56}\protected@file@percent }
+\newlabel{tab:ris-fase4-efficienza}{{7.20}{70}{Analisi CPU a $S=16384$, $P=8$ e $k=32$: throughput ufficiale in GFLOPS per tutte le griglie}{table.caption.56}{}}
+\newlabel{tab:ris-fase4-efficienza@cref}{{[table][20][7]7.20}{[1][70][]70}{}{}{}}
+\newlabel{tab:ris-cpu-griglia}{{7.20}{70}{Analisi CPU a $S=16384$, $P=8$ e $k=32$: throughput ufficiale in GFLOPS per tutte le griglie}{table.caption.56}{}}
+\newlabel{tab:ris-cpu-griglia@cref}{{[table][20][7]7.20}{[1][70][]70}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.21}{\ignorespaces Affidabilità e peso delle comunicazioni nella campagna CPU. Il novantesimo percentile evita che pochi casi piccoli e instabili dominino la lettura dell'intero insieme.}}{70}{table.caption.57}\protected@file@percent }
+\newlabel{tab:ris-fase4-composizione}{{7.21}{70}{Affidabilità e peso delle comunicazioni nella campagna CPU. Il novantesimo percentile evita che pochi casi piccoli e instabili dominino la lettura dell'intero insieme}{table.caption.57}{}}
+\newlabel{tab:ris-fase4-composizione@cref}{{[table][21][7]7.21}{[1][70][]70}{}{}{}}
+\newlabel{tab:ris-cpu-affidabilita}{{7.21}{70}{Affidabilità e peso delle comunicazioni nella campagna CPU. Il novantesimo percentile evita che pochi casi piccoli e instabili dominino la lettura dell'intero insieme}{table.caption.57}{}}
+\newlabel{tab:ris-cpu-affidabilita@cref}{{[table][21][7]7.21}{[1][70][]70}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7.11}{\ignorespaces Analisi CPU a $S=16384$ e $k=32$: speedup sulla migliore griglia per ogni $P$. La crescita superlineare di \texttt  {scheme\_a} misura un cambio di regime della cache, non un aumento sovralineare delle risorse.}}{71}{figure.caption.58}\protected@file@percent }
+\newlabel{fig:ris-fase4-speedup}{{7.11}{71}{Analisi CPU a $S=16384$ e $k=32$: speedup sulla migliore griglia per ogni $P$. La crescita superlineare di \kernelname {scheme\_a} misura un cambio di regime della cache, non un aumento sovralineare delle risorse}{figure.caption.58}{}}
+\newlabel{fig:ris-fase4-speedup@cref}{{[figure][11][7]7.11}{[1][70][]71}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7.6}Il costo dei dati: trasferimenti e preprocessing}{72}{section.7.6}\protected@file@percent }
+\newlabel{sec:ris-trasferimenti}{{7.6}{72}{Il costo dei dati: trasferimenti e preprocessing}{section.7.6}{}}
+\newlabel{sec:ris-trasferimenti@cref}{{[section][6][7]7.6}{[1][71][]72}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.22}{\ignorespaces Scomposizione della fase locale su GPU secondo la \cref  {eq:scomposizione-locale}, in percentuale di $t_{\text  {local}}$.}}{72}{table.caption.60}\protected@file@percent }
+\newlabel{tab:ris-scomposizione}{{7.22}{72}{Scomposizione della fase locale su GPU secondo la \cref {eq:scomposizione-locale}, in percentuale di $t_{\text {local}}$}{table.caption.60}{}}
+\newlabel{tab:ris-scomposizione@cref}{{[table][22][7]7.22}{[1][72][]72}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.23}{\ignorespaces Preprocessing e banda dei trasferimenti, \texttt  {cuda\_warp}, $M = N = \num {16384}$, FP64. Le voci di setup sono pagate una volta sola.}}{72}{table.caption.61}\protected@file@percent }
+\newlabel{tab:ris-prep}{{7.23}{72}{Preprocessing e banda dei trasferimenti, \kernelname {cuda\_warp}, $M = N = \num {16384}$, FP64. Le voci di setup sono pagate una volta sola}{table.caption.61}{}}
+\newlabel{tab:ris-prep@cref}{{[table][23][7]7.23}{[1][72][]72}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7.7}Sintesi}{73}{section.7.7}\protected@file@percent }
+\newlabel{sec:ris-sintesi}{{7.7}{73}{Sintesi}{section.7.7}{}}
+\newlabel{sec:ris-sintesi@cref}{{[section][7][7]7.7}{[1][73][]73}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.24}{\ignorespaces Punti rappresentativi a $M=N=\num {16384}$ e $k=32$. Per MPI + CUDA si usa il throughput della fase locale collettiva.}}{73}{table.caption.63}\protected@file@percent }
+\newlabel{tab:ris-sintesi}{{7.24}{73}{Punti rappresentativi a $M=N=\num {16384}$ e $k=32$. Per MPI + CUDA si usa il throughput della fase locale collettiva}{table.caption.63}{}}
+\newlabel{tab:ris-sintesi@cref}{{[table][24][7]7.24}{[1][73][]73}{}{}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {8}Conclusioni}{74}{chapter.8}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{cap:conclusioni}{{8}{72}{Conclusioni}{chapter.8}{}}
-\newlabel{cap:conclusioni@cref}{{[chapter][8][]8}{[1][72][]72}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {8.1}Che cosa \`e stato realizzato}{72}{section.8.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {8.2}Che cosa dicono i dati finora}{72}{section.8.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {8.3}Lavori futuri}{73}{section.8.3}\protected@file@percent }
-\newlabel{sec:lavori-futuri}{{8.3}{73}{Lavori futuri}{section.8.3}{}}
-\newlabel{sec:lavori-futuri@cref}{{[section][3][8]8.3}{[1][73][]73}{}{}{}}
-\@writefile{toc}{\contentsline {paragraph}{Blocking del ciclo su $j$ sul nucleo di CPU.}{73}{section*.55}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Parallelizzazione OpenMP interna al processo.}{73}{section*.56}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{MPI CUDA-aware.}{73}{section*.57}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{MPS per la condivisione della GPU.}{73}{section*.58}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Profilazione con \texttt  {ncu}.}{73}{section*.59}\protected@file@percent }
-\gdef \@abspage@last{77}
+\newlabel{cap:conclusioni}{{8}{74}{Conclusioni}{chapter.8}{}}
+\newlabel{cap:conclusioni@cref}{{[chapter][8][]8}{[1][74][]74}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {8.1}Che cosa \`e stato realizzato}{74}{section.8.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8.2}Che cosa dicono i dati finora}{74}{section.8.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8.3}Lavori futuri}{75}{section.8.3}\protected@file@percent }
+\newlabel{sec:lavori-futuri}{{8.3}{75}{Lavori futuri}{section.8.3}{}}
+\newlabel{sec:lavori-futuri@cref}{{[section][3][8]8.3}{[1][75][]75}{}{}{}}
+\@writefile{toc}{\contentsline {paragraph}{Blocking del ciclo su $j$ sul nucleo di CPU.}{75}{section*.64}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Parallelizzazione OpenMP interna al processo.}{75}{section*.65}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{MPI CUDA-aware.}{75}{section*.66}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{MPS per la condivisione della GPU.}{75}{section*.67}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Profilazione con \texttt  {ncu}.}{75}{section*.68}\protected@file@percent }
+\gdef \@abspage@last{79}
