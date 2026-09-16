@@ -44,98 +44,106 @@
 \contentsline {paragraph}{\texttt {--x-mode global}}{16}{section*.8}%
 \contentsline {paragraph}{\texttt {--x-mode local}}{16}{section*.9}%
 \contentsline {section}{\numberline {3.7}L'algoritmo distribuito}{17}{section.3.7}%
-\contentsline {section}{\numberline {3.8}Modello di costo della comunicazione}{17}{section.3.8}%
-\contentsline {chapter}{\numberline {4}Il nucleo di CPU}{20}{chapter.4}%
-\contentsline {section}{\numberline {4.1}Tre backend, una sola idea}{20}{section.4.1}%
-\contentsline {section}{\numberline {4.2}Il backend di riferimento}{20}{section.4.2}%
-\contentsline {subsection}{\numberline {4.2.1}Perché specializzare $k$ a compile-time}{20}{subsection.4.2.1}%
-\contentsline {subsection}{\numberline {4.2.2}Il fallback generico, e perché la traccia lo richiede}{21}{subsection.4.2.2}%
-\contentsline {section}{\numberline {4.3}Perché $\texttt {KB} = 32$}{22}{section.4.3}%
-\contentsline {section}{\numberline {4.4}Ciò che il compilatore vede}{22}{section.4.4}%
-\contentsline {section}{\numberline {4.5}Il primo limite: la rilettura di $X$}{22}{section.4.5}%
-\contentsline {section}{\numberline {4.6}Secondo backend: $X$ mattonellata in cache}{23}{section.4.6}%
-\contentsline {paragraph}{Il prezzo.}{23}{section*.11}%
-\contentsline {paragraph}{Un principio già visto.}{23}{section*.12}%
-\contentsline {section}{\numberline {4.7}Terzo backend: register blocking sulle righe}{23}{section.4.7}%
-\contentsline {paragraph}{Chi sceglie RB.}{24}{section*.13}%
-\contentsline {chapter}{\numberline {5}I backend CUDA}{25}{chapter.5}%
-\contentsline {section}{\numberline {5.1}Struttura comune}{26}{section.5.1}%
-\contentsline {section}{\numberline {5.2}Misurazione del backend CUDA}{27}{section.5.2}%
-\contentsline {section}{\numberline {5.3}Preprocessing e occupazione della GPU}{28}{section.5.3}%
-\contentsline {subsection}{\numberline {5.3.1}Gestione della memoria disponibile}{28}{subsection.5.3.1}%
-\contentsline {section}{\numberline {5.4}\texttt {cuda\_naive}}{28}{section.5.4}%
-\contentsline {section}{\numberline {5.5}\texttt {cuda\_warp}: un warp per riga}{30}{section.5.5}%
-\contentsline {subsection}{\numberline {5.5.1}Gestione di $k$}{31}{subsection.5.5.1}%
-\contentsline {subsection}{\numberline {5.5.2}La maschera dello shuffle}{31}{subsection.5.5.2}%
-\contentsline {subsection}{\numberline {5.5.3}Il problema residuo: gli accessi a $X$}{31}{subsection.5.5.3}%
-\contentsline {section}{\numberline {5.6}Primo rimedio: cambio di layout di $X$}{32}{section.5.6}%
-\contentsline {section}{\numberline {5.7}\texttt {cuda\_warp\_smem}: staging di $X$ in shared memory}{32}{section.5.7}%
-\contentsline {subsection}{\numberline {5.7.1}Caricamento cooperativo di $X$}{33}{subsection.5.7.1}%
-\contentsline {subsection}{\numberline {5.7.2}Riuso del tile fra i warp del blocco}{33}{subsection.5.7.2}%
-\contentsline {subsection}{\numberline {5.7.3}Bank conflict e padding della shared memory}{34}{subsection.5.7.3}%
-\contentsline {subsection}{\numberline {5.7.4}Scelta della dimensione del tile}{35}{subsection.5.7.4}%
-\contentsline {subsection}{\numberline {5.7.5}Sincronizzazione e warp inattivi}{36}{subsection.5.7.5}%
-\contentsline {section}{\numberline {5.8}Due rimedi allo stesso problema}{36}{section.5.8}%
-\contentsline {section}{\numberline {5.9}\texttt {cublas}: il riferimento esterno}{37}{section.5.9}%
-\contentsline {subsection}{\numberline {5.9.1}Adattamento fra row-major e column-major}{37}{subsection.5.9.1}%
-\contentsline {subsection}{\numberline {5.9.2}Significato del confronto}{38}{subsection.5.9.2}%
-\contentsline {section}{\numberline {5.10}Più rank MPI sulla stessa GPU}{38}{section.5.10}%
-\contentsline {chapter}{\numberline {6}Metodologia sperimentale}{40}{chapter.6}%
-\contentsline {section}{\numberline {6.1}Ambiente sperimentale}{40}{section.6.1}%
-\contentsline {section}{\numberline {6.2}Protocollo di misura}{41}{section.6.2}%
-\contentsline {subsection}{\numberline {6.2.1}Temporizzazione della fase locale su GPU}{42}{subsection.6.2.1}%
-\contentsline {section}{\numberline {6.3}Metriche di prestazione}{42}{section.6.3}%
-\contentsline {subsection}{\numberline {6.3.1}Prestazione della sola fase computazionale}{43}{subsection.6.3.1}%
-\contentsline {section}{\numberline {6.4}Ripetizioni e raccolta dei campioni}{44}{section.6.4}%
-\contentsline {section}{\numberline {6.5}Disegno sperimentale}{44}{section.6.5}%
-\contentsline {subsection}{\numberline {6.5.1}Criterio di selezione dei parametri}{45}{subsection.6.5.1}%
-\contentsline {section}{\numberline {6.6}Fase 1 - Configurazione dei backend CUDA}{46}{section.6.6}%
-\contentsline {subsection}{\numberline {6.6.1}Campagna 1.1 - Dimensione del blocco e confronto dei backend}{46}{subsection.6.6.1}%
-\contentsline {subsection}{\numberline {6.6.2}Campagna 1.2 - Layout in memoria di $X$}{47}{subsection.6.6.2}%
-\contentsline {subsection}{\numberline {6.6.3}Campagna 1.3 - Granularità del tile}{48}{subsection.6.6.3}%
-\contentsline {subsection}{\numberline {6.6.4}Campagna 1.4 - Padding del tile in shared memory}{49}{subsection.6.6.4}%
-\contentsline {section}{\numberline {6.7}Fase 2 - Caratterizzazione dimensionale}{49}{section.6.7}%
-\contentsline {section}{\numberline {6.8}Fase 3 - Effetto della precisione numerica}{51}{section.6.8}%
-\contentsline {section}{\numberline {6.9}Fase 4 - Esecuzione distribuita MPI + CUDA}{52}{section.6.9}%
-\contentsline {chapter}{\numberline {7}Risultati}{54}{chapter.7}%
-\contentsline {section}{\numberline {7.1}Fase 1 - Configurazione dei backend CUDA}{54}{section.7.1}%
-\contentsline {subsection}{\numberline {7.1.1}Campagna 1.1 - Dimensione del blocco}{54}{subsection.7.1.1}%
-\contentsline {subsection}{\numberline {7.1.2}Campagna 1.2 - Layout in memoria di $X$}{56}{subsection.7.1.2}%
-\contentsline {subsection}{\numberline {7.1.3}Campagna 1.3 - Granularità del tile}{58}{subsection.7.1.3}%
-\contentsline {subsection}{\numberline {7.1.4}Campagna 1.4 - Padding del tile in shared memory}{60}{subsection.7.1.4}%
-\contentsline {subsection}{\numberline {7.1.5}Esito della Fase 1 - Configurazioni consolidate}{61}{subsection.7.1.5}%
-\contentsline {section}{\numberline {7.2}Fase 2 - Caratterizzazione dimensionale}{62}{section.7.2}%
-\contentsline {subsection}{\numberline {7.2.1}Disegno della campagna}{62}{subsection.7.2.1}%
-\contentsline {subsection}{\numberline {7.2.2}Effetto della scala}{63}{subsection.7.2.2}%
-\contentsline {subsubsection}{\texttt {cuda\_warp}}{63}{section*.32}%
-\contentsline {subsubsection}{\texttt {cuda\_warp\_smem}}{64}{section*.34}%
-\contentsline {subsubsection}{\texttt {cuda\_naive}}{64}{section*.35}%
-\contentsline {subsubsection}{\texttt {cublas}}{65}{section*.36}%
-\contentsline {subsection}{\numberline {7.2.3}Effetto della forma}{65}{subsection.7.2.3}%
-\contentsline {subsubsection}{\texttt {cuda\_warp}}{66}{section*.37}%
-\contentsline {subsubsection}{\texttt {cuda\_naive}}{66}{section*.39}%
-\contentsline {subsubsection}{\texttt {cuda\_warp\_smem}}{67}{section*.41}%
-\contentsline {subsubsection}{\texttt {cublas}}{68}{section*.43}%
-\contentsline {subsubsection}{Confronto fra i backend}{68}{section*.45}%
-\contentsline {subsection}{\numberline {7.2.4}Sintesi della Fase 2}{69}{subsection.7.2.4}%
-\contentsline {paragraph}{La scala conta, e conta una volta sola.}{69}{section*.46}%
-\contentsline {paragraph}{La forma conta soprattutto quando la scala è insufficiente.}{69}{section*.47}%
-\contentsline {paragraph}{Il comportamento di cuBLAS è strutturalmente diverso.}{69}{section*.48}%
-\contentsline {section}{\numberline {7.3}Fase 3 - Effetto della precisione numerica}{69}{section.7.3}%
-\contentsline {subsection}{\numberline {7.3.1}Confronto tra FP64 e FP32}{70}{subsection.7.3.1}%
-\contentsline {subsection}{\numberline {7.3.2}Comportamento dei kernel custom}{70}{subsection.7.3.2}%
-\contentsline {subsection}{\numberline {7.3.3}Piano di esecuzione di \texttt {cuda\_warp\_smem}}{71}{subsection.7.3.3}%
-\contentsline {subsection}{\numberline {7.3.4}Comportamento di cuBLAS}{72}{subsection.7.3.4}%
-\contentsline {subsection}{\numberline {7.3.5}Sintesi}{73}{subsection.7.3.5}%
-\contentsline {section}{\numberline {7.4}Fase 4 - Esecuzione distribuita MPI + CUDA}{73}{section.7.4}%
-\contentsline {subsection}{\numberline {7.4.1}Il tempo collettivo come metrica}{73}{subsection.7.4.1}%
-\contentsline {subsection}{\numberline {7.4.2}Effetto del numero di rank $P$}{74}{subsection.7.4.2}%
-\contentsline {subsection}{\numberline {7.4.3}Effetto della griglia MPI}{76}{subsection.7.4.3}%
-\contentsline {subsection}{\numberline {7.4.4}Confronto fra backend nella composizione MPI + CUDA}{78}{subsection.7.4.4}%
-\contentsline {subsection}{\numberline {7.4.5}Sintesi della Fase 4}{79}{subsection.7.4.5}%
-\contentsline {paragraph}{La metrica va scelta prima dei numeri.}{79}{section*.63}%
-\contentsline {paragraph}{Più rank non significano più prestazioni, ma nemmeno sempre meno.}{80}{section*.64}%
-\contentsline {paragraph}{La griglia è una scelta di comunicazione, tranne per cuBLAS.}{80}{section*.65}%
-\contentsline {paragraph}{Il quadro dei backend regge.}{80}{section*.66}%
-\contentsline {section}{\numberline {7.5}Il costo dei dati: trasferimenti e preprocessing}{80}{section.7.5}%
-\contentsline {section}{\numberline {7.6}Sintesi}{81}{section.7.6}%
+\contentsline {chapter}{\numberline {4}Il nucleo di CPU}{18}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Tre backend, una sola idea}{18}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Il backend di riferimento}{18}{section.4.2}%
+\contentsline {subsection}{\numberline {4.2.1}Perché specializzare $k$ a compile-time}{18}{subsection.4.2.1}%
+\contentsline {subsection}{\numberline {4.2.2}Il fallback generico, e perché la traccia lo richiede}{19}{subsection.4.2.2}%
+\contentsline {section}{\numberline {4.3}Perché $\texttt {KB} = 32$}{20}{section.4.3}%
+\contentsline {section}{\numberline {4.4}Ciò che il compilatore vede}{20}{section.4.4}%
+\contentsline {section}{\numberline {4.5}Il primo limite: la rilettura di $X$}{20}{section.4.5}%
+\contentsline {section}{\numberline {4.6}Secondo backend: $X$ mattonellata in cache}{21}{section.4.6}%
+\contentsline {paragraph}{Il prezzo.}{21}{section*.11}%
+\contentsline {paragraph}{Un principio già visto.}{21}{section*.12}%
+\contentsline {section}{\numberline {4.7}Terzo backend: register blocking sulle righe}{21}{section.4.7}%
+\contentsline {paragraph}{Chi sceglie RB.}{22}{section*.13}%
+\contentsline {chapter}{\numberline {5}I backend CUDA}{23}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Struttura comune}{24}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Misurazione del backend CUDA}{25}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Preprocessing e occupazione della GPU}{26}{section.5.3}%
+\contentsline {subsection}{\numberline {5.3.1}Gestione della memoria disponibile}{26}{subsection.5.3.1}%
+\contentsline {section}{\numberline {5.4}\texttt {cuda\_naive}}{26}{section.5.4}%
+\contentsline {section}{\numberline {5.5}\texttt {cuda\_warp}: un warp per riga}{28}{section.5.5}%
+\contentsline {subsection}{\numberline {5.5.1}Gestione di $k$}{29}{subsection.5.5.1}%
+\contentsline {subsection}{\numberline {5.5.2}La maschera dello shuffle}{29}{subsection.5.5.2}%
+\contentsline {subsection}{\numberline {5.5.3}Il problema residuo: gli accessi a $X$}{29}{subsection.5.5.3}%
+\contentsline {section}{\numberline {5.6}Primo rimedio: cambio di layout di $X$}{30}{section.5.6}%
+\contentsline {section}{\numberline {5.7}\texttt {cuda\_warp\_smem}: staging di $X$ in shared memory}{30}{section.5.7}%
+\contentsline {subsection}{\numberline {5.7.1}Caricamento cooperativo di $X$}{31}{subsection.5.7.1}%
+\contentsline {subsection}{\numberline {5.7.2}Riuso del tile fra i warp del blocco}{31}{subsection.5.7.2}%
+\contentsline {subsection}{\numberline {5.7.3}Bank conflict e padding della shared memory}{32}{subsection.5.7.3}%
+\contentsline {subsection}{\numberline {5.7.4}Scelta della dimensione del tile}{33}{subsection.5.7.4}%
+\contentsline {subsection}{\numberline {5.7.5}Sincronizzazione e warp inattivi}{34}{subsection.5.7.5}%
+\contentsline {section}{\numberline {5.8}Due rimedi allo stesso problema}{34}{section.5.8}%
+\contentsline {section}{\numberline {5.9}\texttt {cublas}: il riferimento esterno}{35}{section.5.9}%
+\contentsline {subsection}{\numberline {5.9.1}Adattamento fra row-major e column-major}{35}{subsection.5.9.1}%
+\contentsline {subsection}{\numberline {5.9.2}Significato del confronto}{36}{subsection.5.9.2}%
+\contentsline {section}{\numberline {5.10}Più rank MPI sulla stessa GPU}{36}{section.5.10}%
+\contentsline {chapter}{\numberline {6}Metodologia sperimentale}{38}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Ambiente sperimentale}{38}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Protocollo di misura}{39}{section.6.2}%
+\contentsline {subsection}{\numberline {6.2.1}Temporizzazione della fase locale su GPU}{40}{subsection.6.2.1}%
+\contentsline {section}{\numberline {6.3}Metriche di prestazione}{40}{section.6.3}%
+\contentsline {subsection}{\numberline {6.3.1}Prestazione della sola fase computazionale}{41}{subsection.6.3.1}%
+\contentsline {section}{\numberline {6.4}Ripetizioni e raccolta dei campioni}{42}{section.6.4}%
+\contentsline {section}{\numberline {6.5}Disegno sperimentale}{42}{section.6.5}%
+\contentsline {subsection}{\numberline {6.5.1}Criterio di selezione dei parametri}{43}{subsection.6.5.1}%
+\contentsline {section}{\numberline {6.6}Fase 1 - Configurazione dei backend CUDA}{44}{section.6.6}%
+\contentsline {subsection}{\numberline {6.6.1}Campagna 1.1 - Dimensione del blocco e confronto dei backend}{44}{subsection.6.6.1}%
+\contentsline {subsection}{\numberline {6.6.2}Campagna 1.2 - Layout in memoria di $X$}{45}{subsection.6.6.2}%
+\contentsline {subsection}{\numberline {6.6.3}Campagna 1.3 - Granularità del tile}{46}{subsection.6.6.3}%
+\contentsline {subsection}{\numberline {6.6.4}Campagna 1.4 - Padding del tile in shared memory}{47}{subsection.6.6.4}%
+\contentsline {section}{\numberline {6.7}Fase 2 - Caratterizzazione dimensionale}{47}{section.6.7}%
+\contentsline {section}{\numberline {6.8}Fase 3 - Effetto della precisione numerica}{49}{section.6.8}%
+\contentsline {section}{\numberline {6.9}Fase 4 - Esecuzione distribuita MPI + CUDA}{50}{section.6.9}%
+\contentsline {chapter}{\numberline {7}Risultati}{52}{chapter.7}%
+\contentsline {section}{\numberline {7.1}Fase 1 - Configurazione dei backend CUDA}{52}{section.7.1}%
+\contentsline {subsection}{\numberline {7.1.1}Campagna 1.1 - Dimensione del blocco}{52}{subsection.7.1.1}%
+\contentsline {subsection}{\numberline {7.1.2}Campagna 1.2 - Layout in memoria di $X$}{54}{subsection.7.1.2}%
+\contentsline {subsection}{\numberline {7.1.3}Campagna 1.3 - Granularità del tile}{56}{subsection.7.1.3}%
+\contentsline {subsection}{\numberline {7.1.4}Campagna 1.4 - Padding del tile in shared memory}{58}{subsection.7.1.4}%
+\contentsline {subsection}{\numberline {7.1.5}Esito della Fase 1 - Configurazioni consolidate}{59}{subsection.7.1.5}%
+\contentsline {section}{\numberline {7.2}Fase 2 - Caratterizzazione dimensionale}{60}{section.7.2}%
+\contentsline {subsection}{\numberline {7.2.1}Disegno della campagna}{60}{subsection.7.2.1}%
+\contentsline {subsection}{\numberline {7.2.2}Effetto della scala}{61}{subsection.7.2.2}%
+\contentsline {subsubsection}{\texttt {cuda\_warp}}{61}{section*.32}%
+\contentsline {subsubsection}{\texttt {cuda\_warp\_smem}}{62}{section*.34}%
+\contentsline {subsubsection}{\texttt {cuda\_naive}}{62}{section*.35}%
+\contentsline {subsubsection}{\texttt {cublas}}{63}{section*.36}%
+\contentsline {subsection}{\numberline {7.2.3}Effetto della forma}{63}{subsection.7.2.3}%
+\contentsline {subsubsection}{\texttt {cuda\_warp}}{64}{section*.37}%
+\contentsline {subsubsection}{\texttt {cuda\_naive}}{64}{section*.39}%
+\contentsline {subsubsection}{\texttt {cuda\_warp\_smem}}{65}{section*.41}%
+\contentsline {subsubsection}{\texttt {cublas}}{66}{section*.43}%
+\contentsline {subsubsection}{Confronto fra i backend}{66}{section*.45}%
+\contentsline {subsection}{\numberline {7.2.4}Sintesi della Fase 2}{67}{subsection.7.2.4}%
+\contentsline {paragraph}{La scala conta, e conta una volta sola.}{67}{section*.46}%
+\contentsline {paragraph}{La forma conta soprattutto quando la scala è insufficiente.}{67}{section*.47}%
+\contentsline {paragraph}{Il comportamento di cuBLAS è strutturalmente diverso.}{67}{section*.48}%
+\contentsline {section}{\numberline {7.3}Fase 3 - Effetto della precisione numerica}{67}{section.7.3}%
+\contentsline {subsection}{\numberline {7.3.1}Confronto tra FP64 e FP32}{68}{subsection.7.3.1}%
+\contentsline {subsection}{\numberline {7.3.2}Comportamento dei kernel custom}{68}{subsection.7.3.2}%
+\contentsline {subsection}{\numberline {7.3.3}Piano di esecuzione di \texttt {cuda\_warp\_smem}}{69}{subsection.7.3.3}%
+\contentsline {subsection}{\numberline {7.3.4}Comportamento di cuBLAS}{70}{subsection.7.3.4}%
+\contentsline {subsection}{\numberline {7.3.5}Sintesi}{71}{subsection.7.3.5}%
+\contentsline {section}{\numberline {7.4}Fase 4 - Esecuzione distribuita MPI + CUDA}{71}{section.7.4}%
+\contentsline {subsection}{\numberline {7.4.1}Il tempo collettivo come metrica}{71}{subsection.7.4.1}%
+\contentsline {subsection}{\numberline {7.4.2}Effetto del numero di rank $P$}{72}{subsection.7.4.2}%
+\contentsline {subsection}{\numberline {7.4.3}Effetto della griglia MPI}{74}{subsection.7.4.3}%
+\contentsline {subsection}{\numberline {7.4.4}Confronto fra backend nella composizione MPI + CUDA}{76}{subsection.7.4.4}%
+\contentsline {subsection}{\numberline {7.4.5}Sintesi della Fase 4}{77}{subsection.7.4.5}%
+\contentsline {paragraph}{La metrica va scelta prima dei numeri.}{77}{section*.63}%
+\contentsline {paragraph}{Più rank non significano più prestazioni, ma nemmeno sempre meno.}{78}{section*.64}%
+\contentsline {paragraph}{La griglia è una scelta di comunicazione, tranne per cuBLAS.}{78}{section*.65}%
+\contentsline {paragraph}{Il quadro dei backend regge.}{78}{section*.66}%
+\contentsline {section}{\numberline {7.5}Il costo dei dati: trasferimenti e preprocessing}{78}{section.7.5}%
+\contentsline {section}{\numberline {7.6}Sintesi}{79}{section.7.6}%
+\contentsline {chapter}{\numberline {A}Interfaccia a riga di comando e formato dei dati}{81}{appendix.Alph1}%
+\contentsline {section}{\numberline {A.1}Opzioni del driver}{81}{section.Alph1.1}%
+\contentsline {section}{\numberline {A.2}Colonne del CSV}{81}{section.Alph1.2}%
+\contentsline {section}{\numberline {A.3}Opzioni di build}{82}{section.Alph1.3}%
+\contentsline {chapter}{\numberline {B}L'oracolo seriale}{84}{appendix.Alph2}%
+\contentsline {section}{\numberline {B.1}L'implementazione}{84}{section.Alph2.1}%
+\contentsline {section}{\numberline {B.2}Il confronto}{84}{section.Alph2.2}%
+\contentsline {section}{\numberline {B.3}La tolleranza}{85}{section.Alph2.3}%
+\contentsline {section}{\numberline {B.4}Perché resta fuori dalle misure}{85}{section.Alph2.4}%

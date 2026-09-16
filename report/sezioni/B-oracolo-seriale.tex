@@ -1,0 +1,120 @@
+\chapter{L'oracolo seriale}
+\label{app:oracolo}
+
+La traccia richiede il collaudo funzionale del prodotto distribuito contro
+un'implementazione seriale minimale. Il progetto la realizza in
+\file{src/serial/serial.c} e la usa come \emph{oracolo}: non è un backend da
+misurare, è il termine di paragone rispetto al quale ogni altro percorso di
+calcolo viene dichiarato corretto.
+
+\section{L'implementazione}
+\label{sec:oracolo-implementazione}
+
+\code{serial\_gemm} è la trascrizione letterale della \cref{eq:definizione}:
+tre cicli annidati, nessuna ottimizzazione, nessuna dipendenza da MPI o da CUDA.
+
+\begin{lstlisting}[language=C,caption={Il nucleo di \file{src/serial/serial.c}.},label={lst:oracolo}]
+for (i = 0; i < m; i++) {
+    for (c = 0; c < k; c++) {
+        scalar_t s = (scalar_t)0;
+        for (j = 0; j < n; j++)
+            s += A[(size_t)i * lda + j] * X[(size_t)j * ldx + c];
+        Y[(size_t)i * ldy + c] = s;
+    }
+}
+\end{lstlisting}
+
+Due scelte meritano una nota.
+
+L'ordine dei cicli è $i \to c \to j$, cioè lo schema~B della
+\cref{sec:schemi}, mentre tutti i backend misurati adottano lo schema~A. La
+scelta è deliberata e non ha nulla a che vedere con le prestazioni: se il
+ragionamento sull'ordinamento dei cicli fosse sbagliato, un oracolo costruito
+con la stessa struttura dei backend replicherebbe l'errore invece di
+rivelarlo. L'oracolo deve essere \emph{ovviamente} corretto, non veloce.
+
+La firma accetta le tre leading dimension $\code{lda}$, $\code{ldx}$ e
+$\code{ldy}$ separatamente dalle dimensioni logiche: l'oracolo può quindi
+operare su buffer con padding esattamente come i backend, e la validazione
+resta valida anche nelle build che forzano $\code{lda} \neq \nloc$.
+Il tipo \code{scalar\_t} è lo stesso della build corrente
+(\cref{sec:precisione}): l'oracolo viene compilato nella precisione che si sta
+validando, non in doppia precisione per confronto.
+
+\section{Il confronto}
+\label{sec:oracolo-confronto}
+
+Con l'opzione \code{--check} (\cref{app:cli}) il driver esegue, dopo le
+ripetizioni cronometrate e fuori da qualunque cronometro, la procedura
+\code{check\_against\_serial}:
+
+\begin{enumerate}[nosep,left=0pt]
+  \item i processi della prima colonna della griglia - l'unica che al termine
+        della riduzione possiede $Y$ per intero - raccolgono i propri blocchi
+        di righe sul rank~0 con una \code{MPI\_Gatherv} sul comunicatore di
+        colonna;
+  \item il rank~0 \emph{ricostruisce da sé} $A$ e $X$ globali invocando il
+        generatore deterministico della \cref{eq:gen} con lo stesso seed, senza
+        riceverli da nessun processo;
+  \item calcola $Y_{\text{ref}}$ con \code{serial\_gemm} e confronta.
+\end{enumerate}
+
+Il passo~2 è ciò che rende il collaudo indipendente dal codice che deve
+collaudare: se l'oracolo ricevesse $A$ e $X$ dagli altri processi, un errore
+nella distribuzione dei dati si propagherebbe identico nei due termini del
+confronto e il test passerebbe. Ricostruendoli dal generatore, l'oracolo ha
+accesso al dato globale \emph{per definizione} e non al dato distribuito.
+
+La metrica del confronto è l'errore relativo in norma $L_2$ sull'intera $Y$,
+\begin{equation}
+  \mathrm{err}_{\text{rel}}
+  =
+  \frac{\lVert Y - Y_{\text{ref}} \rVert_2}{\lVert Y_{\text{ref}} \rVert_2},
+  \label{eq:err-rel-oracolo}
+\end{equation}
+riportata nella colonna \code{rel\_err} del CSV e posta a $-1$ quando
+\code{--check} non è attivo.
+
+\section{La tolleranza}
+\label{sec:oracolo-tolleranza}
+
+La soglia del confronto non può essere una costante. Ogni elemento di $Y$ è una
+riduzione su $N$ termini, quindi l'errore di arrotondamento accumulato dipende
+da $N$; e poiché il generatore produce valori a media nulla, gli arrotondamenti
+hanno segno indipendente e l'errore cresce come $\varepsilon\sqrt{N}$, non come
+il pessimistico $\varepsilon N$ del caso in cui tutti i termini abbiano lo
+stesso segno. La soglia adottata segue quindi la stessa legge, con un fattore
+di sicurezza:
+\begin{equation}
+  \mathrm{tol}(N) = S \cdot \varepsilon \cdot \sqrt{N},
+  \qquad S = 8,
+  \label{eq:tol-oracolo}
+\end{equation}
+dove $\varepsilon$ è l'epsilon di macchina del tipo scalare della build
+(\code{DBL\_EPSILON} oppure \code{FLT\_EPSILON}). La formula è implementata in
+\code{scalar\_check\_tol} in \file{src/common/scalar.h}, cioè accanto alla
+definizione di \code{scalar\_t}: precisione e tolleranza cambiano insieme e non
+possono divergere.
+
+Il valore di $N$ che entra nella \cref{eq:tol-oracolo} è il numero
+\emph{globale} di colonne di $A$, non $\nloc$: è su tutte e $N$ le colonne che
+l'oracolo somma, indipendentemente da come il lavoro sia stato distribuito.
+
+L'esito è binario. Il driver stampa \code{PASS} o \code{FAIL} e, soprattutto,
+termina con stato di uscita non nullo in caso di \code{FAIL}: un errore di
+correttezza interrompe lo script della campagna invece di finire silenziosamente
+in una riga di CSV.
+
+\section{Perché resta fuori dalle misure}
+\label{sec:oracolo-costo}
+
+L'oracolo costa $O(MNk)$ operazioni seriali su un solo processo e richiede al
+rank~0 la memorizzazione di $A$ e $X$ globali, cioè $O(MN)$ elementi: alle
+taglie delle campagne è più costoso, da solo, dell'intera sessione di misura.
+Per questo la validazione è un'esecuzione a sé, condotta su taglie ridotte
+\emph{prima} della campagna corrispondente, e \code{--check} non compare mai
+nei comandi che producono i tempi riportati nel \cref{cap:risultati}.
+
+La validazione va inoltre ripetuta per ogni combinazione di backend e
+precisione: l'ordine della riduzione cambia da un kernel all'altro, e un
+backend validato solo in doppia precisione non è validato.
