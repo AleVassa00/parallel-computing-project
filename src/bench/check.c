@@ -14,18 +14,10 @@ double check_against_serial(const grid_t *g, const layout_t *l,
     scalar_t *Y_all = NULL;
     int *counts = NULL, *displs = NULL;
 
-    /* Stesso invariante di mpi_matmul: la Gatherv qui sotto, e i counts di
-     * layout_y_counts, descrivono Y come m_loc*k elementi contigui. Con
-     * ldy > k il gather leggerebbe dentro il padding e l'oracolo direbbe
-     * "sbagliato" su un risultato corretto - o, peggio, il contrario. */
     if (l->ldy != l->k)
         die("check_against_serial: Y deve essere contigua (ldy=%d, k=%d)",
             l->ldy, l->k);
 
-    /* Y vive sulla colonna 0 della griglia: solo quei processi partecipano
-     * alla raccolta. Le collettive sui sotto-comunicatori vanno chiamate
-     * condizionatamente, gli altri processi hanno un col diverso e non devono
-     * entrarci. */
     if (g->my_col == 0) {
         if (g->my_row == 0) {
             Y_all = xmalloc((size_t)l->M * l->k * sizeof *Y_all);
@@ -33,9 +25,7 @@ double check_against_serial(const grid_t *g, const layout_t *l,
             displs = xmalloc((size_t)g->pr * sizeof *displs);
             layout_y_counts(l, g, counts, displs);
         }
-        /* le righe di Y sono contigue (row-major, k contiguo): il blocco di
-         * righe di ciascun processo e' gia' un tratto contiguo del globale,
-         * nessun buffer di packing */
+
         MPI_Gatherv(Y_loc, l->m_loc * l->k, SCALAR_MPI_TYPE,
                     Y_all, counts, displs, SCALAR_MPI_TYPE,
                     0, g->col_comm);
@@ -68,7 +58,6 @@ double check_against_serial(const grid_t *g, const layout_t *l,
     xfree(counts);
     xfree(displs);
 
-    /* tutti i processi devono poter decidere allo stesso modo l'esito */
     MPI_Bcast(&err, 1, MPI_DOUBLE, 0, g->grid_comm);
     return err;
 }

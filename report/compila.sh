@@ -1,12 +1,4 @@
 #!/bin/sh
-# Compilazione della relazione.
-#
-#   ./compila.sh          -> main.pdf
-#   ./compila.sh watch    -> ricompila a ogni salvataggio
-#   ./compila.sh clean    -> rimuove i file ausiliari
-#   ./compila.sh distclean-> rimuove anche il PDF
-#
-# Richiede latexmk (incluso in TeX Live e MacTeX).
 
 set -e
 cd "$(dirname "$0")"

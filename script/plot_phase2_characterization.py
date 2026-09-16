@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-
 ROOT = Path(__file__).resolve().parents[1]
 INPUT_DIR = (
     ROOT
@@ -72,12 +71,10 @@ plt.rcParams.update(
     }
 )
 
-
 def canonical_backend(name: str) -> str:
     if name == "cuda_warp_column_xcolumn":
         return "cuda_warp_column"
     return name
-
 
 def load_results() -> pd.DataFrame:
     if not INPUT_DIR.exists():
@@ -155,7 +152,6 @@ def load_results() -> pd.DataFrame:
                 "2*M*N*k/t_kernel_mean_s"
             )
 
-        # Propagazione lineare dell'incertezza dal tempo al throughput.
         df["gflops_kernel_std_approx"] = (
             df["gflops_kernel"]
             * df["t_kernel_std_s"]
@@ -189,7 +185,6 @@ def load_results() -> pd.DataFrame:
 
     return results
 
-
 def save_figure(fig: plt.Figure, basename: str) -> tuple[Path, Path]:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     png_path = OUTPUT_DIR / f"{basename}.png"
@@ -198,7 +193,6 @@ def save_figure(fig: plt.Figure, basename: str) -> tuple[Path, Path]:
     fig.savefig(pdf_path, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     return png_path, pdf_path
-
 
 def add_bar_labels(ax, bars, values, fontsize: float = 7.8) -> None:
     for bar, value in zip(bars, values):
@@ -212,7 +206,6 @@ def add_bar_labels(ax, bars, values, fontsize: float = 7.8) -> None:
             fontsize=fontsize,
             color=bar.get_facecolor(),
         )
-
 
 def plot_square_kernel_comparison(results: pd.DataFrame) -> tuple[Path, Path]:
     square = results[results["shape"] == "square"].copy()
@@ -299,7 +292,6 @@ def plot_square_kernel_comparison(results: pd.DataFrame) -> tuple[Path, Path]:
     )
     return save_figure(fig, "campagna_VAS_7_square_kernel_comparison_bars")
 
-
 def plot_size_scaling(results: pd.DataFrame) -> tuple[Path, Path]:
     square = results[results["shape"] == "square"].copy()
     selected_k = [3, 8, 32]
@@ -379,7 +371,6 @@ def plot_size_scaling(results: pd.DataFrame) -> tuple[Path, Path]:
     )
     return save_figure(fig, "campagna_VAS_7_size_scaling_bars")
 
-
 def build_shape_ratios(results: pd.DataFrame) -> pd.DataFrame:
     square = (
         results[results["shape"] == "square"]
@@ -399,7 +390,6 @@ def build_shape_ratios(results: pd.DataFrame) -> pd.DataFrame:
         100.0 * ratios["gflops_kernel"] / ratios["gflops_square"]
     )
     return ratios
-
 
 def plot_shape_robustness(
     ratios: pd.DataFrame,
@@ -504,7 +494,6 @@ def plot_shape_robustness(
     )
     return save_figure(fig, f"campagna_VAS_7_shape_robustness_s{size}_bars")
 
-
 def main() -> None:
     results = load_results()
     ratios = build_shape_ratios(results)
@@ -520,7 +509,6 @@ def main() -> None:
     print(f"Configurazioni analizzate: {len(results)}")
     for path in generated:
         print(path)
-
 
 if __name__ == "__main__":
     main()

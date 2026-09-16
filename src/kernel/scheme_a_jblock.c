@@ -1,37 +1,3 @@
-/* Schema A con j-blocking: X mattonellata in cache.
- *
- * scheme_a legge A una volta sola, ma per OGNI riga di A scorre tutta X
- * (n_loc x k). Il traffico su X vale quindi m_loc*n_loc*k scalari, cioe' k
- * volte quello su A: finche' X sta in L2 lo paga la cache, quando non ci sta
- * X viene ristreamata dalla L3 m_loc volte e il kernel si ferma sulla banda
- * della L3. Nella campagna C3 (M=N=10000, un processo, double) il crollo e'
- * visibile fra k=8 (X=640 KB, 10.9 GFLOPS) e k=20 (X=1.6 MB, 5.2 GFLOPS).
- *
- * Qui l'ordine dei cicli viene invertito fra tile e righe:
- *
- *   for j0 (tile di X di BJ righe, BJ*k*sizeof(scalar_t) ~ JBLOCK_BYTES):
- *     for i (TUTTE le righe di A):
- *       acc = (j0 == 0) ? 0 : Y[i][*]
- *       for j in tile:  a = A[i][j];  acc[c] += a * X[j][c]
- *       Y[i][*] = acc
- *
- * Il tile di X viene caricato dalla memoria una volta e riusato m_loc volte
- * restando in L1/L2. A continua a essere letta una volta sola: ogni riga viene
- * consumata a segmenti di BJ elementi, uno per tile.
- *
- * Il prezzo e' Y: non puo' piu' vivere nei registri per tutta la riga, perche'
- * ci si torna sopra a ogni tile. Il traffico extra vale 2*k scalari per riga e
- * per tile, cioe' 2k/BJ rispetto ad A: con k=32 e BJ=256 e' il 25%, con k=8 e
- * BJ=1024 l'1.5%. Il tile va quindi scelto grande abbastanza da rendere Y
- * trascurabile e piccolo abbastanza da stare in L1/L2: JBLOCK_BYTES e' il
- * parametro da misurare, non una costante magica.
- *
- * E' lo stesso principio di cuda_warp_smem: portare un blocco di X in una
- * memoria vicina (li' la shared memory, qui la cache) e riusarlo per molte
- * righe prima di passare al blocco successivo.
- *
- * Come in scheme_a, i k obbligatori hanno kernel con accumulatori espliciti;
- * gli altri k usano il fallback generico, anch'esso mattonellato. */
 
 #include "kernel/kernel.h"
 
@@ -44,17 +10,12 @@
 #error "scheme_a_jblock richiede X row-major (X_LAYOUT=row)"
 #endif
 
-/* Byte di X per tile. 64 KB e' un valore che sta nella L2 di qualunque core
- * x86 recente e quasi nella L1 dei core con 48 KB o piu'; e' il default dello
- * sweep, non il suo risultato. */
 #ifndef JBLOCK_BYTES
 #define JBLOCK_BYTES 65536
 #endif
 
-/* Ampiezza del blocco di colonne del fallback generico (vedi scheme_a). */
 #define KB 32
 
-/* Righe di X per tile: almeno una, mai piu' di n_loc. */
 static int tile_rows(int n_loc, int k)
 {
     const size_t row_bytes = (size_t)k * sizeof(scalar_t);
@@ -67,8 +28,6 @@ static int tile_rows(int n_loc, int k)
     return (int)bj;
 }
 
-/* Fallback generico su [j0, j1): first dice se gli accumulatori partono da
- * zero o dal valore parziale gia' in Y. */
 static void kernel_generic(int m_loc, int j0, int j1, int first, int k,
                            const scalar_t *restrict A_loc, int lda,
                            const scalar_t *restrict X_loc, int ldx,
@@ -117,8 +76,6 @@ static void kernel_generic(int m_loc, int j0, int j1, int first, int k,
 #define COLS_32(M) COLS_20(M) M(20) M(21) M(22) M(23) M(24) M(25) \
                    M(26) M(27) M(28) M(29) M(30) M(31)
 
-/* Rispetto a scheme_a cambia solo l'inizializzazione: al primo tile gli
- * accumulatori partono da zero, ai successivi dal parziale gia' in Y. */
 #define DECLARE_ACC(c) scalar_t acc##c = first ? (scalar_t)0 : yrow[c];
 #define UPDATE_ACC(c)  acc##c += a * xrow[c];
 #define STORE_ACC(c)   yrow[c] = acc##c;
@@ -162,9 +119,8 @@ DEFINE_FIXED_KERNEL(32, COLS_32)
 #undef COLS_6
 #undef COLS_3
 
-#endif /* FORCE_GENERIC_K */
+#endif
 
-/* Un tile di X, [j0, j1), applicato a tutte le righe di A. */
 static void run_tile(int m_loc, int j0, int j1, int first, int k,
                      const scalar_t *restrict A_loc, int lda,
                      const scalar_t *restrict X_loc, int ldx,
@@ -196,13 +152,11 @@ static void run_tile(int m_loc, int j0, int j1, int first, int k,
 #endif
 }
 
-/* Stato del backend: come in scheme_a, solo forma e puntatore. In piu' il
- * numero di righe di X per tile, calcolato una volta in create. */
 struct local_gemm_context {
     int m_loc, n_loc, k;
     int lda;
     int ldx, ldy;
-    int bj;           /* righe di X per tile */
+    int bj;
     const scalar_t *A_loc;
     double t_setup;
 };
@@ -250,8 +204,6 @@ void local_gemm(local_gemm_t *local_gemm_context, const scalar_t * RESTRICT X_lo
             "(ldx %d -> %d, ldy %d -> %d)",
             local_gemm_context->ldx, ldx, local_gemm_context->ldy, ldy);
 
-    /* Y = A*X e' un'assegnazione: con n_loc = 0 non c'e' nessun tile che la
-     * scriva, e la somma vuota vale zero. */
     if (n_loc == 0) {
         int i;
         for (i = 0; i < m_loc; i++)
@@ -270,7 +222,6 @@ void local_gemm_destroy(local_gemm_t *local_gemm_context)
     xfree(local_gemm_context);
 }
 
-/* Canali di misura: backend di CPU, stesse sentinelle di scheme_a. */
 double local_gemm_last_compute_seconds(const local_gemm_t *local_gemm_context)
 {
     (void)local_gemm_context;
@@ -336,9 +287,6 @@ int local_gemm_blocks_per_sm(const local_gemm_t *local_gemm_context)
     return -1;
 }
 
-/* Qui il concetto ESISTE: e' il tile di X in cache, l'analogo del tile in
- * shared memory di cuda_warp_smem. Riportarlo nella stessa colonna rende
- * confrontabili le due campagne di tiling. */
 int local_gemm_x_rows_per_tile(const local_gemm_t *local_gemm_context)
 {
     return (local_gemm_context != NULL) ? local_gemm_context->bj : -1;

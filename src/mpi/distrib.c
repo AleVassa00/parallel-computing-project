@@ -42,28 +42,13 @@ void layout_init(layout_t *layout, const grid_t *grid, int M, int N, int k)
     layout->N = N;
     layout->k = k;
 
-    /* Le righe di A (e quindi di Y) sono divise fra le Pr righe della griglia,
-     * le colonne di A (e quindi le righe di X) fra le Pc colonne. */
     layout->m_loc = block_size(M, grid->pr, grid->my_row);
     layout->row0 = block_start(M, grid->pr, grid->my_row);
     layout->n_loc = block_size(N, grid->pc, grid->my_col);
     layout->col0 = block_start(N, grid->pc, grid->my_col);
 
-    /* m_loc dipende solo da my_row e n_loc solo da my_col: tutti i processi di
-     * una stessa riga della griglia concordano su m_loc (count della reduce) e
-     * tutti quelli di una stessa colonna su n_loc (count del broadcast).
-     * E' la condizione di consistenza delle due collettive. */
-
-    /* La build normale usa lda == n_loc. Il target check-padding definisce
-     * TEST_A_PADDING=8 per collaudare il datatype ricevente con stride locale
-     * senza esporre il padding come opzione pubblica. */
     layout->lda = layout->n_loc + TEST_A_PADDING;
 
-    /* ldx e ldy valgono k e NON sono un punto di estensione: mpi_matmul,
-     * distribute_global_X e check_against_serial trattano X e Y come buffer
-     * contigui, e lo impongono. Il padding dei buffer che attraversano una
-     * collettiva richiederebbe un datatype derivato per invocazione, dentro
-     * la misura. Vedi il commento in src/mpi/matmul_mpi.c. */
     layout->ldx = k;
     layout->ldy = k;
 }
@@ -97,8 +82,6 @@ void distribute_global_A(const grid_t *grid, const layout_t *layout, const scala
                 if (error_code != MPI_SUCCESS)
                     mpi_abort_error(grid->grid_comm, error_code, "MPI_Cart_rank");
 
-                /* Nessun messaggio e nessun datatype per un blocco vuoto.
-                 * Il processo destinatario segue la stessa condizione. */
                 if (count == 0)
                     continue;
 
@@ -126,9 +109,6 @@ void distribute_global_A(const grid_t *grid, const layout_t *layout, const scala
                         mpi_abort_error(grid->grid_comm, error_code, "MPI_Type_commit");
                     }
 
-                    /* MPI_Send e' bloccante: al ritorno il buffer globale e il
-                     * datatype non sono piu' in uso e il tipo puo' essere
-                     * liberato immediatamente. */
                     error_code = MPI_Send(start, 1, block_type, destination,
                                           TAG_DISTRIBUTE_A, grid->grid_comm);
                     if (error_code != MPI_SUCCESS) {
@@ -151,8 +131,6 @@ void distribute_global_A(const grid_t *grid, const layout_t *layout, const scala
             MPI_Datatype recv_type = MPI_DATATYPE_NULL;
             MPI_Status status;
 
-            /* Il sender cammina nel globale con stride N; il receiver scrive
-             * direttamente nel layout locale, che puo' avere lda > n_loc. */
             error_code = MPI_Type_vector(layout->m_loc, layout->n_loc, layout->lda,
                                          SCALAR_MPI_TYPE, &recv_type);
             if (error_code != MPI_SUCCESS)
@@ -186,26 +164,13 @@ void distribute_global_X(const grid_t *grid, const layout_t *layout,
     int *sendcounts = NULL, *displs = NULL;
     int recv_count, error_code;
 
-    /* Solo la riga 0 possiede inizialmente X: gli altri processi riceveranno
-     * la stessa fetta dal normale broadcast lungo col_comm in mpi_matmul. */
     if (grid->my_row != 0)
         return;
 
-    /* X_loc e' contigua per costruzione (layout_init fissa ldx == k) e DEVE
-     * restarlo: e' lo stesso invariante che mpi_matmul impone al broadcast.
-     * Descrivere qui uno stride locale con un datatype derivato sarebbe
-     * possibile - questa e' preprocessing, non e' cronometrata - ma sarebbe
-     * una generalita' solo apparente: il buffer cosi' distribuito verrebbe
-     * poi trasmesso da un MPI_Bcast che lo assume contiguo, e il risultato
-     * sarebbe sbagliato in silenzio. Meglio un invariante unico, imposto in
-     * tutti i punti che lo usano. */
     if (layout->ldx != layout->k)
         mpi_abort_error(grid->grid_comm, MPI_ERR_ARG,
                         "X_loc leading dimension must be exactly k");
 
-    /* MPI_Scatterv usa count e displacement di tipo int. Il controllo sul
-     * prodotto globale implica che anche tutti i conteggi e displacement dei
-     * singoli blocchi siano rappresentabili. */
     (void)element_count(
         grid->grid_comm, layout->N, layout->k,
         "global X element count exceeds the MPI int count range");
@@ -241,8 +206,6 @@ void distribute_global_X(const grid_t *grid, const layout_t *layout,
         }
     }
 
-    /* Sia X_global sia X_loc sono compatte (ld = k): entrambi i lati della
-     * Scatterv sono scalar_t contigui e non serve nessun datatype derivato. */
     error_code = MPI_Scatterv(X_global, sendcounts, displs, SCALAR_MPI_TYPE,
                               X_loc, recv_count, SCALAR_MPI_TYPE,
                               root, grid->row_comm);

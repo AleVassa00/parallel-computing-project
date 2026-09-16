@@ -1,44 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ============================================================
-# CUDA / MPI experiment runner
-# parallel-computing-project
-# ============================================================
-#
-# Tutto si configura tramite flag: non ci sono argomenti posizionali.
-#
-# Esempi:
-#
-#   ./run_cuda_experiments.sh --experiment k-sweep
-#
-#   ./run_cuda_experiments.sh \
-#       --experiment k-sweep \
-#       --kernel cuda_naive \
-#       --ks "3 6 8 20 32" \
-#       --block 256
-#
-#   ./run_cuda_experiments.sh \
-#       --experiment grid-sweep \
-#       --kernel cuda_naive \
-#       --k 32 \
-#       --block 256 \
-#       --all-grids 8
-#
-#   # --all-grids 8 genera:
-#   #   1x8, 2x4, 4x2, 8x1
-#
-#   ./run_cuda_experiments.sh \
-#       --experiment full \
-#       --all-grids 4
-#
-# ============================================================
-
 ORIGINAL_ARGS=("$@")
-
-# -------------------------
-# Default
-# -------------------------
 
 EXPERIMENT=""
 EXPERIMENT_NAME=""
@@ -240,50 +203,41 @@ FLAG PROFILING / OUTPUT
 
 ESEMPI
 
-  # Da file di configurazione
   ./run_cuda_experiments.sh --config experiments/naive_block_sweep.conf
 
-  # Esegue piu' file di configurazione in sequenza
   ./run_cuda_experiments.sh --suite experiments/cuda_naive_suite.txt
 
-  # Naive, tutti i k standard
   ./run_cuda_experiments.sh \
       --experiment k-sweep \
       --kernel cuda_naive
 
-  # Naive, solo k=32 e BLOCK=128
   ./run_cuda_experiments.sh \
       --experiment k-sweep \
       --kernel cuda_naive \
       --k 32 \
       --block 128
 
-  # Tutte le forme di griglia con P=8, k=32
   ./run_cuda_experiments.sh \
       --experiment grid-sweep \
       --kernel cuda_naive \
       --k 32 \
       --all-grids 8
 
-  # k-sweep per tutte le griglie di 4 processi
   ./run_cuda_experiments.sh \
       --experiment k-sweep \
       --kernel cuda_naive \
       --all-grids 4
 
-  # BLOCK x k x tutte le griglie di 8 processi
   ./run_cuda_experiments.sh \
       --experiment block-sweep \
       --ks "3 32" \
       --all-grids 8
 
-  # Campagna totale su tutte le griglie di 4 processi
   ./run_cuda_experiments.sh \
       --experiment full \
       --all-grids 4
 EOF
 }
-
 
 trim() {
     local x="$1"
@@ -417,7 +371,6 @@ load_config() {
         key="$(trim "${line%%=*}")"
         value="$(trim "${line#*=}")"
 
-        # Supporta opzionalmente virgolette semplici/doppie attorno all'intero valore.
         if [[ ${#value} -ge 2 ]]; then
             if [[ "$value" == \"*\" && "$value" == *\" ]]; then
                 value="${value:1:${#value}-2}"
@@ -441,16 +394,6 @@ run_suite() {
     local suite_dir
     suite_dir="$(cd "$(dirname "$suite")" && pwd)"
 
-    # La lista viene letta dal descrittore 3, non da stdin, e il figlio riceve
-    # stdin da /dev/null.
-    #
-    # Serve entrambe le cose. Il figlio arriva a mpirun, che per progetto
-    # INOLTRA stdin al rank 0 e quindi lo legge fino a EOF: con il ciclo
-    # attaccato a stdin, mpirun si mangiava il resto del file della suite. Al
-    # giro dopo `read` non trovava piu' niente e il ciclo terminava senza
-    # errore, quindi una suite da N configurazioni ne eseguiva UNA e
-    # annunciava "Esperimento completato". E' lo stesso inciampo di ssh dentro
-    # un while read, e non fa rumore: si vede solo contando i banner SUITE.
     while IFS= read -r raw <&3 || [[ -n "$raw" ]]; do
         local line config_path
         line="$(trim "$raw")"
@@ -479,12 +422,6 @@ need_value() {
     fi
 }
 
-# -------------------------
-# Pre-scan: config / suite
-# -------------------------
-
-# I file vengono caricati prima del parsing normale, cosi' i flag CLI
-# successivi possono sovrascrivere i valori del file.
 for ((i=0; i<${#ORIGINAL_ARGS[@]}; i++)); do
     case "${ORIGINAL_ARGS[$i]}" in
         --config)
@@ -509,10 +446,6 @@ if [[ -n "$SUITE_FILE" ]]; then
     exit 0
 fi
 
-# -------------------------
-# Parse: SOLO flag
-# -------------------------
-
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --experiment)
@@ -527,12 +460,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --config)
             need_value "$@"
-            # gia' caricato nel pre-scan
             shift 2
             ;;
         --suite)
             need_value "$@"
-            # gia' gestito nel pre-scan
             shift 2
             ;;
         --M)
@@ -704,10 +635,6 @@ if [[ -n "$SINGLE_K" ]]; then
     COMPARE_KS=("$SINGLE_K")
 fi
 
-# -------------------------
-# Validazione
-# -------------------------
-
 is_pos_int() {
     [[ "$1" =~ ^[1-9][0-9]*$ ]]
 }
@@ -795,11 +722,6 @@ validate_common() {
     fi
 }
 
-# -------------------------
-# Griglie MPI
-# GRIDS: "np:pr:pc"
-# -------------------------
-
 GRIDS=()
 
 generate_grids() {
@@ -851,10 +773,6 @@ generate_grids() {
     GRIDS+=("${NP}:${PR}:${PC}")
 }
 
-# -------------------------
-# Helpers
-# -------------------------
-
 build_mpi_flags() {
     MPI_FLAGS=()
 
@@ -877,8 +795,6 @@ warn_multi_rank_gpu_contention() {
     local uses_cuda=0
     local g np pr pc
 
-    # Il runner gestisce anche i backend CPU scheme_a*. L'avviso ha senso
-    # soltanto quando almeno uno dei kernel eseguiti usa davvero la GPU.
     local kernels_to_check=("$KERNEL")
     if [[ "$EXPERIMENT" == "compare" || "$EXPERIMENT" == "registers" || "$EXPERIMENT" == "full" ]]; then
         kernels_to_check=("${KERNELS[@]}")
@@ -944,9 +860,6 @@ result_path() {
 benchmark_csv_path() {
     local stem="$1"
 
-    # Per gli esperimenti singoli il CSV prende esattamente il nome indicato
-    # da name= nel .conf. "full" genera piu' dataset nella stessa directory,
-    # quindi in quel solo caso viene mantenuto un suffisso descrittivo.
     if [[ "$EXPERIMENT" == "full" ]]; then
         echo "$OUTDIR/${EXPERIMENT_NAME}_${stem}.csv"
     else
@@ -1210,10 +1123,6 @@ write_metadata() {
     } > "$file"
 }
 
-# -------------------------
-# Esperimenti
-# -------------------------
-
 experiment_k_sweep() {
     local kernel="$KERNEL"
     local block="$BLOCK"
@@ -1372,7 +1281,6 @@ experiment_registers() {
 
         echo "kernel=$kernel"
 
-        # -B e' necessario: EXTRA_NVCCFLAGS non entra nel nome CONFIG del Makefile.
         set +e
         make -B \
             KERNEL="$kernel" \
@@ -1463,7 +1371,6 @@ experiment_ncu() {
     local smem_pad="$SMEM_PAD"
     local k="${K_SWEEP_KS[0]}"
 
-    # Se non e' stato passato --k/--ks, il default per ncu e' k=32.
     if [[ "$KS_EXPLICIT" -eq 0 ]]; then
         k=32
     fi
@@ -1527,30 +1434,23 @@ experiment_full() {
     local saved_block_ks=("${BLOCK_SWEEP_KS[@]}")
     local saved_compare_ks=("${COMPARE_KS[@]}")
 
-    # 1) k-sweep naive
     KERNEL="cuda_naive"
     KERNEL_EXPLICIT=1
     experiment_k_sweep
 
-    # 2) block-sweep COMPLETO: tutti i k standard
     BLOCK_SWEEP_KS=("${K_SWEEP_KS[@]}")
     experiment_block_sweep
 
-    # 3) confronto kernel: tutti i k standard
     COMPARE_KS=("${K_SWEEP_KS[@]}")
     experiment_compare
 
-    # 4) padding shared memory
     KERNEL="cuda_warp_smem"
     KERNEL_EXPLICIT=1
     experiment_smem_pad_sweep
 
-    # 5) registri di tutti i kernel
     KERNEL_EXPLICIT=0
     experiment_registers
 
-    # 6) ncu: un solo caso rappresentativo, naive k=32.
-    # Se sul server i counter sono vietati, viene registrato e saltato.
     KERNEL="cuda_naive"
     KERNEL_EXPLICIT=1
 
@@ -1559,7 +1459,6 @@ experiment_full() {
     K_SWEEP_KS=(32)
     KS_EXPLICIT=1
 
-    # In full profiliamo solo la prima griglia per non moltiplicare replay/costi.
     local saved_grids=("${GRIDS[@]}")
     GRIDS=("${GRIDS[0]}")
     experiment_ncu || true
@@ -1573,10 +1472,6 @@ experiment_full() {
     BLOCK_SWEEP_KS=("${saved_block_ks[@]}")
     COMPARE_KS=("${saved_compare_ks[@]}")
 }
-
-# -------------------------
-# Main
-# -------------------------
 
 validate_common
 generate_grids

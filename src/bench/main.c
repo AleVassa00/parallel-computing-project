@@ -1,15 +1,3 @@
-/* Driver di misura del prodotto matrice x multivettore distribuito.
- *
- *   mpirun -np P ./bin/matmul_mpi -M .. -N .. -k .. --pr .. --pc ..
- *
- * Le modalita' predefinite generano localmente i blocchi di A e X; le modalita'
- * alternative materializzano il rispettivo input sul grid rank 0 e lo
- * distribuiscono. Tutti questi percorsi sono preprocessing.
- *
- * Preprocessing, I/O e trasferimenti da e verso la scheda restano FUORI dalla
- * metrica ufficiale, come la consegna richiede, ma vengono cronometrati voce
- * per voce e pubblicati in coda al CSV: la consegna consente di misurarli e
- * discuterli a parte, e un costo che non si misura non si puo' discutere. */
 
 #include <mpi.h>
 
@@ -42,15 +30,13 @@ typedef enum {
 
 typedef struct {
     int M, N, k;
-    int pr, pc;       /* 0 = forma della griglia scelta automaticamente */
+    int pr, pc;
     int pr_given, pc_given;
     int reps, warmup_reps;
     uint64_t seed;
     int check;
     int csv;
-    /* Cronometro di gruppo attorno alla fase locale (vedi matmul_mpi.h).
-     * Diagnostico: le due barriere che introduce entrano nei tempi ufficiali,
-     * quindi non va usato nelle campagne da cui si ricavano i GFLOPS. */
+
     int group_timing;
     const char *csv_raw_file;
     a_mode_t a_mode;
@@ -68,9 +54,7 @@ static const char *CSV_HEADER =
     "t_transfer_runtime_overhead_mean_s,t_transfer_runtime_overhead_std_s,"
     "t_setup_s,gflops,gflops_compute,gflops_kernel,"
     "blocks_per_sm,x_rows_per_tile,rel_err,"
-    /* Da qui in poi: tempi ESCLUSI dalla metrica ufficiale, raccolti perche'
-     * la consegna consente di misurarli e discuterli a parte. Sono in coda
-     * cosi' che le colonne storiche restino nella stessa posizione. */
+
     "t_setup_device_init_s,t_setup_device_alloc_s,t_setup_h2d_A_s,bw_h2d_A_gbs,"
     "t_h2d_X_mean_s,t_h2d_X_std_s,bw_h2d_X_gbs,"
     "t_d2h_Y_mean_s,t_d2h_Y_std_s,bw_d2h_Y_gbs,"
@@ -78,9 +62,7 @@ static const char *CSV_HEADER =
     "t_prep_alloc_buffers_s,t_prep_gen_A_s,t_prep_distrib_A_s,"
     "t_prep_gen_X_s,t_prep_distrib_X_s,t_prep_total_s,t_io_csv_raw_s,"
     "x_layout,t_prep_convert_X_s,"
-    /* Cronometro di gruppo della fase locale (--group-timing). Sentinella
-     * negativa quando la modalita' e' spenta, cosi' le righe restano
-     * distinguibili anche senza guardare la colonna group_timing. */
+
     "group_timing,t_local_group_mean_s,t_local_group_std_s,gflops_local_group";
 
 static const char *CSV_RAW_HEADER =
@@ -100,10 +82,6 @@ static const char *x_mode_name(x_mode_t mode)
     return mode == X_MODE_GLOBAL ? "global" : "local";
 }
 
-/* Chiamata una volta dopo gen/distrib, prima anche dei warm-up. Sulla riga 0
- * X e' valida; gli altri rank riceveranno lo stesso buffer compatto via Bcast.
- * Cambia solo la rappresentazione: dimensioni, valori e ordine delle somme
- * restano invariati. Il temporaneo viene liberato prima delle ripetizioni. */
 static void prepare_x_layout(const grid_t *grid, const layout_t *layout,
                              scalar_t **X_loc, double *elapsed)
 {
@@ -189,8 +167,6 @@ static uint64_t arg_seed(int argc, char **argv, int *i)
     return (uint64_t)parsed;
 }
 
-/* Tutti i processi vedono lo stesso argv e prendono quindi le stesse
- * decisioni: nessun bisogno di distribuire le opzioni. */
 static void parse_args(int argc, char **argv, opts_t *options, int rank)
 {
     int i;
@@ -350,8 +326,6 @@ static double coeff_var_pct(double mean, double stddev)
     return mean > 0.0 ? 100.0 * stddev / mean : -1.0;
 }
 
-/* n e' la lunghezza della riduzione, cioe' il numero GLOBALE di colonne di A:
- * la soglia dipende da quanti termini sono stati sommati (vedi scalar.h). */
 static int validation_passed(double rel_err, int n)
 {
     return isfinite(rel_err) && rel_err >= 0.0 && rel_err <= scalar_check_tol(n);
@@ -398,8 +372,7 @@ static void append_raw_csv(const char *path,
     if (file_size == 0) {
         fprintf(fp, "%s\n", CSV_RAW_HEADER);
     } else {
-        /* Non appendere righe con le nuove colonne a un CSV di una build
-         * precedente: il file diventerebbe ambiguo senza alcun errore. */
+
         char header[1024];
         if (fseek(fp, 0, SEEK_SET) != 0 || fgets(header, sizeof header, fp) == NULL)
             die("cannot read raw CSV header '%s'", path);
@@ -470,12 +443,8 @@ int main(int argc, char **argv)
     double *official_times, *kernel_times, *non_kernel_local_times;
     double *sorted_total_times, *sorted_official_times, *sorted_kernel_times;
 
-    /* Voci per ripetizione escluse dal tempo ufficiale: i due trasferimenti
-     * host<->device e cio' che di essi non e' PCIe ma runtime. */
     double *h2d_X_transfer_times, *d2h_Y_transfer_times, *launch_overhead_times;
 
-    /* Cronometro di gruppo della fase locale (--group-timing). Sentinella
-     * negativa quando spento. */
     double *local_group_times;
     double mean_local_group_time = -1.0, std_local_group_time = 0.0;
     double gflops_local_group = -1.0;
@@ -499,37 +468,22 @@ int main(int argc, char **argv)
     double gflops, gflops_compute, rel_err = -1.0;
     double gflops_kernel = -1.0, setup_time;
 
-    /* --------------------------------------------------------------------
-     * Tempi "da discutere a parte" (consegna): preprocessing, trasferimenti
-     * da e verso la scheda e I/O. Nessuno di essi entra in t_official.
-     * -------------------------------------------------------------------- */
-
-    /* Preprocessing: tutto cio' che accade UNA volta sola prima della prima
-     * ripetizione cronometrata. Ogni voce e' il tempo di QUESTO processo; la
-     * riduzione finale prende il massimo, che e' il cammino critico. */
     double prep_section_start;
     double prep_alloc_local_buffers_time = 0.0;
     double prep_gen_A_time = 0.0;
-    double prep_distrib_A_time = 0.0;   /* resta 0 con --a-mode local */
+    double prep_distrib_A_time = 0.0;
     double prep_gen_X_time = 0.0;
-    double prep_distrib_X_time = 0.0;   /* resta 0 con --x-mode local */
+    double prep_distrib_X_time = 0.0;
     double prep_convert_X_time = 0.0;
     double prep_total_time = 0.0;
 
-    /* Scomposizione del preprocessing del backend (t_setup): su CUDA sono
-     * contesto, VRAM e la sola copia H2D di A; su CPU valgono zero. */
     double setup_device_init_time, setup_device_alloc_time, setup_h2d_A_time;
 
-    /* Byte che attraversano il PCIe, sommati su tutti i rank che condividono
-     * la scheda: e' il numeratore delle bande qui sotto. */
     double bytes_h2d_A_all_ranks, bytes_h2d_X_all_ranks, bytes_d2h_Y_all_ranks;
     double bandwidth_h2d_A_gbs = -1.0;
     double bandwidth_h2d_X_gbs = -1.0;
     double bandwidth_d2h_Y_gbs = -1.0;
 
-    /* I/O: la scrittura del CSV per ripetizione. E' l'unico I/O del driver
-     * (gli input sono generati, non letti da file) e la consegna lo esclude
-     * dalla misura tanto quanto i trasferimenti. */
     double io_csv_raw_write_time = -1.0;
     int blocks_per_sm, x_rows_per_tile;
     int world_rank, world_size, rep;
@@ -540,11 +494,6 @@ int main(int argc, char **argv)
 
     parse_args(argc, argv, &options, world_rank);
 
-    /*
-     * Se l'utente non ha specificato la forma della griglia, la calcolo in modo
-     * da renderla il più quadrata possibile. Se invece ha specificato solo una
-     * dimensione, calcolo l'altra in modo da usare tutti i processi.
-    */
     if (!options.pr_given && !options.pc_given) {
         grid_default_shape(world_size, &options.pr, &options.pc);
     } else if (!options.pr_given) {
@@ -562,28 +511,15 @@ int main(int argc, char **argv)
             options.pr, options.pc, world_size);
     }
 
-    /*
-    * Creazione della griglia e del layout locale. La griglia e' cartesiana 2D
-    * con reorder, quindi i rank in grid possono differire da quelli di
-    * MPI_COMM_WORLD. Il layout locale e' calcolato a partire dalle dimensioni
-    * globali e dalla forma della griglia.
-    */
     grid_create(MPI_COMM_WORLD, options.pr, options.pc, &grid);
 
-    /* Stabiliamo le porzioni di ogni matrice per il processo corrente.*/
     layout_init(&layout, &grid, options.M, options.N, options.k);
 
-    /* Avviso se la griglia e' piu' grande della matrice: alcuni processi non
-     * possiedono dati, ma partecipano comunque alla computazione.
-     */
     if (grid.rank == 0 && (options.pr > options.M || options.pc > options.N))
         fprintf(stderr,
                 "warning: grid %dx%d is larger than the matrix %dx%d, "
                 "some processes own no data\n", options.pr, options.pc, options.M, options.N);
 
-    /* Allocazione dei blocchi locali. Prima voce del preprocessing: non e'
-     * gratuita quando A e' dell'ordine dei GB, e va misurata invece che
-     * assunta trascurabile. */
     prep_section_start = now_seconds();
     A_loc = xmalloc((size_t)layout.m_loc * layout.lda * sizeof *A_loc);
     X_loc = xmalloc((size_t)layout.n_loc * layout.ldx * sizeof *X_loc);
@@ -593,20 +529,13 @@ int main(int argc, char **argv)
     prep_alloc_local_buffers_time = now_seconds() - prep_section_start;
 
     if (options.a_mode == A_MODE_LOCAL) {
-        /* Modalita' predefinita: ogni processo genera direttamente il proprio
-         * blocco e fa anche il first touch delle proprie pagine. */
+
         prep_section_start = now_seconds();
         gen_block_A(A_loc, layout.lda, layout.m_loc, layout.n_loc,
                     layout.row0, layout.col0, layout.N, options.seed);
         prep_gen_A_time = now_seconds() - prep_section_start;
     } else {
-        /* Modalita' alternativa: soltanto il grid rank 0 materializza la
-         * matrice globale. Lo stesso generatore e gli stessi indici globali
-         * garantiscono valori identici alla generazione locale. */
-        /* Il tempo di generazione e quello di distribuzione restano separati:
-         * il primo e' lavoro del solo rank 0, il secondo e' una collettiva che
-         * tutti pagano, e mescolarli renderebbe il confronto fra le due
-         * modalita' di input illeggibile. */
+
         prep_section_start = now_seconds();
         if (grid.rank == 0) {
             A_global_root = xmalloc((size_t)layout.M * (size_t)layout.N * sizeof *A_global_root);
@@ -622,19 +551,8 @@ int main(int argc, char **argv)
         A_global_root = NULL;
     }
 
-    /* Preparazione del backend: e' PREPROCESSING, quindi sta fuori dalla
-     * regione cronometrata. Va dopo che A_loc e' stata popolata, perche' e'
-     * qui che un backend CUDA copierebbe A in VRAM una volta sola (la
-     * consegna esclude dalla misura i trasferimenti da e verso la scheda).
-     * Forma e leading dimension vengono dal layout una volta sola: il kernel
-     * non puo' piu' essere invocato con dimensioni diverse da quelle con cui
-     * A e' stata preparata. */
     local_gemm_context = local_gemm_create(layout.m_loc, layout.n_loc, layout.k, A_loc, layout.lda, layout.ldx, layout.ldy);
 
-    /* X e' inizialmente collocata sulla sola riga 0 della griglia. In modalita'
-     * local ogni processo di quella riga genera la propria fetta; in modalita'
-     * global il grid rank 0 genera X compatta e la distribuisce sulla riga 0.
-     * In entrambi i casi mpi_matmul esegue poi lo stesso broadcast verticale. */
     if (options.x_mode == X_MODE_LOCAL) {
         prep_section_start = now_seconds();
         if (grid.my_row == 0)
@@ -642,8 +560,7 @@ int main(int argc, char **argv)
                         layout.col0, options.seed);
         prep_gen_X_time = now_seconds() - prep_section_start;
     } else {
-        /* MPI_Scatterv usa conteggi e displacement int. Controllare prima
-         * dell'allocazione evita di materializzare un buffer non distribuibile. */
+
         if (layout.N > INT_MAX / layout.k)
             die("global X element count exceeds the MPI int count range");
         prep_section_start = now_seconds();
@@ -680,8 +597,6 @@ int main(int argc, char **argv)
     launch_overhead_times = xmalloc((size_t)options.reps * sizeof *launch_overhead_times);
     local_group_times = xmalloc((size_t)options.reps * sizeof *local_group_times);
 
-    /* Il warm-up segue lo stesso cammino delle ripetizioni misurate, barriere
-     * comprese: cio' che si scalda deve essere cio' che poi si cronometra. */
     for (rep = 0; rep < options.warmup_reps; rep++)
         mpi_matmul(&grid, &layout, local_gemm_context, X_loc, Y_loc_part, Y_row_col0, NULL,
                    options.group_timing);
@@ -689,8 +604,7 @@ int main(int argc, char **argv)
     for (rep = 0; rep < options.reps; rep++) {
 
         matmul_time_t times_struct_rep;
-        /* barriera prima di ogni ripetizione: senza, un processo in anticipo
-         * comincerebbe a cronometrare mentre gli altri sono ancora indietro */
+
         MPI_Barrier(grid.grid_comm);
 
         mpi_matmul(&grid, &layout, local_gemm_context, X_loc, Y_loc_part, Y_row_col0, &times_struct_rep,
@@ -704,38 +618,26 @@ int main(int argc, char **argv)
         kernel_times[rep] = times_struct_rep.kernel_time;
         non_kernel_local_times[rep] = (times_struct_rep.kernel_time >= 0.0) ? times_struct_rep.local_phase_time - times_struct_rep.kernel_time : -1.0;
 
-        /* Le tre voci escluse dal tempo ufficiale: i due trasferimenti e cio'
-         * che avanza della fase locale, che e' overhead del runtime e non
-         * PCIe. Vengono raccolte qui, insieme a tutto il resto, per non
-         * aggiungere niente al cammino cronometrato. */
         h2d_X_transfer_times[rep] = times_struct_rep.h2d_X_transfer_time;
         d2h_Y_transfer_times[rep] = times_struct_rep.d2h_Y_transfer_time;
         launch_overhead_times[rep] = times_struct_rep.launch_overhead_time;
         local_group_times[rep] = times_struct_rep.local_group_time;
     }
 
-    /* Il tempo di una invocazione e' il MASSIMO fra i processi, non quello del
-     * rank 0: l'operazione e' finita quando ha finito l'ultimo. Le riduzioni
-     * si fanno alla fine, su tutto il vettore, per non disturbare le misure. */
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : bcast_times, bcast_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : local_phase_times, local_phase_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : reduce_times, reduce_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : total_times, total_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
-    /* t_official e' costruito LOCALMENTE per ogni repetition e solo dopo si
-     * prende il massimo: sommare medie/massimi delle singole fasi non darebbe
-     * il cammino critico di una vera invocazione. */
+
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : official_times, official_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
-    /* Stesso criterio per il tempo di kernel e per il preprocessing: conta il
-     * processo piu' lento, non il rank 0. Il sentinella negativo dei backend di
-     * CPU sopravvive al massimo, perche' li' e' negativo su tutti i rank. */
+
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : kernel_times, kernel_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : non_kernel_local_times, non_kernel_local_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
-    /* Stesso criterio per le tre voci escluse dalla misura ufficiale. */
+
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : h2d_X_transfer_times, h2d_X_transfer_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : d2h_Y_transfer_times, d2h_Y_transfer_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : launch_overhead_times, launch_overhead_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
-    /* Gia' identico su tutti i rank (due barriere e un MPI_Wtime ciascuna):
-     * la riduzione serve solo a portarlo sul rank 0 con lo stesso schema. */
+
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : local_group_times, local_group_times, options.reps, MPI_DOUBLE, MPI_MAX, 0, grid.grid_comm);
 
     setup_time = local_gemm_setup_seconds(local_gemm_context);
@@ -743,18 +645,12 @@ int main(int argc, char **argv)
     setup_device_alloc_time = local_gemm_setup_device_alloc_seconds(local_gemm_context);
     setup_h2d_A_time = local_gemm_setup_h2d_A_seconds(local_gemm_context);
 
-    /* Il totale del preprocessing si compone LOCALMENTE e solo dopo si riduce,
-     * per lo stesso motivo di t_official: la somma dei massimi di fasi diverse
-     * non e' il cammino critico di nessun processo reale. Va fatto prima delle
-     * riduzioni, che sovrascrivono i valori locali sul rank 0. */
     prep_total_time = prep_alloc_local_buffers_time
                     + prep_gen_A_time + prep_distrib_A_time
                     + prep_gen_X_time + prep_distrib_X_time
                     + prep_convert_X_time
                     + setup_time;
 
-    /* I byte si SOMMANO invece di prendere il massimo: i rank condividono
-     * l'unica scheda, quindi la banda utile e' quella aggregata sul bus. */
     bytes_h2d_A_all_ranks = (double)local_gemm_bytes_h2d_A(local_gemm_context);
     bytes_h2d_X_all_ranks = (double)local_gemm_bytes_h2d_X_per_call(local_gemm_context);
     bytes_d2h_Y_all_ranks = (double)local_gemm_bytes_d2h_Y_per_call(local_gemm_context);
@@ -776,13 +672,6 @@ int main(int argc, char **argv)
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &bytes_h2d_X_all_ranks, &bytes_h2d_X_all_ranks, 1, MPI_DOUBLE, MPI_SUM, 0, grid.grid_comm);
     MPI_Reduce(grid.rank == 0 ? MPI_IN_PLACE : &bytes_d2h_Y_all_ranks, &bytes_d2h_Y_all_ranks, 1, MPI_DOUBLE, MPI_SUM, 0, grid.grid_comm);
 
-    /* Configurazione scelta dal backend, non una misura: dice COME il lavoro e'
-     * stato mappato sull'hardware, ed e' quello che rende leggibili le curve di
-     * una campagna sul tiling. Vale -1 sui backend che non hanno il concetto.
-     *
-     * Il massimo fra i rank e' lo stesso criterio di t_setup: i rank possono
-     * avere n_loc diversi e quindi piani diversi, e il sentinella -1
-     * sopravvive al massimo perche' li' e' -1 su tutti. */
     blocks_per_sm = local_gemm_blocks_per_sm(local_gemm_context);
     x_rows_per_tile = local_gemm_x_rows_per_tile(local_gemm_context);
 
@@ -812,10 +701,6 @@ int main(int argc, char **argv)
         std_kernel_time = vec_stddev(kernel_times, options.reps);
         std_non_kernel_local_time = vec_stddev(non_kernel_local_times, options.reps);
 
-        /* Le voci escluse dal tempo ufficiale ricevono lo stesso trattamento
-         * statistico di quelle incluse: una media senza dispersione non e'
-         * discutibile, e su un bus condiviso da piu' rank la dispersione e'
-         * proprio cio' che si vuole vedere. */
         mean_h2d_X_transfer_time = vec_mean(h2d_X_transfer_times, options.reps);
         std_h2d_X_transfer_time = vec_stddev(h2d_X_transfer_times, options.reps);
         mean_d2h_Y_transfer_time = vec_mean(d2h_Y_transfer_times, options.reps);
@@ -823,10 +708,6 @@ int main(int argc, char **argv)
         mean_launch_overhead_time = vec_mean(launch_overhead_times, options.reps);
         std_launch_overhead_time = vec_stddev(launch_overhead_times, options.reps);
 
-        /* Banda effettiva sul PCIe: byte sommati su tutti i rank diviso il
-         * tempo del rank piu' lento, cioe' quanto il bus ha davvero trasportato
-         * nella finestra in cui e' stato occupato. Il sentinella negativo
-         * sopravvive quando il backend non trasferisce nulla. */
         if (setup_h2d_A_time > 0.0 && bytes_h2d_A_all_ranks > 0.0)
             bandwidth_h2d_A_gbs = bytes_h2d_A_all_ranks / setup_h2d_A_time / 1.0e9;
         if (mean_h2d_X_transfer_time > 0.0 && bytes_h2d_X_all_ranks > 0.0)
@@ -846,25 +727,16 @@ int main(int argc, char **argv)
         cv_official_time = coeff_var_pct(mean_official_time, std_official_time);
         cv_kernel_time = coeff_var_pct(mean_kernel_time, std_kernel_time);
 
-        /* Metrica ufficiale: prodotto MPI completo, ma senza i trasferimenti
-         * CUDA come richiesto dalla traccia. Su CPU mean_official coincide con
-         * il totale end-to-end misurato direttamente. */
         gflops = 2.0 * (double)options.M * (double)options.N * (double)options.k
                   / mean_official_time / 1.0e9;
         gflops_compute = 2.0 * (double)options.M * (double)options.N * (double)options.k
                           / mean_compute_time / 1.0e9;
-        /* Solo se il backend sa distinguere il kernel dai trasferimenti.
-         * Questa e' la colonna che, sul backend CUDA, esclude H2D e D2H come
-         * la consegna consente esplicitamente di fare. */
+
         if (mean_kernel_time > 0.0) {
-            /* Alias CUDA esplicito, mantenuto nel CSV per distinguere a colpo
-             * d'occhio le righe GPU. Il valore coincide con gflops_compute. */
+
             gflops_kernel = gflops_compute;
         }
 
-        /* Cronometro di gruppo: il denominatore e' il tempo visto "da fuori"
-         * dal via comune all'ultimo arrivo, quindi i GFLOPS sono quelli del
-         * gruppo, non del rank piu' veloce. Include H2D di X e D2H di Y. */
         if (options.group_timing) {
             mean_local_group_time = vec_mean(local_group_times, options.reps);
             std_local_group_time = vec_stddev(local_group_times, options.reps);
@@ -874,10 +746,6 @@ int main(int argc, char **argv)
                                        / mean_local_group_time / 1.0e9;
         }
 
-        /* L'unico I/O del driver, e anch'esso escluso dalla misura ufficiale:
-         * lo si cronometra qui per potere dire di quanto, invece di affermare
-         * che e' trascurabile. La riga aggregata viene stampata dopo, quindi
-         * puo' riportare il tempo appena misurato. */
         if (options.csv_raw_file != NULL) {
             const double io_csv_raw_start = now_seconds();
             append_raw_csv(options.csv_raw_file, &options, &grid,
@@ -1002,14 +870,7 @@ int main(int argc, char **argv)
                 printf("  NOTE: --group-timing adds two MPI_Barrier inside the timed path:\n"
                        "        t_local, t_total and t_official include them. Use this run\n"
                        "        for the group time only, not for the official GFLOPS.\n");
-            /* ------------------------------------------------------------
-             * Tempi esclusi dalla misura ufficiale.
-             *
-             * La consegna li tiene fuori da T ma consente di misurarli e
-             * discuterli: stamparli qui, sotto un titolo che dice cosa sono,
-             * evita sia di gonfiare la metrica sia di far sparire costi che
-             * esistono davvero.
-             * ------------------------------------------------------------ */
+
             printf("  --- tempi esclusi da T, misurati per la discussione ---\n");
             printf("  Preprocessing totale    %.3f ms\n", prep_total_time * 1e3);
             printf("    alloc buffer locali   %.3f ms\n",
@@ -1060,7 +921,6 @@ int main(int argc, char **argv)
         fflush(stdout);
     }
 
-    /* prima il backend, poi la memoria di A: il contesto la referenzia */
     local_gemm_destroy(local_gemm_context);
     xfree(A_loc);
     xfree(A_global_root);
@@ -1085,7 +945,6 @@ int main(int argc, char **argv)
     grid_free(&grid);
     MPI_Finalize();
 
-    /* esito non nullo se la validazione fallisce: utile negli script */
     return (options.check && !validation_passed(rel_err, options.N))
              ? EXIT_FAILURE : EXIT_SUCCESS;
 }

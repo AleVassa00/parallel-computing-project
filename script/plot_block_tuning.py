@@ -5,11 +5,6 @@ from matplotlib.patches import Rectangle
 import numpy as np
 import pandas as pd
 
-
-# ============================================================
-# Percorsi
-# ============================================================
-
 ROOT = Path(__file__).resolve().parents[1]
 
 RESULTS_DIR = (
@@ -25,11 +20,6 @@ OUTPUT_DIR = (
     / "fase_1_tuning"
     / "campagna_VAS_block_k_tuning"
 )
-
-
-# ============================================================
-# Configurazione della campagna e stile
-# ============================================================
 
 EXPERIMENTS = {
     "cuda_naive": {
@@ -52,9 +42,6 @@ EXPERIMENTS = {
 K_VALUES = [3, 6, 8, 20, 32]
 BLOCK_VALUES = [64, 128, 192, 256, 384, 512, 1024]
 
-# Due medie normalizzate che differiscono meno di questa quantità sono
-# considerate praticamente equivalenti. La soglia evita che differenze più
-# piccole della variabilità sperimentale decidano da sole la configurazione.
 MEAN_R_TIE_TOLERANCE_PCT = 0.5
 
 COLOR_STANDARD = "#4C78A8"
@@ -78,17 +65,11 @@ plt.rcParams.update(
     }
 )
 
-
-# ============================================================
-# Lettura e validazione dei dati
-# ============================================================
-
 def extract_block(kernel_names: pd.Series) -> pd.Series:
     """Ricava BLOCK dal nome; l'assenza del suffisso indica il default 256."""
 
     extracted = kernel_names.astype(str).str.extract(r"blk(\d+)", expand=False)
     return extracted.fillna(256).astype(int)
-
 
 def require_single_value(df: pd.DataFrame, column: str, csv_path: Path):
     values = df[column].dropna().unique()
@@ -98,7 +79,6 @@ def require_single_value(df: pd.DataFrame, column: str, csv_path: Path):
             f"valore, trovati {values.tolist()}."
         )
     return values[0]
-
 
 def load_results(csv_path: Path) -> tuple[pd.DataFrame, dict]:
     df = pd.read_csv(csv_path)
@@ -185,9 +165,6 @@ def load_results(csv_path: Path) -> tuple[pd.DataFrame, dict]:
             f"{csv_path.name}: configurazioni duplicate: {pairs}."
         )
 
-    # Nel benchmark gflops_kernel è la metrica del solo kernel CUDA ed è
-    # definita a partire dal tempo medio delle ripetizioni. Verifichiamo che il
-    # valore salvato nel CSV sia coerente con quella definizione.
     flop = 2.0 * df["M"] * df["N"] * df["k"]
     expected_gflops = flop / df["t_kernel_mean_s"] / 1.0e9
     if not np.allclose(
@@ -202,7 +179,6 @@ def load_results(csv_path: Path) -> tuple[pd.DataFrame, dict]:
         )
 
     return df, metadata
-
 
 def load_failures(failure_path: Path | None) -> pd.DataFrame:
     if failure_path is None or not failure_path.exists():
@@ -222,7 +198,6 @@ def load_failures(failure_path: Path | None) -> pd.DataFrame:
     df["k"] = pd.to_numeric(df["k"], errors="raise").astype(int)
     df["block"] = pd.to_numeric(df["block"], errors="raise").astype(int)
     return df[["k", "block"]].drop_duplicates()
-
 
 def validate_coverage(
     df: pd.DataFrame,
@@ -247,17 +222,11 @@ def validate_coverage(
             f"{missing_pairs}."
         )
 
-
-# ============================================================
-# Tabelle e criterio di selezione
-# ============================================================
-
 def build_pivot(df: pd.DataFrame, value_column: str) -> pd.DataFrame:
     return (
         df.pivot(index="k", columns="block", values=value_column)
         .reindex(index=K_VALUES, columns=BLOCK_VALUES)
     )
-
 
 def compute_normalized_summary(
     performance_pivot: pd.DataFrame,
@@ -295,7 +264,6 @@ def compute_normalized_summary(
 
     return normalized, summary
 
-
 def choose_block(summary: pd.DataFrame) -> int:
     """Sceglie il compromesso robusto tra i BLOCK praticamente equivalenti."""
 
@@ -309,7 +277,6 @@ def choose_block(summary: pd.DataFrame) -> int:
         na_position="last",
     )
     return int(candidates.iloc[0]["block"])
-
 
 def print_summary(
     experiment_name: str,
@@ -335,17 +302,11 @@ def print_summary(
         f"(quasi-parità: {MEAN_R_TIE_TOLERANCE_PCT:.1f} punti percentuali)"
     )
 
-
-# ============================================================
-# Figura finale: heatmap + robustezza
-# ============================================================
-
 def heatmap_lower_bound(normalized_pct: np.ndarray) -> float:
     finite = normalized_pct[np.isfinite(normalized_pct)]
     if finite.size == 0:
         raise ValueError("Nessuna prestazione valida da rappresentare.")
     return max(0.0, 5.0 * np.floor(float(finite.min()) / 5.0))
-
 
 def add_heatmap(
     ax,
@@ -445,7 +406,6 @@ def add_heatmap(
     colorbar.set_label("Prestazione normalizzata [%]")
     return image
 
-
 def add_loss_plot(ax, summary: pd.DataFrame, chosen_block: int):
     valid = summary[summary["valid_all_k"]].copy().sort_index()
     blocks = valid.index.to_numpy(dtype=int)
@@ -523,9 +483,6 @@ def plot_tuning_summary(
         gridspec_kw={"width_ratios": [1.35, 1.0]},
     )
 
-    # Gli spazi superiore e inferiore sono riservati esplicitamente a titolo,
-    # contesto sperimentale e riepilogo: fig.text non viene gestito da
-    # constrained_layout e altrimenti finirebbe sopra titoli e assi.
     fig.subplots_adjust(
         left=0.06,
         right=0.975,
@@ -588,11 +545,6 @@ def plot_tuning_summary(
     print(f"Grafico PNG: {png_path}")
     print(f"Grafico PDF: {pdf_path}")
 
-
-# ============================================================
-# Main
-# ============================================================
-
 def main() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -639,7 +591,6 @@ def main() -> None:
             chosen_block=chosen_block,
             failure_df=failure_df,
         )
-
 
 if __name__ == "__main__":
     main()

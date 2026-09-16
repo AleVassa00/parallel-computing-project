@@ -6,69 +6,24 @@
 #include "mpi/distrib.h"
 #include "mpi/grid.h"
 
-/* Tempi della singola invocazione, misurati localmente da ciascun processo.
- * Il tempo di fase include l'attesa dei processi in ritardo: e' voluto, e'
- * esattamente il costo che si paga sul cammino critico. */
 typedef struct {
     double bcast_time;
     double local_phase_time;
     double reduce_time;
     double total_time;
-    /* Tempo usato per la metrica ufficiale. Coincide con t_total sui backend
-     * CPU; su CUDA sostituisce la fase locale con il solo t_kernel, escludendo
-     * H2D/D2H ma conservando le due comunicazioni MPI. */
+
     double official_time;
-    /* Tempo del solo kernel, chiesto al backend. Su CPU e' negativo
-     * ("non applicabile": la risposta e' gia' t_local); su CUDA e' il tempo
-     * misurato dai cudaEvent. */
+
     double kernel_time;
-    /* Le due voci che la consegna esclude dal tempo ufficiale ma consente di
-     * misurare e discutere a parte: i trasferimenti host<->device di questa
-     * invocazione, letti dagli event del backend. Negativi su CPU. */
+
     double h2d_X_transfer_time;
     double d2h_Y_transfer_time;
-    /* Cio' che resta della fase locale una volta tolti kernel e trasferimenti:
-     * e' l'overhead del runtime CUDA (lancio, record ed eventuale attesa),
-     * l'unico modo per sapere se la differenza t_local-t_kernel e' PCIe o no.
-     *
-     *   t_local = h2d_X + kernel + d2h_Y + launch_overhead
-     *
-     * Negativo su CPU, dove non c'e' nessuna delle tre voci. */
+
     double launch_overhead_time;
-    /* Tempo DI GRUPPO della fase locale, misurato solo con group_timing:
-     * MPI_Barrier -> MPI_Wtime -> local_gemm -> MPI_Barrier -> MPI_Wtime.
-     * Parte quando TUTTI i rank sono pronti a lanciare e finisce quando
-     * l'ULTIMO ha ricevuto il risultato dalla GPU: e' identico su ogni rank e
-     * non dipende da come il driver ha alternato i contesti sulla scheda.
-     * Serve quando piu' rank condividono la stessa GPU, dove t_kernel dei
-     * cudaEvent misura anche i turni degli altri processi e il suo massimo
-     * fra i rank non e' piu' un tempo di gruppo. Negativo se disattivato. */
+
     double local_group_time;
 } matmul_time_t;
 
-/* Y = A*X distribuito. Tutti i processi eseguono lo stesso codice.
- *
- *   1. MPI_Bcast di X_loc lungo col_comm            (root = riga 0)
- *   2. Y_parz = A_loc * X_loc                      (kernel locale)
- *   3. MPI_Reduce(MPI_SUM) lungo row_comm          (root = colonna 0)
- *
- * All'ingresso X_loc e' significativo soltanto sulla grid row 0. Il broadcast
- * lo replica nella relativa colonna; la reduce ricompone Y perche' ogni
- * processo di una riga ha calcolato soltanto il contributo delle colonne di A
- * che possiede.
- *
- * kern:  contesto del kernel locale, creato in preprocessing con il blocco
- *        A_loc di questo processo. A non compare piu' qui: il backend la
- *        possiede gia' (su GPU e' la copia in VRAM), e forma e leading
- *        dimension vengono da li', non possono divergere dal layout.
- * X_loc: fetta n_loc x k inizializzata sulla grid row 0; buffer su tutti.
- * Ypart: buffer di lavoro m_loc x k, richiesto su tutti i processi.
- * Y_loc: significativo solo sulla colonna 0; puo' essere NULL altrove.
- *        Volutamente distinto da Ypart, cosi' non serve MPI_IN_PLACE.
- * t:     puo' essere NULL se non interessa la scomposizione dei tempi.
- * group_timing: se diverso da zero, racchiude local_gemm fra due MPI_Barrier
- *        e riempie local_group_time. Le barriere entrano in t_local, t_total
- *        e t_official: e' una modalita' diagnostica, non quella ufficiale. */
 void mpi_matmul(const grid_t *grid, const layout_t *layout,
                 local_gemm_t *local_gemm_context,
                 scalar_t *X_loc,
@@ -77,4 +32,4 @@ void mpi_matmul(const grid_t *grid, const layout_t *layout,
                 matmul_time_t *times_struct_rep,
                 int group_timing);
 
-#endif /* MATMUL_MPI_H */
+#endif

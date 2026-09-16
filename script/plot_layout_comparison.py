@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 ROW_CSV = (
@@ -51,13 +50,11 @@ plt.rcParams.update(
     }
 )
 
-
 def extract_block(kernel_names: pd.Series) -> pd.Series:
     """Ricava BLOCK dal nome; l'assenza del suffisso indica il default 256."""
 
     extracted = kernel_names.astype(str).str.extract(r"blk(\d+)", expand=False)
     return extracted.fillna(256).astype(int)
-
 
 def require_single_value(df: pd.DataFrame, column: str, csv_path: Path):
     values = df[column].dropna().unique()
@@ -67,7 +64,6 @@ def require_single_value(df: pd.DataFrame, column: str, csv_path: Path):
             f"trovati {values.tolist()}."
         )
     return values[0]
-
 
 def load_layout(csv_path: Path, expected_layout: str) -> tuple[pd.DataFrame, dict]:
     if not csv_path.exists():
@@ -158,7 +154,6 @@ def load_layout(csv_path: Path, expected_layout: str) -> tuple[pd.DataFrame, dic
     keep = ["k", "gflops_kernel", "t_kernel_cv_pct"]
     return df[keep].sort_values("k").reset_index(drop=True), metadata
 
-
 def verify_same_setup(row_metadata: dict, column_metadata: dict) -> None:
     mismatches = {
         key: (row_metadata[key], column_metadata[key])
@@ -167,7 +162,6 @@ def verify_same_setup(row_metadata: dict, column_metadata: dict) -> None:
     }
     if mismatches:
         raise ValueError(f"Le due campagne non hanno lo stesso setup: {mismatches}")
-
 
 def build_comparison(row: pd.DataFrame, column: pd.DataFrame) -> pd.DataFrame:
     comparison = row.merge(
@@ -186,7 +180,6 @@ def build_comparison(row: pd.DataFrame, column: pd.DataFrame) -> pd.DataFrame:
     )
     return comparison
 
-
 def annotate_bars(ax, bars, values, offset: float) -> None:
     for bar, value in zip(bars, values):
         ax.annotate(
@@ -199,7 +192,6 @@ def annotate_bars(ax, bars, values, offset: float) -> None:
             fontsize=9,
             color=bar.get_facecolor(),
         )
-
 
 def plot_comparison(comparison: pd.DataFrame, metadata: dict) -> tuple[Path, Path]:
     x = np.arange(len(comparison), dtype=float)
@@ -340,7 +332,6 @@ def plot_comparison(comparison: pd.DataFrame, metadata: dict) -> tuple[Path, Pat
     plt.close(fig)
     return png_path, pdf_path
 
-
 def main() -> None:
     row, row_metadata = load_layout(ROW_CSV, expected_layout="row")
     column, column_metadata = load_layout(COLUMN_CSV, expected_layout="column")
@@ -365,7 +356,6 @@ def main() -> None:
     png_path, pdf_path = plot_comparison(comparison, row_metadata)
     print(f"Grafico PNG: {png_path}")
     print(f"Grafico PDF: {pdf_path}")
-
 
 if __name__ == "__main__":
     main()

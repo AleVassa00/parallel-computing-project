@@ -1,31 +1,3 @@
-/* Schema A: ordine dei cicli i -> j -> c, tutto row-major.
- *
- * E' lo schema che NON rilegge A k volte, ed e' il motivo per cui il prodotto
- * matrice-multivettore vale piu' di k prodotti matrice-vettore.
- *
- *   for i:
- *     acc[0..k) = 0
- *     for j:
- *       a = A[i][j]              <- letto UNA sola volta
- *       for c: acc[c] += a * X[j][c]   <- riusato k volte, dai registri
- *     Y[i][0..k) = acc[0..k)
- *
- * Proprieta':
- *  - entrambi gli stream in memoria sono a stride 1: la riga di A e la riga
- *    di X (che e' contigua perche' X e' row-major con k contiguo);
- *  - il riuso di A vale esattamente k, per qualunque k, senza casi degeneri.
- *    L'intensita' aritmetica passa da k/4 * (1/k) = 1/4 dello schema B a
- *    k/4 FLOP/byte, che e' il massimo ottenibile leggendo A una volta.
- *
- * Confronto con lo schema B (i -> c -> j, X column-major): li' la riga di A
- * viene riletta una volta per ogni colonna di X, e il riuso si recupera solo
- * con l'unrolling su c, che pero' satura a min(k, ampiezza del gruppo). Qui
- * il riuso e' k per costruzione.
- *
- * I k obbligatori hanno funzioni con aggiornamenti espliciti, cosi' il
- * compilatore vede a compile-time il numero di accumulatori. Gli altri k
- * usano il fallback bloccato generico; per k > KB A viene riletta
- * ceil(k/KB) volte. */
 
 #include "kernel/kernel.h"
 
@@ -33,9 +5,6 @@
 
 #include "common/util.h"
 
-/* Ampiezza del blocco di colonne tenuto negli accumulatori.
- * 32 copre tutti i k del collaudo (3, 6, 8, 20, 32): in quei casi il ciclo
- * su c0 e' degenere e A viene letta una volta sola. */
 #define KB 32
 
 static void kernel_generic(int m_loc, int n_loc, int k,
@@ -73,9 +42,6 @@ static void kernel_generic(int m_loc, int n_loc, int k,
 
 #ifndef FORCE_GENERIC_K
 
-/* Una sola lista per ogni ampiezza genera dichiarazione, aggiornamento e
- * store. Il percorso caldo risultante contiene istruzioni C esplicite per
- * ogni colonna, senza un limite runtime sul ciclo c. */
 #define COLS_3(M)  M(0) M(1) M(2)
 #define COLS_6(M)  COLS_3(M) M(3) M(4) M(5)
 #define COLS_8(M)  COLS_6(M) M(6) M(7)
@@ -127,24 +93,15 @@ DEFINE_FIXED_KERNEL(32, COLS_32)
 #undef COLS_6
 #undef COLS_3
 
-#endif /* FORCE_GENERIC_K */
+#endif
 
-/* Stato del backend.
- *
- * Per lo schema A scalare non c'e' nulla da preparare: A e' gia' nella memoria
- * del processo e il kernel la legge direttamente, quindi il contesto si limita
- * a registrare forma e puntatore. Esiste comunque, e con la stessa interfaccia
- * degli altri backend, perche' e' qui che il backend CUDA terra' il puntatore
- * alla copia di A in VRAM: da quel lato create() e' una cudaMemcpy H2D che
- * deve avvenire UNA volta sola, fuori dalla regione cronometrata. */
 struct local_gemm_context {
     int m_loc, n_loc, k;
     int lda;
     int ldx, ldy;
     const scalar_t *A_loc;
-    double t_setup;   /* misurato davvero, anche se qui e' ~1 us: il confronto
-                       * con il backend CUDA ha senso solo se lo stesso numero
-                       * viene dallo stesso punto del codice in entrambi. */
+    double t_setup;
+
 };
 
 local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_loc, int lda, int ldx, int ldy)
@@ -176,9 +133,7 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
 
 void local_gemm(local_gemm_t *local_gemm_context, const scalar_t * RESTRICT X_loc, int ldx, scalar_t * RESTRICT Y_loc_part, int ldy)
 {
-    /* Copie locali: il puntatore ad A torna a essere restrict all'interno di
-     * questa funzione, cosi' i kernel specializzati ricevono la stessa
-     * garanzia di non aliasing che avevano quando A era un parametro. */
+
     const scalar_t *RESTRICT A_loc = local_gemm_context->A_loc;
     const int m_loc = local_gemm_context->m_loc,
               n_loc = local_gemm_context->n_loc,
@@ -218,16 +173,10 @@ void local_gemm(local_gemm_t *local_gemm_context, const scalar_t * RESTRICT X_lo
 
 void local_gemm_destroy(local_gemm_t *local_gemm_context)
 {
-    /* Nessuna risorsa esterna da rilasciare: A appartiene al chiamante.
-     * Il backend CUDA fara' qui la cudaFree della copia in VRAM. */
+
     xfree(local_gemm_context);
 }
 
-/* Su CPU il kernel E' l'invocazione: non esiste un tempo di calcolo distinto
- * da t_local, e restituire t_local qui vorrebbe dire duplicare in una colonna
- * un numero che il chiamante ha gia'. Il valore negativo dice "non applicabile"
- * e il driver lo riporta come tale, cosi' nel CSV si vede a colpo d'occhio
- * quali righe vengono da un backend con trasferimenti e quali no. */
 double local_gemm_last_compute_seconds(const local_gemm_t *local_gemm_context)
 {
     (void)local_gemm_context;
@@ -239,15 +188,6 @@ double local_gemm_setup_seconds(const local_gemm_t *local_gemm_context)
     return (local_gemm_context != NULL) ? local_gemm_context->t_setup : 0.0;
 }
 
-/* ---------------------------------------------------------------------------
- * Tempi "da discutere a parte": qui non esistono
- * ---------------------------------------------------------------------------
- * Un backend di CPU legge A, X e Y dove gia' stanno: non c'e' nessun
- * trasferimento da e verso una scheda, ne' un runtime da pagare per lanciare
- * il lavoro. Le voci restano nel CSV perche' le colonne devono essere le
- * stesse per tutti i backend, ma valgono il sentinella negativo (tempi) o
- * zero (byte), cosi' una riga di CPU si distingue a colpo d'occhio da una che
- * i trasferimenti li ha davvero. */
 double local_gemm_last_h2d_X_seconds(const local_gemm_t *local_gemm_context)
 {
     (void)local_gemm_context;
@@ -278,10 +218,6 @@ size_t local_gemm_bytes_d2h_Y_per_call(const local_gemm_t *local_gemm_context)
     return 0;
 }
 
-/* Il preprocessing di un backend di CPU e' solo la registrazione dei
- * puntatori: non c'e' nessun contesto da creare, nessuna VRAM da allocare e
- * nessuna A da copiare, quindi le tre voci sono zero e il loro totale
- * (local_gemm_setup_seconds) resta dell'ordine del microsecondo. */
 double local_gemm_setup_device_init_seconds(const local_gemm_t *local_gemm_context)
 {
     (void)local_gemm_context;
@@ -300,9 +236,6 @@ double local_gemm_setup_h2d_A_seconds(const local_gemm_t *local_gemm_context)
     return 0.0;
 }
 
-/* Occupancy e tiling in shared memory sono concetti di GPU: su CPU non esistono
- * e il sentinella negativo lo dichiara, con la stessa convenzione di
- * local_gemm_last_compute_seconds. */
 int local_gemm_blocks_per_sm(const local_gemm_t *local_gemm_context)
 {
     (void)local_gemm_context;

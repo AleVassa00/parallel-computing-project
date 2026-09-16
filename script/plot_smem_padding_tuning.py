@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-
 ROOT = Path(__file__).resolve().parents[1]
 RESULTS_DIR = (
     ROOT
@@ -47,13 +46,11 @@ plt.rcParams.update(
     }
 )
 
-
 def extract_pad(kernel_names: pd.Series) -> pd.Series:
     """Ricava SMEM_PAD: il nome senza suffisso corrisponde a pad=1."""
 
     extracted = kernel_names.astype(str).str.extract(r"pad(\d+)", expand=False)
     return extracted.fillna(1).astype(int)
-
 
 def require_single_value(df: pd.DataFrame, column: str):
     values = df[column].dropna().unique()
@@ -63,7 +60,6 @@ def require_single_value(df: pd.DataFrame, column: str):
             f"trovati {values.tolist()}."
         )
     return values[0]
-
 
 def load_results() -> tuple[pd.DataFrame, dict]:
     if not INPUT_CSV.exists():
@@ -154,7 +150,6 @@ def load_results() -> tuple[pd.DataFrame, dict]:
     }
     return df, metadata
 
-
 def build_comparison(df: pd.DataFrame) -> pd.DataFrame:
     comparison = df.pivot(index="k", columns="smem_pad", values="gflops_kernel")
     comparison = comparison.reindex(index=K_VALUES, columns=[0, 1])
@@ -174,7 +169,6 @@ def build_comparison(df: pd.DataFrame) -> pd.DataFrame:
         100.0 * comparison["pad1_gflops"] / comparison["best_gflops"]
     )
     return comparison
-
 
 def plot_padding_comparison(
     comparison: pd.DataFrame, metadata: dict
@@ -282,7 +276,6 @@ def plot_padding_comparison(
     plt.close(fig)
     return png_path, pdf_path
 
-
 def main() -> None:
     df, metadata = load_results()
     comparison = build_comparison(df)
@@ -304,7 +297,6 @@ def main() -> None:
     )
     print(f"Grafico PNG: {png_path}")
     print(f"Grafico PDF: {pdf_path}")
-
 
 if __name__ == "__main__":
     main()

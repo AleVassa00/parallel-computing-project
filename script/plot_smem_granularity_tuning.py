@@ -5,7 +5,6 @@ from matplotlib.patches import Rectangle
 import numpy as np
 import pandas as pd
 
-
 ROOT = Path(__file__).resolve().parents[1]
 RESULTS_DIR = (
     ROOT
@@ -55,13 +54,11 @@ plt.rcParams.update(
     }
 )
 
-
 def extract_block(kernel_names: pd.Series) -> pd.Series:
     """Ricava BLOCK dal nome; l'assenza del suffisso indica il default 256."""
 
     extracted = kernel_names.astype(str).str.extract(r"blk(\d+)", expand=False)
     return extracted.fillna(256).astype(int)
-
 
 def require_single_value(df: pd.DataFrame, column: str, csv_path: Path):
     values = df[column].dropna().unique()
@@ -71,7 +68,6 @@ def require_single_value(df: pd.DataFrame, column: str, csv_path: Path):
             f"trovati {values.tolist()}."
         )
     return values[0]
-
 
 def load_results() -> tuple[pd.DataFrame, pd.DataFrame, dict]:
     if not INPUT_CSV.exists():
@@ -196,7 +192,6 @@ def load_results() -> tuple[pd.DataFrame, pd.DataFrame, dict]:
     }
     return df, failures, metadata
 
-
 def build_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     performance = df.pivot(
         index="k",
@@ -235,7 +230,6 @@ def build_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     )
     return normalized, summary
 
-
 def choose_configuration(summary: pd.DataFrame) -> tuple[int, int]:
     candidates = summary[summary["near_best_mean"]].reset_index()
     candidates = candidates.sort_values(
@@ -244,11 +238,9 @@ def choose_configuration(summary: pd.DataFrame) -> tuple[int, int]:
     row = candidates.iloc[0]
     return int(row["block"]), int(row["tile_granularity"])
 
-
 def summary_matrix(summary: pd.DataFrame, column: str) -> pd.DataFrame:
     matrix = summary[column].unstack("block")
     return matrix.reindex(index=GRANULARITIES, columns=BLOCK_VALUES)
-
 
 def draw_summary_heatmap(
     ax,
@@ -321,7 +313,6 @@ def draw_summary_heatmap(
             tick.set_color(COLOR_SELECTED)
             tick.set_fontweight("bold")
     return image
-
 
 def plot_joint_summary(
     summary: pd.DataFrame,
@@ -402,7 +393,6 @@ def plot_joint_summary(
     fig.savefig(pdf_path, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     return png_path, pdf_path
-
 
 def plot_selected_block_detail(
     df: pd.DataFrame,
@@ -512,7 +502,6 @@ def plot_selected_block_detail(
     plt.close(fig)
     return png_path, pdf_path
 
-
 def main() -> None:
     df, failures, metadata = load_results()
     _, summary = build_summary(df)
@@ -543,7 +532,6 @@ def main() -> None:
     print(f"Grafico principale PDF: {summary_pdf}")
     print(f"Grafico di dettaglio PNG: {detail_png}")
     print(f"Grafico di dettaglio PDF: {detail_pdf}")
-
 
 if __name__ == "__main__":
     main()

@@ -1,5 +1,4 @@
-/* clock_gettime e CLOCK_MONOTONIC non sono ISO C: con -std=c11 (senza
- * estensioni GNU) vanno richiesti esplicitamente. */
+
 #define _POSIX_C_SOURCE 200809L
 
 #include "common/util.h"
@@ -17,13 +16,8 @@ void *xmalloc(size_t bytes)
 {
     void *p = NULL;
 
-    /* Un blocco locale puo' essere legittimamente vuoto (griglia con piu'
-     * processi che indici globali). Si alloca comunque il minimo: il puntatore
-     * resta valido, e nessun percorso deve preoccuparsi di aritmetica su NULL
-     * o di buffer nulli passati alle collettive con count == 0. */
     if (bytes == 0) bytes = 1;
 
-    /* aligned_alloc esige una dimensione multipla dell'allineamento */
     bytes = (bytes + ALIGN - 1) / ALIGN * ALIGN;
     p = aligned_alloc(ALIGN, bytes);
     if (p == NULL)
@@ -55,9 +49,6 @@ void die(const char *fmt, ...)
     va_end(ap);
     fflush(stderr);
 
-    /* Prima di MPI_Init (e dopo MPI_Finalize) exit e' l'unica terminazione
-     * lecita. Durante un job MPI, invece, la morte di un solo rank potrebbe
-     * lasciare gli altri bloccati in una collettiva: termina l'intero job. */
     MPI_Initialized(&initialized);
     if (initialized)
         MPI_Finalized(&finalized);

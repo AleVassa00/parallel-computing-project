@@ -6,7 +6,6 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-
 REPO = Path(__file__).resolve().parents[1]
 STUB = r'''#!/usr/bin/env python3
 import json, os, sys
@@ -34,7 +33,6 @@ elif tool == 'mpirun' and '--version' not in args:
             for rep in range(int(args[args.index('--reps')+1])):
                 f.write(row + ',' + str(rep+1) + '\n')
 '''
-
 
 def main():
     with tempfile.TemporaryDirectory(prefix='cuda-runner-test-') as temp:
@@ -72,7 +70,6 @@ def main():
             with path.open() as f:
                 return list(csv.DictReader(f))
 
-        # Tutte le modalita' del runner continuano a costruire e instradare i backend.
         for experiment in ('k-sweep', 'block-sweep', 'compare', 'registers',
                            'smem-pad-sweep', 'ncu', 'full', 'grid-sweep'):
             _, log = run(['--experiment', experiment, '--all-grids', '4'])
@@ -93,7 +90,6 @@ def main():
         _, log = run(['--experiment', 'k-sweep', '--ks', ''], expected=1)
         assert not builds(log)
         print('PASS runner: {} CLI/config/regression/error scenarios'.format(runs))
-
 
 if __name__ == '__main__':
     main()

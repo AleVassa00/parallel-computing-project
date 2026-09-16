@@ -1,7 +1,6 @@
 from pathlib import Path
 import shutil
 
-
 ROOT = Path(__file__).resolve().parents[1]
 PHASE_DIR = ROOT / "experiments" / "fase_5_mpi_cuda"
 CAMPAIGN_NAME = "campagna_VAS_10_mpi_cuda_hybrid"
@@ -38,16 +37,14 @@ KERNELS = {
     },
 }
 
-
 def validate_target() -> None:
     expected_parent = (ROOT / "experiments" / "fase_5_mpi_cuda").resolve()
     target = CAMPAIGN_DIR.resolve()
     if target.parent != expected_parent or target.name != CAMPAIGN_NAME:
         raise RuntimeError(f"Target non sicuro per la rigenerazione: {target}")
 
-
 def config_text(size: int, process_count: int, key: str, spec: dict) -> str:
-    return f"""# Campagna VAS 10 - {spec['description']}, S={size}, tutte le griglie di P={process_count}.
+    return f"""
 name=campagna_VAS_10_s{size}_{key}_p{process_count}_all_grids
 experiment=k-sweep
 outdir=results/fase_5_mpi_cuda/{CAMPAIGN_NAME}/s{size}
@@ -75,47 +72,23 @@ group_timing=1
 continue_on_error=1
 """
 
-
 def size_suite_text(size: int, relative_configs: list[str]) -> str:
     factorisations = (
         "P=1: 1x1; P=2: 1x2, 2x1; "
         "P=4: 1x4, 2x2, 4x1; P=8: 1x8, 2x4, 4x2, 8x1"
     )
     entries = "\n".join(relative_configs)
-    return f"""# Campagna VAS 10 - MPI + CUDA, matrici quadrate S={size}.
-# M=N={size}, FP64, k={K_VALUES}.
-# Tutti i backend CUDA e tutte le fattorizzazioni ordinate fino a P=8.
-# {factorisations}.
-# Input globali distribuiti con MPI (a_mode=global, x_mode=global).
-# Il cronometro di gruppo sincronizza i rank immediatamente prima e dopo
-# local_gemm e produce t_local_group_* e gflops_local_group.
+    return f"""
 
 {entries}
 """
-
 
 def master_suite_text(relative_configs: list[str]) -> str:
     entries = "\n".join(relative_configs)
-    return f"""# Campagna VAS 10 - parallelismo ibrido MPI + CUDA su una singola GPU.
-#
-# Tre sottocampagne, una per ciascuna taglia quadrata della Fase 2:
-# M=N=4096, 8192, 16384. Per ogni taglia si provano tutti i backend CUDA,
-# k={K_VALUES}, P=1,2,4,8 e tutte le fattorizzazioni ordinate Pr x Pc.
-#
-# Le matrici globali vengono generate sul root e distribuite ai rank.
-# Tutti i rank usano il device CUDA 0: le run multi-rank misurano anche la
-# contesa fra contesti sulla singola GPU del server.
-# group_timing=1 aggiunge due MPI_Barrier attorno a local_gemm per misurare
-# la finestra comune dal lancio coordinato al completamento dell'ultimo rank.
-#
-# Esecuzione completa:
-#   ./script/run_cuda_experiments.sh --suite experiments/fase_5_mpi_cuda/{CAMPAIGN_NAME}.txt
-#
-# Le tre suite per taglia possono essere eseguite separatamente.
+    return f"""
 
 {entries}
 """
-
 
 def main() -> None:
     validate_target()
@@ -156,7 +129,6 @@ def main() -> None:
     print(f"Generate {len(SIZES) * len(KERNELS) * len(PROCESS_COUNTS)} configurazioni")
     print(f"Cartella: {CAMPAIGN_DIR}")
     print(f"Suite completa: {master_path}")
-
 
 if __name__ == "__main__":
     main()

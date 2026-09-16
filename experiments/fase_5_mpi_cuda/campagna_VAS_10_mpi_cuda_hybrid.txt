@@ -1,19 +1,3 @@
-# Campagna VAS 10 - parallelismo ibrido MPI + CUDA su una singola GPU.
-#
-# Tre sottocampagne, una per ciascuna taglia quadrata della Fase 2:
-# M=N=4096, 8192, 16384. Per ogni taglia si provano tutti i backend CUDA,
-# k=3 6 8 20 32, P=1,2,4,8 e tutte le fattorizzazioni ordinate Pr x Pc.
-#
-# Le matrici globali vengono generate sul root e distribuite ai rank.
-# Tutti i rank usano il device CUDA 0: le run multi-rank misurano anche la
-# contesa fra contesti sulla singola GPU del server.
-# group_timing=1 aggiunge due MPI_Barrier attorno a local_gemm per misurare
-# la finestra comune dal lancio coordinato al completamento dell'ultimo rank.
-#
-# Esecuzione completa:
-#   ./script/run_cuda_experiments.sh --suite experiments/fase_5_mpi_cuda/campagna_VAS_10_mpi_cuda_hybrid.txt
-#
-# Le tre suite per taglia possono essere eseguite separatamente.
 
 campagna_VAS_10_mpi_cuda_hybrid/s4096/cuda_naive_p1.conf
 campagna_VAS_10_mpi_cuda_hybrid/s4096/cuda_naive_p2.conf

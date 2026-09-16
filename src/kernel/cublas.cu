@@ -1,82 +1,10 @@
-/* Backend cuBLAS: RIFERIMENTO ESTERNO, non una proposta.  M4.4.
- *
- * Serve a rispondere alla domanda che all'orale arriva sempre: "perche' avete
- * scritto un kernel invece di chiamare una libreria?". La risposta ha valore
- * solo se il numero della libreria e' stato misurato sulla stessa macchina,
- * con la stessa pipeline, gli stessi trasferimenti e lo stesso cronometro
- * degli altri backend. Per questo cuBLAS entra nel progetto come un backend
- * come gli altri, dietro la stessa local_gemm_create / local_gemm /
- * local_gemm_destroy, e non come uno script a parte.
- *
- * L'attesa e' che vada MALE, ed e' un risultato: cuBLAS e' un GEMM
- * general-purpose, ottimizzato per matrici in cui tutte e tre le dimensioni
- * sono grandi. Qui k <= 32, cioe' il multivettore e' strettissimo: la libreria
- * non riesce ad ammortizzare il proprio percorso di selezione dell'algoritmo,
- * il tiling che sceglie ha molte piu' righe che colonne utili e gran parte del
- * lavoro va sprecato. Un numero basso qui e' l'argomento piu' forte per
- * giustificare l'intero progetto.
- *
- * ---------------------------------------------------------------------------
- * Il trucco riga/colonna: nessuna trasposizione, nessuna copia
- * ---------------------------------------------------------------------------
- * cuBLAS e' COLUMN-MAJOR, tutto il progetto e' ROW-MAJOR. La soluzione non e'
- * trasporre (costerebbe piu' del prodotto) ma reinterpretare: una matrice
- * P x Q row-major con leading dimension ld E' GIA', bit per bit, la matrice
- * Q x P column-major con la stessa ld. Leggere gli stessi byte con l'altra
- * convenzione equivale a trasporre gratis.
- *
- * Quindi, con  _rm = come la vede il progetto  e  _cm = come la vede cuBLAS:
- *
- *     A_rm (m x n, lda)  ==  A_cm (n x m, lda)
- *     X_rm (n x k, ldx)  ==  X_cm (k x n, ldx)
- *     Y_rm (m x k, ldy)  ==  Y_cm (k x m, ldy)
- *
- * e la trasposta del prodotto ribalta l'ordine dei fattori:
- *
- *     Y_cm = (Y_rm)^T = (A_rm * X_rm)^T = (X_rm)^T * (A_rm)^T = X_cm * A_cm
- *            (k x m)                                            (k x n)(n x m)
- *
- * Le dimensioni tornano. Nella convenzione di cublas<t>gemm(op, op, M, N, K,
- * alpha, A, lda, B, ldb, beta, C, ldc) - che calcola C(MxN) = A(MxK)*B(KxN) -
- * il nostro prodotto si scrive percio':
- *
- *     M = k            N = m_loc        K = n_loc
- *     A = dX_loc (ldx) B = dA_loc (lda) C = dY_loc_part (ldy)
- *
- * con entrambe le op a CUBLAS_OP_N. I vincoli di cuBLAS sulle leading
- * dimension (lda >= righe della matrice column-major) diventano ldx >= k,
- * lda >= n, ldy >= k: esattamente le tre condizioni che local_gemm_create gia'
- * verifica.
- *
- * ---------------------------------------------------------------------------
- * Cosa entra nel cronometro
- * ---------------------------------------------------------------------------
- * Identico agli altri backend CUDA, altrimenti il confronto non varrebbe:
- * l'handle cuBLAS, i cudaMalloc e la H2D di A stanno in create (t_setup); i
- * cudaEvent circondano la sola chiamata gemm, non le copie di X e Y. La
- * creazione dell'handle e' costosa (carica i kernel della libreria) ed e'
- * proprio per questo che sta in create: metterla nel cammino misurato
- * misurerebbe l'inizializzazione della libreria, non il suo GEMM.
- */
 
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
 
-
 #include "kernel/kernel.h"
 #include "common/util.h"
 
-/* Il server di dipartimento su cui la consegna richiede di misurare ha una
- * sola GPU: non c'e' nessun device da scegliere, e una logica di selezione
- * basata sul rank locale MPI sarebbe codice che non puo' mai fare nulla.
- * Tutti i rank sullo stesso nodo usano quindi il device 0.
- *
- * Conseguenza da tenere presente nel leggere le misure: con piu' rank MPI per
- * GPU i contesti si alternano sulla scheda (MPS non attivo), quindi t_kernel
- * comprende anche il tempo in cui il contesto di questo rank e' sospeso a
- * favore di un altro. Per caratterizzare il kernel in se' va usato un rank
- * singolo; con piu' rank il numero resta valido come throughput AGGREGATO
- * della GPU sul problema globale, non come tempo di una GPU dedicata. */
 #define CUDA_DEVICE_ID 0
 
 #define BYTES_PER_GIB 1073741824.0
@@ -89,9 +17,6 @@
                 cudaGetErrorName(err_), cudaGetErrorString(err_));            \
     } while (0)
 
-/* cublasGetStatusName esiste solo dalle versioni recenti del toolkit: qui la
- * tabella e' esplicita, cosi' il backend compila anche sui moduli piu' vecchi
- * che potrebbero esserci sul server. */
 static const char *cublas_status_name(cublasStatus_t s)
 {
     switch (s) {
@@ -117,8 +42,6 @@ static const char *cublas_status_name(cublasStatus_t s)
                 cublas_status_name(st_), (int)st_);                           \
     } while (0)
 
-/* La precisione e' gia' un flag di compilazione per tutto il progetto
- * (scalar_t): qui si limita a scegliere quale delle due gemm chiamare. */
 #ifdef USE_FLOAT
 #define CUBLAS_GEMM cublasSgemm
 #else
@@ -130,25 +53,19 @@ struct local_gemm_context {
     int lda, ldx, ldy;
     scalar_t *dA_loc, *dX_loc, *dY_loc_part;
     cublasHandle_t handle;
-    /* Tre coppie di event, non una: la consegna esclude dal tempo ufficiale i
-     * trasferimenti da e verso la scheda ma consente di misurarli a parte, e
-     * per farlo servono confini propri. Gli event sono l'unico strumento
-     * corretto: la D2H parte quando il kernel ha finito, quindi un cronometro
-     * sull'host le attribuirebbe anche l'attesa del calcolo. */
+
     cudaEvent_t ev_h2d_X_start, ev_h2d_X_stop;
     cudaEvent_t ev_kernel_start, ev_kernel_stop;
     cudaEvent_t ev_d2h_Y_start, ev_d2h_Y_stop;
     double t_setup;
     double t_last;
-    double t_last_h2d_X;   /* H2D di X, ultima invocazione (< 0 = mai) */
-    double t_last_d2h_Y;   /* D2H di Y, ultima invocazione (< 0 = mai) */
-    /* Scomposizione di t_setup: contesto, VRAM e la sola copia H2D di A.
-     * Sommate valgono meno del totale, che comprende anche i controlli sugli
-     * argomenti e la creazione degli event. */
+    double t_last_h2d_X;
+    double t_last_d2h_Y;
+
     double t_setup_device_init;
     double t_setup_device_alloc;
     double t_setup_h2d_A;
-    /* Byte che attraversano davvero il PCIe, per convertire i tempi in banda. */
+
     size_t bytes_h2d_A;
     size_t bytes_h2d_X_per_call;
     size_t bytes_d2h_Y_per_call;
@@ -190,9 +107,6 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
     local_gemm_context->t_last_h2d_X = -1.0;
     local_gemm_context->t_last_d2h_Y = -1.0;
 
-    /* Voce 1 del preprocessing: creazione del contesto CUDA. E' un costo
-     * fisso, indipendente dalla taglia, e va tenuto separato dalle altre due
-     * per non farlo passare per un costo di trasferimento. */
     const double t_device_init_start = now_seconds();
     CUDA_CHECK(cudaSetDevice(CUDA_DEVICE_ID));
     CUDA_CHECK(cudaFree(0));
@@ -203,19 +117,6 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
     bytes_Y = (size_t)m_loc * (size_t)ldy * sizeof(scalar_t);
     need = bytes_A + bytes_X + bytes_Y;
 
-    /* Capienza in VRAM: si VERIFICA TENTANDO, non stimando prima.
-     *
-     * Il driver e' l'unico a sapere quanto costano davvero allineamento e
-     * frammentazione, e - su questo server, dove piu' rank MPI condividono
-     * l'unica GPU - quanto hanno allocato gli altri processi un istante fa.
-     * Un controllo preventivo con cudaMemGetInfo confronterebbe una fotografia
-     * gia' obsoleta e andrebbe corretto con un margine arbitrario; qui la
-     * risposta la da' cudaMalloc, che non puo' sbagliarsi.
-     *
-     * La catena si ferma alla prima allocazione che non entra: le successive
-     * non vengono nemmeno tentate, ed err arriva al controllo qui sotto. */
-    /* Voce 2 del preprocessing: le allocazioni in VRAM. Crescono con la
-     * taglia del blocco locale ma non sono un trasferimento. */
     const double t_device_alloc_start = now_seconds();
     err = cudaMalloc((void **)&local_gemm_context->dA_loc, nonzero(bytes_A));
     if (err == cudaSuccess)
@@ -224,10 +125,7 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
         err = cudaMalloc((void **)&local_gemm_context->dY_loc_part, nonzero(bytes_Y));
 
     if (err == cudaErrorMemoryAllocation) {
-        /* Serve solo a comporre il messaggio: se anche questa query fallisse,
-         * i due valori resterebbero a zero e la diagnosi degraderebbe senza
-         * mascherare l'errore vero. Meglio questo del laconico "out of
-         * memory" del runtime, che non dice ne' quanto serviva ne' che fare. */
+
         cudaMemGetInfo(&free_b, &total_b);
         die("%s: out of memory on device %d: the local block needs about "
             "%.2f GiB (A %dx%d, X %dx%d, Y %dx%d in %s), but only %.2f GiB "
@@ -239,25 +137,13 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
     CUDA_CHECK(err);
     local_gemm_context->t_setup_device_alloc = now_seconds() - t_device_alloc_start;
 
-    /* A non cambia mai fra un'invocazione e l'altra: la H2D avviene una volta
-     * sola, qui nel preprocessing. X e Y sono gia' dimensionate sopra, quindi
-     * nessuna cudaMalloc puo' cadere nella prima repetition, neppure con
-     * --warmup 0. */
-    /* Voce 3 del preprocessing, e l'unica delle tre che e' PCIe: e' il
-     * trasferimento che la separazione fra create e local_gemm ha tolto dal
-     * cammino misurato, ed e' quindi quello che va discusso a parte. */
     const double t_h2d_A_start = now_seconds();
     if (bytes_A > 0)
         CUDA_CHECK(cudaMemcpy(local_gemm_context->dA_loc, A_loc, bytes_A, cudaMemcpyHostToDevice));
-    /* Una copia da memoria paginabile puo' ritornare prima che il DMA sia
-     * concluso: senza questa attesa il tempo misurato sarebbe quello di
-     * accodamento, non quello del trasferimento. */
+
     CUDA_CHECK(cudaDeviceSynchronize());
     local_gemm_context->t_setup_h2d_A = now_seconds() - t_h2d_A_start;
 
-    /* Byte che attraversano davvero il bus, nelle stesse condizioni in cui
-     * sono stati cronometrati: e' cio' che rende i tempi convertibili in
-     * banda e confrontabili con il picco del PCIe. */
     local_gemm_context->bytes_h2d_A = (bytes_A > 0) ? bytes_A : 0;
     local_gemm_context->bytes_h2d_X_per_call =
         (n_loc > 0 && k > 0) ? (size_t)n_loc * (size_t)ldx * sizeof(scalar_t) : 0;
@@ -273,10 +159,6 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
     CUDA_CHECK(cudaEventCreate(&local_gemm_context->ev_d2h_Y_start));
     CUDA_CHECK(cudaEventCreate(&local_gemm_context->ev_d2h_Y_stop));
 
-    /* Handle e stream: la creazione carica i kernel della libreria ed e'
-     * costosa, quindi sta qui, fuori dal cammino misurato. Lo stream esplicito
-     * e' quello di default, lo stesso su cui vengono registrati gli eventi: e'
-     * cosi' che i cudaEvent misurano davvero il gemm. */
     CUBLAS_CHECK(cublasCreate(&local_gemm_context->handle));
     CUBLAS_CHECK(cublasSetStream(local_gemm_context->handle, 0));
     CUBLAS_CHECK(cublasSetPointerMode(local_gemm_context->handle, CUBLAS_POINTER_MODE_HOST));
@@ -301,11 +183,6 @@ void local_gemm(local_gemm_t *local_gemm_context, const scalar_t *RESTRICT X_loc
     if (ldx != local_gemm_context->ldx || ldy != local_gemm_context->ldy)
         die("cublas: leading dimensions changed between calls " "(ldx %d -> %d, ldy %d -> %d)", local_gemm_context->ldx, ldx, local_gemm_context->ldy, ldy);
 
-    /* H2D di X: dentro l'invocazione perche' X e' il risultato del Bcast
-     * appena concluso, ma delimitata dai suoi event per poterla sottrarre
-     * dal tempo ufficiale e discuterla a parte. I record ci sono anche
-     * quando non c'e' niente da copiare: cosi' il tempo e' definito
-     * (circa zero) invece che indefinito. */
     CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_h2d_X_start, 0));
     if (n_loc > 0 && k > 0)
         CUDA_CHECK(cudaMemcpy(local_gemm_context->dX_loc, X_loc, (size_t)n_loc * (size_t)ldx * sizeof(scalar_t), cudaMemcpyHostToDevice));
@@ -315,44 +192,33 @@ void local_gemm(local_gemm_t *local_gemm_context, const scalar_t *RESTRICT X_loc
 
     if (m_loc > 0 && k > 0) {
         if (n_loc > 0) {
-            /* Y_cm(k x m) = X_cm(k x n) * A_cm(n x m): vedi il trucco
-             * riga/colonna in testa al file. */
+
             CUBLAS_CHECK(CUBLAS_GEMM(local_gemm_context->handle,
                                      CUBLAS_OP_N, CUBLAS_OP_N,
                                      k, m_loc, n_loc,
                                      &alpha,
-                                     local_gemm_context->dX_loc, ldx, /* primo operando */
-                                     local_gemm_context->dA_loc, local_gemm_context->lda, /* secondo operando */
+                                     local_gemm_context->dX_loc, ldx,
+                                     local_gemm_context->dA_loc, local_gemm_context->lda,
                                      &beta,
-                                     local_gemm_context->dY_loc_part, ldy)); /* output */
+                                     local_gemm_context->dY_loc_part, ldy));
         } else {
-            /* Blocco senza colonne: Y = 0. Un gemm con K=0 sarebbe legale ma
-             * qui il caso e' esplicito, e resta dentro gli eventi cosi' che
-             * t_kernel misuri la stessa regione in tutti i casi. */
+
             CUDA_CHECK(cudaMemsetAsync(local_gemm_context->dY_loc_part, 0, (size_t)m_loc * (size_t)ldy * sizeof(scalar_t), 0));
         }
     }
 
     CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_kernel_stop, 0));
 
-    /* D2H di Y, l'altra copia esclusa dal tempo ufficiale. L'event di
-     * partenza viene accodato dopo il kernel, quindi fra i due record
-     * resta la sola copia e non l'attesa del calcolo. */
     CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_d2h_Y_start, 0));
     if (m_loc > 0 && k > 0)
         CUDA_CHECK(cudaMemcpy(Y_loc_part, local_gemm_context->dY_loc_part, (size_t)m_loc * (size_t)ldy * sizeof(scalar_t), cudaMemcpyDeviceToHost));
     CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_d2h_Y_stop, 0));
 
-    /* L'ultimo event accodato e' quello della D2H: aspettare lui vuol dire
-     * aspettare tutto il lavoro di questa invocazione. */
     CUDA_CHECK(cudaEventSynchronize(local_gemm_context->ev_d2h_Y_stop));
 
     CUDA_CHECK(cudaEventElapsedTime(&ms, local_gemm_context->ev_kernel_start, local_gemm_context->ev_kernel_stop));
     local_gemm_context->t_last = (double)ms * 1.0e-3;
 
-    /* Le due voci da discutere a parte. Insieme a t_last e a cio' che
-     * avanza (overhead del runtime) ricostruiscono il tempo dell'intera
-     * invocazione misurato dal chiamante. */
     CUDA_CHECK(cudaEventElapsedTime(&ms, local_gemm_context->ev_h2d_X_start, local_gemm_context->ev_h2d_X_stop));
     local_gemm_context->t_last_h2d_X = (double)ms * 1.0e-3;
 
@@ -387,9 +253,6 @@ double local_gemm_setup_seconds(const local_gemm_t *local_gemm_context)
     return (local_gemm_context != NULL) ? local_gemm_context->t_setup : 0.0;
 }
 
-/* ---------------------------------------------------------------------------
- * Tempi esclusi dalla misura ufficiale, misurati per essere discussi a parte
- * ------------------------------------------------------------------------- */
 double local_gemm_last_h2d_X_seconds(const local_gemm_t *local_gemm_context)
 {
     return (local_gemm_context != NULL) ? local_gemm_context->t_last_h2d_X : -1.0;
@@ -430,8 +293,6 @@ double local_gemm_setup_h2d_A_seconds(const local_gemm_t *local_gemm_context)
     return (local_gemm_context != NULL) ? local_gemm_context->t_setup_h2d_A : 0.0;
 }
 
-/* cuBLAS sceglie da se' tiling e occupancy e non li espone: non c'e' niente di
- * onesto da riportare, quindi sentinella. */
 int local_gemm_blocks_per_sm(const local_gemm_t *local_gemm_context)
 {
     (void)local_gemm_context;

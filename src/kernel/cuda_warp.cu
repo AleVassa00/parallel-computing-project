@@ -1,13 +1,3 @@
-/* Backend CUDA warp-per-row.
- *
- * Un warp calcola una riga di Y. La lane l visita j=l,l+32,...: le letture
- * della riga di A sono coalescenti e ogni valore di A viene riusato per tutte
- * le colonne del multivettore. I cinque k richiesti sono template distinti;
- * ogni altro k usa un fallback runtime a tile, senza limiti sul valore di k.
- * X_LAYOUT=column rende contigue anche le letture di X delle lane: per una
- * colonna c leggono X[c*n_loc+j]. La selezione e' costante di compilazione;
- * la conversione host e' gia' terminata prima di chiamare questo backend.
- */
 
 #include <cuda_runtime.h>
 #include <stdint.h>
@@ -25,17 +15,6 @@
 
 #define WARP_SIZE 32
 
-/* Thread per blocco.
- *
- * 256 e' il default: 8 warp, e un DIVISORE di 1024, il massimo di thread
- * residenti per SM su Turing (sm_75) - quattro blocchi riempiono l'SM, mentre
- * 192 o 384 si fermerebbero a 960 e 768 thread su 1024.
- *
- * Qui, a differenza del backend naive, il multiplo di 32 e' un requisito di
- * CORRETTEZZA e non solo di efficienza: WARPS_PER_BLOCK determina quante righe
- * di Y elabora un blocco, e la riduzione finale e' un __shfl_down_sync interno
- * al warp. Un blocco non multiplo di 32 spezzerebbe un warp fra due righe.
- * Il valore si sostituisce dal Makefile con BLOCK=<n> (BLOCK_THREADS). */
 #ifndef BLOCK_THREADS
 #define BLOCK_THREADS 256
 #endif
@@ -46,17 +25,7 @@
 
 #define WARPS_PER_BLOCK (BLOCK_THREADS / WARP_SIZE)
 #define RUNTIME_TILE 4
-/* Il server di dipartimento su cui la consegna richiede di misurare ha una
- * sola GPU: non c'e' nessun device da scegliere, e una logica di selezione
- * basata sul rank locale MPI sarebbe codice che non puo' mai fare nulla.
- * Tutti i rank sullo stesso nodo usano quindi il device 0.
- *
- * Conseguenza da tenere presente nel leggere le misure: con piu' rank MPI per
- * GPU i contesti si alternano sulla scheda (MPS non attivo), quindi t_kernel
- * comprende anche il tempo in cui il contesto di questo rank e' sospeso a
- * favore di un altro. Per caratterizzare il kernel in se' va usato un rank
- * singolo; con piu' rank il numero resta valido come throughput AGGREGATO
- * della GPU sul problema globale, non come tempo di una GPU dedicata. */
+
 #define CUDA_DEVICE_ID 0
 
 #define BYTES_PER_GIB 1073741824.0
@@ -76,8 +45,6 @@ static __global__ void warp_kernel_fixed(int m_loc, int n_loc, const scalar_t *_
     unsigned mask;
     int c, j, offset;
 
-    /* Il test e' uniforme per tutto il warp: nessuna lane valida resta fuori
-     * dalle shuffle. Questo copre anche l'ultimo blocco parzialmente usato. */
     if (warp_id >= m_loc)
         return;
 
@@ -96,14 +63,7 @@ static __global__ void warp_kernel_fixed(int m_loc, int n_loc, const scalar_t *_
                 : (size_t)j * (size_t)ldx + c];
     }
 
-    /* Maschera piena, non __activemask(). Da Volta in poi le lane di un warp
-     * possono divergere e riconvergere in modo indipendente, e la guida CUDA
-     * dice esplicitamente che il valore di __activemask() non implica
-     * convergenza: usarlo come maschera di una __shfl_*_sync e' un
-     * comportamento non definito se due lane ne ottengono una diversa. Qui il
-     * return sopra e' UNIFORME sul warp (warp_id non dipende da lane), quindi
-     * le 32 lane sono tutte vive e la maschera corretta e' nota a priori. */
-    mask = 0xffffffffu; //selezioniamo tutte le lane all'interno del Warp
+    mask = 0xffffffffu;
 #pragma unroll
     for (offset = WARP_SIZE / 2; offset > 0; offset >>= 1) {
 #pragma unroll
@@ -119,9 +79,6 @@ static __global__ void warp_kernel_fixed(int m_loc, int n_loc, const scalar_t *_
     }
 }
 
-/* Fallback per k arbitrario. Quattro colonne alla volta limitano la pressione
- * sui registri e riusano ogni lettura di A; l'ultimo tile gestisce qualsiasi
- * resto. Non e' richiesta alcuna dimensione massima di k. */
 static __global__ void warp_kernel_runtime(int m_loc, int n_loc, int k,
                                            const scalar_t *__restrict__ A,
                                            int lda,
@@ -143,7 +100,7 @@ static __global__ void warp_kernel_runtime(int m_loc, int n_loc, int k,
         return;
 
     arow = A + (size_t)warp_id * (size_t)lda;
-    mask = 0xffffffffu;   /* stesso motivo del kernel template qui sopra */
+    mask = 0xffffffffu;
 
     for (c0 = 0; c0 < k; c0 += RUNTIME_TILE) {
 #pragma unroll
@@ -207,25 +164,19 @@ struct local_gemm_context {
     int m_loc, n_loc, k;
     int lda, ldx, ldy;
     scalar_t *dA_loc, *dX_loc, *dY_loc_part;
-    /* Tre coppie di event, non una: la consegna esclude dal tempo ufficiale i
-     * trasferimenti da e verso la scheda ma consente di misurarli a parte, e
-     * per farlo servono confini propri. Gli event sono l'unico strumento
-     * corretto: la D2H parte quando il kernel ha finito, quindi un cronometro
-     * sull'host le attribuirebbe anche l'attesa del calcolo. */
+
     cudaEvent_t ev_h2d_X_start, ev_h2d_X_stop;
     cudaEvent_t ev_kernel_start, ev_kernel_stop;
     cudaEvent_t ev_d2h_Y_start, ev_d2h_Y_stop;
     double t_setup;
     double t_last;
-    double t_last_h2d_X;   /* H2D di X, ultima invocazione (< 0 = mai) */
-    double t_last_d2h_Y;   /* D2H di Y, ultima invocazione (< 0 = mai) */
-    /* Scomposizione di t_setup: contesto, VRAM e la sola copia H2D di A.
-     * Sommate valgono meno del totale, che comprende anche i controlli sugli
-     * argomenti e la creazione degli event. */
+    double t_last_h2d_X;
+    double t_last_d2h_Y;
+
     double t_setup_device_init;
     double t_setup_device_alloc;
     double t_setup_h2d_A;
-    /* Byte che attraversano davvero il PCIe, per convertire i tempi in banda. */
+
     size_t bytes_h2d_A;
     size_t bytes_h2d_X_per_call;
     size_t bytes_d2h_Y_per_call;
@@ -270,9 +221,6 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
     local_gemm_context->t_last_h2d_X = -1.0;
     local_gemm_context->t_last_d2h_Y = -1.0;
 
-    /* Voce 1 del preprocessing: creazione del contesto CUDA. E' un costo
-     * fisso, indipendente dalla taglia, e va tenuto separato dalle altre due
-     * per non farlo passare per un costo di trasferimento. */
     const double t_device_init_start = now_seconds();
     CUDA_CHECK(cudaSetDevice(CUDA_DEVICE_ID));
     CUDA_CHECK(cudaFree(0));
@@ -283,19 +231,6 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
     bytes_Y = (size_t)m_loc * (size_t)ldy * sizeof(scalar_t);
     need = bytes_A + bytes_X + bytes_Y;
 
-    /* Capienza in VRAM: si VERIFICA TENTANDO, non stimando prima.
-     *
-     * Il driver e' l'unico a sapere quanto costano davvero allineamento e
-     * frammentazione, e - su questo server, dove piu' rank MPI condividono
-     * l'unica GPU - quanto hanno allocato gli altri processi un istante fa.
-     * Un controllo preventivo con cudaMemGetInfo confronterebbe una fotografia
-     * gia' obsoleta e andrebbe corretto con un margine arbitrario; qui la
-     * risposta la da' cudaMalloc, che non puo' sbagliarsi.
-     *
-     * La catena si ferma alla prima allocazione che non entra: le successive
-     * non vengono nemmeno tentate, ed err arriva al controllo qui sotto. */
-    /* Voce 2 del preprocessing: le allocazioni in VRAM. Crescono con la
-     * taglia del blocco locale ma non sono un trasferimento. */
     const double t_device_alloc_start = now_seconds();
     err = cudaMalloc((void **)&local_gemm_context->dA_loc, nonzero(bytes_A));
     if (err == cudaSuccess)
@@ -304,10 +239,7 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
         err = cudaMalloc((void **)&local_gemm_context->dY_loc_part, nonzero(bytes_Y));
 
     if (err == cudaErrorMemoryAllocation) {
-        /* Serve solo a comporre il messaggio: se anche questa query fallisse,
-         * i due valori resterebbero a zero e la diagnosi degraderebbe senza
-         * mascherare l'errore vero. Meglio questo del laconico "out of
-         * memory" del runtime, che non dice ne' quanto serviva ne' che fare. */
+
         cudaMemGetInfo(&free_b, &total_b);
         die("%s: out of memory on device %d: the local block needs about "
             "%.2f GiB (A %dx%d, X %dx%d, Y %dx%d in %s), but only %.2f GiB "
@@ -319,25 +251,13 @@ local_gemm_t *local_gemm_create(int m_loc, int n_loc, int k, const scalar_t *A_l
     CUDA_CHECK(err);
     local_gemm_context->t_setup_device_alloc = now_seconds() - t_device_alloc_start;
 
-    /* A non cambia mai fra un'invocazione e l'altra: la H2D avviene una volta
-     * sola, qui nel preprocessing. X e Y sono gia' dimensionate sopra, quindi
-     * nessuna cudaMalloc puo' cadere nella prima repetition, neppure con
-     * --warmup 0. */
-    /* Voce 3 del preprocessing, e l'unica delle tre che e' PCIe: e' il
-     * trasferimento che la separazione fra create e local_gemm ha tolto dal
-     * cammino misurato, ed e' quindi quello che va discusso a parte. */
     const double t_h2d_A_start = now_seconds();
     if (bytes_A > 0)
         CUDA_CHECK(cudaMemcpy(local_gemm_context->dA_loc, A_loc, bytes_A, cudaMemcpyHostToDevice));
-    /* Una copia da memoria paginabile puo' ritornare prima che il DMA sia
-     * concluso: senza questa attesa il tempo misurato sarebbe quello di
-     * accodamento, non quello del trasferimento. */
+
     CUDA_CHECK(cudaDeviceSynchronize());
     local_gemm_context->t_setup_h2d_A = now_seconds() - t_h2d_A_start;
 
-    /* Byte che attraversano davvero il bus, nelle stesse condizioni in cui
-     * sono stati cronometrati: e' cio' che rende i tempi convertibili in
-     * banda e confrontabili con il picco del PCIe. */
     local_gemm_context->bytes_h2d_A = (bytes_A > 0) ? bytes_A : 0;
     local_gemm_context->bytes_h2d_X_per_call =
         (n_loc > 0 && k > 0)
@@ -369,11 +289,6 @@ void local_gemm(local_gemm_t *local_gemm_context, const scalar_t *RESTRICT X_loc
     if (ldx != local_gemm_context->ldx || ldy != local_gemm_context->ldy)
         die("cuda_warp: leading dimensions changed between calls " "(ldx %d -> %d, ldy %d -> %d)", local_gemm_context->ldx, ldx, local_gemm_context->ldy, ldy);
 
-    /* H2D di X: dentro l'invocazione perche' X e' il risultato del Bcast
-     * appena concluso, ma delimitata dai suoi event per poterla sottrarre
-     * dal tempo ufficiale e discuterla a parte. I record ci sono anche
-     * quando non c'e' niente da copiare: cosi' il tempo e' definito
-     * (circa zero) invece che indefinito. */
     CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_h2d_X_start, 0));
     if (n_loc > 0 && k > 0)
         CUDA_CHECK(cudaMemcpy(local_gemm_context->dX_loc, X_loc, (size_t)n_loc * (size_t)ldx * sizeof(scalar_t), cudaMemcpyHostToDevice));
@@ -386,24 +301,16 @@ void local_gemm(local_gemm_t *local_gemm_context, const scalar_t *RESTRICT X_loc
     }
     CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_kernel_stop, 0));
 
-    /* D2H di Y, l'altra copia esclusa dal tempo ufficiale. L'event di
-     * partenza viene accodato dopo il kernel, quindi fra i due record
-     * resta la sola copia e non l'attesa del calcolo. */
     CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_d2h_Y_start, 0));
     if (m_loc > 0 && k > 0)
         CUDA_CHECK(cudaMemcpy(Y_loc_part, local_gemm_context->dY_loc_part, (size_t)m_loc * (size_t)ldy * sizeof(scalar_t), cudaMemcpyDeviceToHost));
     CUDA_CHECK(cudaEventRecord(local_gemm_context->ev_d2h_Y_stop, 0));
 
-    /* L'ultimo event accodato e' quello della D2H: aspettare lui vuol dire
-     * aspettare tutto il lavoro di questa invocazione. */
     CUDA_CHECK(cudaEventSynchronize(local_gemm_context->ev_d2h_Y_stop));
 
     CUDA_CHECK(cudaEventElapsedTime(&ms, local_gemm_context->ev_kernel_start, local_gemm_context->ev_kernel_stop));
     local_gemm_context->t_last = (double)ms * 1.0e-3;
 
-    /* Le due voci da discutere a parte. Insieme a t_last e a cio' che
-     * avanza (overhead del runtime) ricostruiscono il tempo dell'intera
-     * invocazione misurato dal chiamante. */
     CUDA_CHECK(cudaEventElapsedTime(&ms, local_gemm_context->ev_h2d_X_start, local_gemm_context->ev_h2d_X_stop));
     local_gemm_context->t_last_h2d_X = (double)ms * 1.0e-3;
 
@@ -436,9 +343,6 @@ double local_gemm_setup_seconds(const local_gemm_t *local_gemm_context)
     return (local_gemm_context != NULL) ? local_gemm_context->t_setup : 0.0;
 }
 
-/* ---------------------------------------------------------------------------
- * Tempi esclusi dalla misura ufficiale, misurati per essere discussi a parte
- * ------------------------------------------------------------------------- */
 double local_gemm_last_h2d_X_seconds(const local_gemm_t *local_gemm_context)
 {
     return (local_gemm_context != NULL) ? local_gemm_context->t_last_h2d_X : -1.0;
@@ -479,8 +383,6 @@ double local_gemm_setup_h2d_A_seconds(const local_gemm_t *local_gemm_context)
     return (local_gemm_context != NULL) ? local_gemm_context->t_setup_h2d_A : 0.0;
 }
 
-/* Questo backend non pianifica nessun tiling in shared memory: non ha il
- * concetto, e il sentinella negativo lo dice invece di inventare un numero. */
 int local_gemm_blocks_per_sm(const local_gemm_t *local_gemm_context)
 {
     (void)local_gemm_context;
@@ -493,8 +395,6 @@ int local_gemm_x_rows_per_tile(const local_gemm_t *local_gemm_context)
     return -1;
 }
 
-/* Il nome porta la dimensione del blocco quando non e' quella di default: nel
- * CSV le righe di uno sweep su BLOCK devono restare distinguibili fra loro. */
 #define STR_(x) #x
 #define STR(x)  STR_(x)
 

@@ -1,39 +1,3 @@
-/* Schema A con j-blocking E register blocking sulle righe di A.
- *
- * scheme_a_jblock toglie il limite di banda della L3 (X mattonellata in
- * cache). Resta il limite che si vede ai k piccoli: in scheme_a ogni acc[c] e'
- * una catena seriale di FMA lungo j, e l'unico parallelismo di istruzione e'
- * fra le k colonne. Nella campagna C3 i GFLOPS crescono linearmente con k
- * (4.5, 8.4, 10.9 per k = 3, 6, 8): con latenza FMA 4 cicli e due porte
- * servono almeno 8 catene VETTORIALI indipendenti per saturare la pipeline,
- * e k=8 in double AVX2 ne offre 2.
- *
- * Qui il kernel lavora su RB righe di A per volta:
- *
- *   for j0 (tile di X, come in scheme_a_jblock):
- *     for i a passi di RB:
- *       acc[r][c] = (j0 == 0) ? 0 : Y[i+r][c]
- *       for j in tile:
- *         x[c] = X[j][c]                     <- caricato UNA volta
- *         for r: a = A[i+r][j]; acc[r][c] += a * x[c]   <- riusato RB volte
- *       Y[i+r][c] = acc[r][c]
- *
- * Due effetti:
- *  - le catene indipendenti diventano RB * ceil(k/W), con W scalari per
- *    vettore: le righe di A sono indipendenti per costruzione;
- *  - ogni load di X viene riusato RB volte dai registri, quindi anche il
- *    traffico su X (gia' in cache grazie al tile) cala di un fattore RB.
- *
- * RB e' limitato dal register file: RB*ceil(k/W) accumulatori + RB broadcast
- * di A devono stare nei registri vettoriali, altrimenti gli accumulatori
- * finiscono in stack (spill) e si perde piu' di quanto si guadagna. La scelta
- * e' fatta a compile-time per ogni k dal numero di registri e dall'ampiezza
- * vettoriale dell'architettura (vedi VEC_W / VEC_NREGS); RB_ROWS la forza.
- *
- * I k obbligatori hanno kernel con accumulatori espliciti per RB = 4, 2 e 1
- * righe: per ogni k viene usato il piu' grande che sta nei registri, e il
- * kernel a 1 riga chiude le righe residue (m_loc mod RB). Gli altri k usano il
- * fallback generico, mattonellato ma a una riga. */
 
 #include "kernel/kernel.h"
 
@@ -52,12 +16,6 @@
 
 #define KB 32
 
-/* ---------------------------------------------------------------------------
- * Scelta di RB per ogni k
- * ---------------------------------------------------------------------------
- * VEC_W:     scalari per registro vettoriale;  VEC_NREGS: registri vettoriali.
- * Il budget e' VEC_NREGS - 2 (un registro per il puntatore-X caricato, uno di
- * scorta), e RB deve soddisfare RB*ceil(k/VEC_W) + RB <= budget. */
 #if defined(__AVX512F__)
 #define VEC_BYTES 64
 #define VEC_NREGS 32
@@ -100,7 +58,6 @@ static int tile_rows(int n_loc, int k)
     return (int)bj;
 }
 
-/* Fallback generico: j-blocked, una riga per volta (vedi scheme_a_jblock). */
 static void kernel_generic(int m_loc, int j0, int j1, int first, int k,
                            const scalar_t *restrict A_loc, int lda,
                            const scalar_t *restrict X_loc, int ldx,
@@ -141,7 +98,6 @@ static void kernel_generic(int m_loc, int j0, int j1, int first, int k,
 
 #ifndef FORCE_GENERIC_K
 
-/* Liste di colonne: M riceve (riga, colonna). */
 #define COLS_3(M, r)  M(r, 0) M(r, 1) M(r, 2)
 #define COLS_6(M, r)  COLS_3(M, r) M(r, 3) M(r, 4) M(r, 5)
 #define COLS_8(M, r)  COLS_6(M, r) M(r, 6) M(r, 7)
@@ -150,8 +106,6 @@ static void kernel_generic(int m_loc, int j0, int j1, int first, int k,
 #define COLS_32(M, r) COLS_20(M, r) M(r, 20) M(r, 21) M(r, 22) M(r, 23) M(r, 24) \
                       M(r, 25) M(r, 26) M(r, 27) M(r, 28) M(r, 29) M(r, 30) M(r, 31)
 
-/* Liste di righe: applicano una lista di colonne a ogni riga del blocco.
- * ROWS_ONLY applica M (una macro di sola riga) a ogni riga. */
 #define ROWS_1(COLS, M) COLS(M, 0)
 #define ROWS_2(COLS, M) COLS(M, 0) COLS(M, 1)
 #define ROWS_4(COLS, M) COLS(M, 0) COLS(M, 1) COLS(M, 2) COLS(M, 3)
@@ -167,8 +121,6 @@ static void kernel_generic(int m_loc, int j0, int j1, int first, int k,
 #define UPDATE_ACC(r, c)  acc##r##_##c += a##r * xrow[c];
 #define STORE_ACC(r, c)   yrow##r[c] = acc##r##_##c;
 
-/* Kernel a RB righe: processa le righe [0, m_loc) a blocchi di RB e lascia al
- * chiamante le residue (m_loc mod RB), che passano dal kernel a 1 riga. */
 #define DEFINE_FIXED_KERNEL(K, COLS, RB, ROWS, ROWS_ONLY)                     \
     static void kernel_k##K##_r##RB(int m_loc, int j0, int j1, int first,    \
                             const scalar_t *restrict A_loc, int lda,          \
@@ -194,16 +146,16 @@ static void kernel_generic(int m_loc, int j0, int j1, int first, int k,
     DEFINE_FIXED_KERNEL(K, COLS, 4, ROWS_4, ROWS_ONLY_4)                      \
     DEFINE_FIXED_KERNEL(K, COLS, 2, ROWS_2, ROWS_ONLY_2)                      \
     DEFINE_FIXED_KERNEL(K, COLS, 1, ROWS_1, ROWS_ONLY_1)                      \
-    /* Dispatch per questo k: RB_FOR(K) e' una costante, il compilatore     \
-     * elimina i rami morti e le varianti non usate. */                       \
+
+                       \
     static void run_k##K(int m_loc, int j0, int j1, int first,                \
                          const scalar_t *restrict A_loc, int lda,             \
                          const scalar_t *restrict X_loc, int ldx,             \
                          scalar_t *restrict Y_loc_part, int ldy)              \
     {                                                                         \
         const int rb = RB_FOR(K);                                             \
-        /* righe coperte dal kernel a RB righe; con rb == 1 sono tutte       \
-         * del kernel a 1 riga */                                             \
+
+                                             \
         const int m_blk = (rb == 1) ? 0 : m_loc - m_loc % rb;                 \
         if (rb == 4)                                                          \
             kernel_k##K##_r4(m_blk, j0, j1, first, A_loc, lda, X_loc, ldx,    \
@@ -242,7 +194,7 @@ DEFINE_FIXED_KERNELS(32, COLS_32)
 #undef COLS_6
 #undef COLS_3
 
-#endif /* FORCE_GENERIC_K */
+#endif
 
 static void run_tile(int m_loc, int j0, int j1, int first, int k,
                      const scalar_t *restrict A_loc, int lda,
@@ -279,7 +231,7 @@ struct local_gemm_context {
     int m_loc, n_loc, k;
     int lda;
     int ldx, ldy;
-    int bj;           /* righe di X per tile */
+    int bj;
     const scalar_t *A_loc;
     double t_setup;
 };
@@ -327,7 +279,6 @@ void local_gemm(local_gemm_t *local_gemm_context, const scalar_t * RESTRICT X_lo
             "(ldx %d -> %d, ldy %d -> %d)",
             local_gemm_context->ldx, ldx, local_gemm_context->ldy, ldy);
 
-    /* Y = A*X e' un'assegnazione: con n_loc = 0 nessun tile la scrive. */
     if (n_loc == 0) {
         int i;
         for (i = 0; i < m_loc; i++)
@@ -346,7 +297,6 @@ void local_gemm_destroy(local_gemm_t *local_gemm_context)
     xfree(local_gemm_context);
 }
 
-/* Canali di misura: backend di CPU, stesse sentinelle di scheme_a. */
 double local_gemm_last_compute_seconds(const local_gemm_t *local_gemm_context)
 {
     (void)local_gemm_context;

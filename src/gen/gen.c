@@ -2,9 +2,6 @@
 
 #include <stddef.h>
 
-/* splitmix64: mixer a 64 bit, stateless e di ottima qualita' statistica.
- * Serve proprio la sua natura stateless: da (seed, indici) al valore in un
- * passo solo, senza dover "avanzare" un generatore fino alla posizione. */
 static inline uint64_t splitmix64(uint64_t x)
 {
     x += 0x9E3779B97F4A7C15ULL;
@@ -15,11 +12,10 @@ static inline uint64_t splitmix64(uint64_t x)
 
 scalar_t gen_value(uint64_t seed, uint64_t stream, uint64_t key)
 {
-    /* Il seme viene mescolato una volta con lo stream, poi con la chiave:
-     * due passaggi evitano che chiavi vicine diano valori correlati. */
+
     uint64_t h = splitmix64(seed ^ (stream * 0x9E3779B97F4A7C15ULL));
     uint64_t r = splitmix64(h + key);
-    /* 53 bit alti -> double esatto in [0,1), poi riscalato in [-1,1) */
+
     double u = (double)(r >> 11) * (1.0 / 9007199254740992.0);
     return (scalar_t)(2.0 * u - 1.0);
 }
@@ -29,9 +25,7 @@ void gen_block_A(scalar_t *A, int lda, int m, int n,
 {
     int i, j;
     for (i = 0; i < m; i++) {
-        /* chiave = indice lineare globale row-major: i_glob * N + j_glob.
-         * Il cast a 64 bit e' obbligatorio: a M = N = 40000 il prodotto
-         * supera il range di int. */
+
         uint64_t base = (uint64_t)(row0 + i) * (uint64_t)N;
         scalar_t *row = A + (size_t)i * (size_t)lda;
         for (j = 0; j < n; j++)
