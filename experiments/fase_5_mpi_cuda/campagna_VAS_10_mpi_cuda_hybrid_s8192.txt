@@ -3,6 +3,8 @@
 # Tutti i backend CUDA e tutte le fattorizzazioni ordinate fino a P=8.
 # P=1: 1x1; P=2: 1x2, 2x1; P=4: 1x4, 2x2, 4x1; P=8: 1x8, 2x4, 4x2, 8x1.
 # Input globali distribuiti con MPI (a_mode=global, x_mode=global).
+# Il cronometro di gruppo sincronizza i rank immediatamente prima e dopo
+# local_gemm e produce t_local_group_* e gflops_local_group.
 
 campagna_VAS_10_mpi_cuda_hybrid/s8192/cuda_naive_p1.conf
 campagna_VAS_10_mpi_cuda_hybrid/s8192/cuda_naive_p2.conf

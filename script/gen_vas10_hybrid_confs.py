@@ -71,7 +71,7 @@ map_by=core
 a_mode=global
 x_mode=global
 check=0
-group_timing=0
+group_timing=1
 continue_on_error=1
 """
 
@@ -87,6 +87,8 @@ def size_suite_text(size: int, relative_configs: list[str]) -> str:
 # Tutti i backend CUDA e tutte le fattorizzazioni ordinate fino a P=8.
 # {factorisations}.
 # Input globali distribuiti con MPI (a_mode=global, x_mode=global).
+# Il cronometro di gruppo sincronizza i rank immediatamente prima e dopo
+# local_gemm e produce t_local_group_* e gflops_local_group.
 
 {entries}
 """
@@ -103,6 +105,8 @@ def master_suite_text(relative_configs: list[str]) -> str:
 # Le matrici globali vengono generate sul root e distribuite ai rank.
 # Tutti i rank usano il device CUDA 0: le run multi-rank misurano anche la
 # contesa fra contesti sulla singola GPU del server.
+# group_timing=1 aggiunge due MPI_Barrier attorno a local_gemm per misurare
+# la finestra comune dal lancio coordinato al completamento dell'ultimo rank.
 #
 # Esecuzione completa:
 #   ./script/run_cuda_experiments.sh --suite experiments/fase_5_mpi_cuda/{CAMPAIGN_NAME}.txt

@@ -7,6 +7,8 @@
 # Le matrici globali vengono generate sul root e distribuite ai rank.
 # Tutti i rank usano il device CUDA 0: le run multi-rank misurano anche la
 # contesa fra contesti sulla singola GPU del server.
+# group_timing=1 aggiunge due MPI_Barrier attorno a local_gemm per misurare
+# la finestra comune dal lancio coordinato al completamento dell'ultimo rank.
 #
 # Esecuzione completa:
 #   ./script/run_cuda_experiments.sh --suite experiments/fase_5_mpi_cuda/campagna_VAS_10_mpi_cuda_hybrid.txt
