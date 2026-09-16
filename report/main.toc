@@ -3,7 +3,7 @@
 \contentsline {chapter}{\numberline {1}Introduzione}{1}{chapter.1}%
 \contentsline {section}{\numberline {1.1}Obiettivo}{1}{section.1.1}%
 \contentsline {section}{\numberline {1.2}Struttura della relazione}{2}{section.1.2}%
-\contentsline {chapter}{\numberline {2}Il kernel di calcolo}{3}{chapter.2}%
+\contentsline {chapter}{\numberline {2}Il nucleo di calcolo}{3}{chapter.2}%
 \contentsline {section}{\numberline {2.1}Che cosa calcola il nucleo}{3}{section.2.1}%
 \contentsline {subsection}{\numberline {2.1.1}Conteggio delle operazioni}{3}{subsection.2.1.1}%
 \contentsline {section}{\numberline {2.2}Come vengono memorizzati i dati}{4}{section.2.2}%
