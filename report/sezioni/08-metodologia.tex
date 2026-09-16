@@ -4,39 +4,12 @@
 \section{Ambiente sperimentale}
 \label{sec:ambiente-sperimentale}
 
-Tutte le misure riportate nella relazione sono state eseguite sul server di
-calcolo del Dipartimento. La configurazione hardware e software rilevante ai
-fini delle misure è riassunta in \cref{tab:ambiente-sperimentale}.
+Tutte le misure riportate nella relazione sono state eseguite sul \emph{server di
+calcolo del Dipartimento}.
 
-\begin{table}[H]
-\centering
-\footnotesize
-\caption{Configurazione dell'ambiente sperimentale.}
-\label{tab:ambiente-sperimentale}
-\begin{tabular}{@{}ll@{}}
-\toprule
-\textbf{Componente} & \textbf{Configurazione} \\
-\midrule
-CPU & \TODO{modello CPU} \\
-Socket / core & \TODO{numero socket e core} \\
-Memoria principale & \TODO{quantità di RAM} \\
-Gerarchia di cache & \TODO{L1d/L2 per core, L3 per socket} \\
-\midrule
-GPU & NVIDIA Quadro RTX 5000 \\
-Memoria GPU & \SI{15.56}{\gibi\byte} \\
-Compute Capability & 7.5 (Turing) \\
-Streaming Multiprocessor (SM) & 48 \\
-\midrule
-Compilatore GNU & GCC 13.3.0 \\
-Open MPI & 5.0.9 \\
-CUDA Toolkit & 12.8 (V12.8.61) \\
-Architettura CUDA & \code{sm\_75} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-L'ambiente software viene predisposto tramite il sistema di moduli del server,
-utilizzando versioni fissate della toolchain GNU, di Open MPI e di CUDA:
+L'ambiente software viene predisposto tramite il sistema di moduli del
+server, utilizzando versioni fissate della toolchain GNU, di Open MPI e di
+CUDA:
 
 \begin{verbatim}
 module purge
@@ -45,131 +18,156 @@ module load openmpi/5.0.9
 module load cuda/12.8
 \end{verbatim}
 
-In questo modo tutte le campagne vengono compilate ed eseguite utilizzando la
-stessa toolchain software.
+Tutte le campagne vengono quindi compilate ed eseguite con la stessa
+toolchain software.
 
-Le implementazioni CPU sono compilate con ottimizzazione \code{-O3} e
+Le implementazioni CPU sono compilate con ottimizzazione \code{-O3} e con
 ottimizzazioni specifiche per l'architettura host tramite
-\code{-march=native}; viene inoltre abilitata la contrazione delle operazioni
-floating-point mediante \code{-ffp-contract=fast}. Le implementazioni CUDA sono
-compilate con \code{-O3} per l'architettura \code{sm\_75}, corrispondente alla
-Compute Capability 7.5 della GPU utilizzata. La precisione numerica, singola o
-doppia, viene selezionata a tempo di compilazione.
+\code{-march=native}. È inoltre abilitata la contrazione delle operazioni
+floating-point mediante \code{-ffp-contract=fast}.
 
-Per le esecuzioni MPI multi-processo i rank vengono vincolati ai core mediante
-le opzioni \code{--bind-to core --map-by core}. Il placement esplicito riduce
-la variabilità dovuta alla migrazione dei processi e rende più controllabile la
-località degli accessi alla memoria durante il confronto tra configurazioni.
+I backend CUDA sono compilati con \code{-O3} e per l'architettura \code{sm\_75}, corrispondente
+alla Compute Capability 7.5 della GPU utilizzata. La precisione numerica
+viene selezionata a tempo di compilazione.
 
-Il nodo dispone di una singola GPU e tutti i rank CUDA utilizzano il device
-\code{0}. Di conseguenza, quando più rank MPI eseguono contemporaneamente un
-backend CUDA, essi condividono la stessa GPU e i tempi del kernel possono
-includere effetti di contesa e alternanza tra i diversi contesti CUDA
-(\cref{sec:serializzazione}). Per questo motivo tutte le campagne che
-caratterizzano i kernel GPU vengono eseguite con un solo rank MPI ($P=1$),
-mentre lo studio della decomposizione MPI viene condotto sui backend di CPU,
-dove il numero di processi non introduce contesa su un acceleratore condiviso.
+Nelle esecuzioni MPI con più processi, i rank vengono associati
+esplicitamente ai core mediante:
 
-Per ogni campagna il runner registra nei metadati il comando eseguito, il file
-di configurazione, i principali parametri sperimentali, il commit Git, lo stato
-del working tree, le versioni di CUDA e Open MPI e le informazioni sulla GPU.
-Tali informazioni consentono di associare ogni insieme di misure alla
-configurazione software con cui è stato prodotto.
+\begin{verbatim}
+--bind-to core --map-by core
+\end{verbatim}
+
+in modo da mantenere stabile il placement dei processi durante
+l'esperimento ed evitare che la migrazione dei rank fra core introduca
+un'ulteriore sorgente di variabilità nelle misure.
+
+Il nodo utilizzato dispone di una sola GPU e tutti i backend CUDA
+selezionano il device~0. Quando più rank MPI utilizzano contemporaneamente
+un backend CUDA, essi condividono quindi lo stesso acceleratore. Nel
+contesto sperimentale adottato non viene utilizzato NVIDIA MPS, per cui
+l'esecuzione multi-rank sulla GPU non rappresenta una configurazione con
+acceleratori indipendenti.
+
+Per questo motivo le campagne dedicate alla caratterizzazione dei kernel
+CUDA vengono eseguite con un solo rank MPI. In questo modo le differenze
+osservate fra configurazioni CUDA non vengono confuse con la contesa fra
+più processi sulla stessa scheda. Le conseguenze dell'utilizzo di più
+contesti CUDA sullo stesso device sono discusse nel
+\cref{sec:serializzazione}.
+
+Per ogni esecuzione il runner salva inoltre informazioni sufficienti a
+ricostruire la configurazione con cui sono state prodotte le misure, fra
+cui il comando eseguito, il file di configurazione, i principali parametri
+sperimentali, il commit Git, lo stato del working tree e le versioni della
+toolchain utilizzata. I risultati possono così essere ricondotti alla
+specifica versione del codice e dell'ambiente software che li ha generati.
 
 \section{Protocollo di misura}
 \label{sec:protocollo-misura}
 
-Le misure vengono raccolte durante l'esecuzione del prodotto distribuito,
-separando le tre fasi principali dell'algoritmo: distribuzione del blocco
-locale di $X$, calcolo locale e riduzione dei contributi di $Y$.
+Ogni campione temporale corrisponde a una singola invocazione del prodotto
+distribuito. Prima di ciascuna repetition misurata viene eseguita una
+\code{MPI\_Barrier} sul comunicatore dell'intera griglia, in modo che tutti
+i processi abbiano completato la repetition precedente prima di iniziare
+quella successiva.
 
-Prima di ogni repetition misurata viene eseguita una barriera sul comunicatore
-della griglia MPI, in modo che tutti i rank inizino l'operazione dalla stessa
-fase dell'esecuzione. La barriera precede l'avvio del cronometro e non è quindi
-inclusa nei tempi riportati.
+La barriera precede l'avvio del cronometro e non contribuisce quindi ai
+tempi riportati.
 
-Per ciascun rank, una repetition segue la sequenza
+Una repetition segue quindi la sequenza
 
 \begin{equation}
-\text{\code{MPI\_Bcast}}
+\text{\code{MPI\_Bcast}}(X)
 \;\longrightarrow\;
 \text{\code{local\_gemm}}
 \;\longrightarrow\;
-\text{\code{MPI\_Reduce}} .
+\text{\code{MPI\_Reduce}}(Y).
+\label{eq:sequenza-repetition}
 \end{equation}
 
-Il broadcast rende disponibile a tutti i processi interessati il blocco di
-$X$ necessario al calcolo locale; il risultato parziale prodotto da
-\code{local\_gemm} viene successivamente combinato mediante la reduce.
-Le due operazioni collettive utilizzano rispettivamente i comunicatori di
-colonna e di riga della griglia bidimensionale.
+Il broadcast viene eseguito sul comunicatore di colonna della griglia MPI
+e rende disponibile a ciascun processo il blocco di $X$ necessario al
+prodotto locale. Ogni rank calcola quindi, mediante \code{local\_gemm},
+il proprio contributo parziale a $Y$. I contributi appartenenti alla
+stessa banda di righe vengono infine sommati mediante una
+\code{MPI\_Reduce} sul corrispondente comunicatore di riga.
 
-I quattro istanti temporali vengono acquisiti mediante \code{MPI\_Wtime}:
+La temporizzazione delle tre fasi viene effettuata localmente da ciascun
+rank mediante \code{MPI\_Wtime}. Indicando con
 
 \begin{align}
 t_0 &:\quad \text{inizio del broadcast}, \\
 t_1 &:\quad \text{fine del broadcast}, \\
 t_2 &:\quad \text{fine della fase locale}, \\
-t_3 &:\quad \text{fine della reduce}.
+t_3 &:\quad \text{fine della reduce},
 \end{align}
 
-Da essi vengono ricavati i tempi
+si definiscono
 
 \begin{align}
 t_{\mathrm{bcast}} &= t_1-t_0, \\
 t_{\mathrm{local}} &= t_2-t_1, \\
 t_{\mathrm{reduce}} &= t_3-t_2, \\
 t_{\mathrm{total}} &= t_3-t_0.
+\label{eq:tempi-repetition}
 \end{align}
 
-Il tempo $t_{\mathrm{total}}$ rappresenta quindi il tempo wall-clock
-dell'intera invocazione distribuita, dall'inizio del broadcast alla conclusione
-della reduce. Le operazioni di preparazione del problema e di inizializzazione
-del backend vengono eseguite prima delle repetition e non appartengono a tale
-intervallo temporale.
+Il tempo $t_{\mathrm{total}}$ è quindi una misura wall-clock diretta
+dell'intera invocazione distribuita osservata dal singolo rank, dall'inizio
+del broadcast fino al completamento della reduce. Le operazioni di
+preparazione dei dati e di inizializzazione del backend sono già terminate
+prima dell'inizio delle repetition e non appartengono a questo intervallo.
 
-\paragraph{Misura della fase CUDA.}
-Nei backend CPU la fase \code{local\_gemm} coincide con il calcolo locale.
-Nei backend CUDA, invece, la stessa fase comprende il trasferimento del blocco
-di $X$ dalla memoria host alla GPU, l'esecuzione del kernel e il trasferimento
-del risultato locale $Y$ dalla GPU alla memoria host:
+\subsection{Temporizzazione della fase locale su GPU}
 
-\begin{equation}
-t_{\mathrm{local}}
-\simeq
-t_{\mathrm{H2D},X}
-+
-t_{\mathrm{kernel}}
-+
-t_{\mathrm{D2H},Y}
-+
-t_{\mathrm{overhead}} .
-\end{equation}
+Il significato di $t_{\mathrm{local}}$ dipende dal backend utilizzato.
+Nei backend CPU esso misura direttamente l'intervallo trascorso
+all'interno del nucleo locale. Nei backend CUDA, invece,
+\code{local\_gemm} comprende l'intero percorso necessario a utilizzare
+l'acceleratore durante una singola invocazione:
 
-I tre intervalli GPU principali vengono misurati separatamente mediante
-CUDA events. In particolare vengono registrati il tempo del trasferimento
-H2D di $X$, il tempo di esecuzione del kernel e il tempo del trasferimento
-D2H di $Y$. La sincronizzazione associata al completamento dell'ultimo
-trasferimento garantisce che la fase locale sia conclusa prima che venga
-eseguita la successiva \code{MPI\_Reduce}.
+\[
+X_{\mathrm{host}}
+\longrightarrow
+X_{\mathrm{device}}
+\longrightarrow
+\text{kernel CUDA}
+\longrightarrow
+Y_{\mathrm{device}}
+\longrightarrow
+Y_{\mathrm{host}}.
+\]
 
-La copia iniziale della matrice locale $A$ verso la memoria della GPU avviene
-invece durante l'inizializzazione del backend e non viene ripetuta a ogni
-invocazione del prodotto.
+Di conseguenza $t_{\mathrm{local}}$ è il tempo wall-clock della fase locale
+completa e comprende sia il calcolo sul device sia i trasferimenti necessari
+alla singola invocazione.
 
-\section{Definizione della metrica di prestazione}
-\label{sec:metrica-prestazione}
-\label{sec:metriche}
+Per poter distinguere questi contributi, i backend CUDA utilizzano inoltre
+gli eventi CUDA per misurare separatamente il trasferimento H2D di $X$, il tempo
+del kernel e il trasferimento D2H di $Y$. Tali misure sono interne alla fase
+delimitata da $t_1$ e $t_2$ e vengono registrate come metriche distinte.
 
-I tempi descritti nella sezione precedente vengono misurati separatamente da
-ciascun rank MPI. Poiché l'esecuzione distribuita può proseguire solo alla
-velocità del processo più lento, il tempo associato a una repetition viene
-definito considerando il massimo tra i rank.
+Il trasferimento iniziale di $A$ non appartiene invece alla repetition:
+$A_{\mathrm{loc}}$ è invariata fra le diverse invocazioni e viene trasferita
+sul device durante l'inizializzazione del backend.
 
-Indicando con $i$ la repetition e con $p$ il rank MPI, il tempo ufficiale
-locale della repetition è definito in modo diverso per i backend CPU e CUDA.
+\section{Metriche di prestazione}\label{sec:metrica-prestazione}\label{sec:metriche}
 
-Per i backend CPU:
+Il protocollo descritto nella sezione precedente produce, per ciascuna
+repetition e per ciascun rank MPI, i tempi delle tre fasi che compongono il
+prodotto distribuito. Queste misure devono essere combinate in una singola
+quantità da utilizzare al denominatore della metrica in GFLOP/s.
+
+La traccia richiede che la misura includa il tempo necessario al prodotto
+matrice-multivettore, escludendo preprocessing, I/O e, nel caso CUDA, i
+trasferimenti fra memoria host e device. Le comunicazioni MPI necessarie
+all'esecuzione distribuita rimangono invece parte del prodotto.
+
+Indicando con $i$ la repetition e con $p$ il rank MPI, viene quindi definito
+un tempo di prestazione $T_{i,p}$ associato al singolo processo.
+
+Per i backend CPU la fase locale coincide con l'esecuzione del nucleo di
+calcolo. Si utilizza quindi
 
 \begin{equation}
 T^{\mathrm{CPU}}_{i,p}
@@ -179,16 +177,22 @@ t_{\mathrm{bcast},i,p}
 t_{\mathrm{local},i,p}
 +
 t_{\mathrm{reduce},i,p}.
-\label{eq:t-official-cpu-local}
+\label{eq:t-performance-cpu}
 \end{equation}
 
-Poiché in questo caso l'intera fase locale coincide con il calcolo eseguito
-dalla CPU, tale quantità corrisponde anche al tempo wall-clock
-$t_{\mathrm{total}}$ misurato dall'inizio del broadcast alla fine della reduce.
+Poiché i tre intervalli sono consecutivi, questa quantità coincide con il
+tempo wall-clock
 
-Per i backend CUDA la metrica richiesta esclude invece i trasferimenti tra
-memoria host e device. La fase locale viene pertanto rappresentata dal solo
-tempo di esecuzione del kernel:
+\[
+t_{\mathrm{total},i,p}
+=
+t_{3,i,p}-t_{0,i,p}.
+\]
+
+Per i backend CUDA, invece, il tempo wall-clock della fase locale contiene
+anche i trasferimenti H2D di $X$ e D2H di $Y$. Poiché tali trasferimenti
+sono esclusi dalla metrica richiesta dalla traccia, il contributo della
+fase locale viene sostituito dal tempo del solo kernel:
 
 \begin{equation}
 T^{\mathrm{CUDA}}_{i,p}
@@ -198,22 +202,32 @@ t_{\mathrm{bcast},i,p}
 t_{\mathrm{kernel},i,p}
 +
 t_{\mathrm{reduce},i,p}.
-\label{eq:t-official-cuda-local}
+\label{eq:t-performance-cuda}
 \end{equation}
 
-Il tempo rappresentativo della repetition $i$ è quindi
+$T^{\mathrm{CUDA}}_{i,p}$ non coincide quindi con il tempo wall-clock
+completo della repetition. È la quantità utilizzata per valutare il
+prodotto distribuito dopo aver escluso i trasferimenti host-device richiesti
+dalla pipeline CUDA.
+
+Per ogni repetition, i tempi vengono prima composti separatamente per
+ciascun rank e soltanto successivamente aggregati fra i processi:
 
 \begin{equation}
-T_i = \max_{0 \leq p < P} T_{i,p},
-\label{eq:t-official-repetition}
+T_i
+=
+\max_{0\le p<P} T_{i,p},
+\label{eq:t-performance-repetition}
 \end{equation}
 
-dove $P$ è il numero complessivo di processi MPI.
+dove $P$ è il numero complessivo di rank MPI.
 
-La composizione delle diverse fasi viene effettuata localmente prima
-dell'operazione di massimo. In particolare, nel caso CUDA viene calcolato
+L'operazione di massimo riflette il fatto che l'esecuzione distribuita non
+può essere considerata completata prima del processo più lento.
+È importante che la composizione delle fasi preceda tale operazione. Nel
+caso CUDA viene quindi calcolato
 
-\begin{equation}
+\[
 \max_p
 \left(
 t_{\mathrm{bcast},p}
@@ -222,636 +236,812 @@ t_{\mathrm{kernel},p}
 +
 t_{\mathrm{reduce},p}
 \right),
-\end{equation}
+\]
 
-e non la somma
+e non
 
-\begin{equation}
+\[
 \max_p t_{\mathrm{bcast},p}
 +
 \max_p t_{\mathrm{kernel},p}
 +
 \max_p t_{\mathrm{reduce},p}.
-\end{equation}
+\]
 
-La seconda espressione potrebbe infatti combinare tempi appartenenti a rank
-differenti e non rappresenterebbe il percorso temporale di alcun processo
-reale.
+Quest'ultima espressione potrebbe combinare i massimi di fasi osservati su
+processi differenti e costruirebbe quindi un tempo che non corrisponde al
+percorso di alcun rank.
 
-Dopo aver ottenuto un valore $T_i$ per ciascuna delle $R$ repetition misurate,
-il tempo medio utilizzato per valutare le prestazioni è
+Dalle $R$ repetition misurate si ottiene infine il tempo medio
 
 \begin{equation}
 \overline{T}
 =
 \frac{1}{R}
 \sum_{i=1}^{R} T_i .
-\label{eq:t-official-mean}
+\label{eq:t-performance-mean}
 \end{equation}
 
-Il prodotto tra una matrice $A \in \mathbb{R}^{M \times N}$ e un
-multivettore $X \in \mathbb{R}^{N \times k}$ richiede approssimativamente
+Utilizzando il conteggio del lavoro definito in
+\cref{eq:flops-totali}, la prestazione complessiva è
 
 \begin{equation}
-2MNk
-\end{equation}
-
-operazioni floating-point. La prestazione viene quindi espressa come
-
-\begin{equation}
-\mathrm{GFLOP/s}
+P_{\mathrm{GFLOP/s}}
 =
-\frac{2MNk}{\overline{T}} \cdot 10^{-9}.
-\label{eq:gflops}
+\frac{2MNk}{\overline{T}}\cdot10^{-9}.
+\label{eq:gflops-performance}
 \end{equation}
 
-Questa quantità costituisce la metrica principale utilizzata per il confronto
-tra le diverse configurazioni sperimentali.
+$M$ e $N$ sono sempre le dimensioni della matrice globale. Il numeratore
+rappresenta quindi lo stesso lavoro matematico indipendentemente dal numero
+di processi utilizzati per eseguirlo.
 
-\paragraph{Metriche ausiliarie.}
-Oltre alla metrica complessiva, il programma calcola una misura della sola fase
-computazionale. Per i backend CPU essa utilizza $t_{\mathrm{local}}$, mentre
-per i backend CUDA utilizza $t_{\mathrm{kernel}}$:
+\subsection{Prestazione della sola fase computazionale}
+
+\color{red}
+Accanto alla metrica complessiva viene mantenuta una misura che esclude le
+comunicazioni MPI e considera soltanto la fase computazionale del backend.
+
+Per ogni repetition e rank si definisce
 
 \begin{equation}
-T_{\mathrm{compute}} =
+C_{i,p}
+=
 \begin{cases}
-t_{\mathrm{local}}, & \text{CPU}, \\[2pt]
-t_{\mathrm{kernel}}, & \text{CUDA}.
+t_{\mathrm{local},i,p},
+& \text{backend CPU}, \\[4pt]
+t_{\mathrm{kernel},i,p},
+& \text{backend CUDA}.
 \end{cases}
 \end{equation}
 
-La corrispondente prestazione è riportata come \code{gflops\_compute}. Nei
-backend CUDA la stessa quantità è riportata anche come
-\code{gflops\_kernel}.
+La stessa regola di aggregazione utilizzata per il tempo complessivo viene
+applicata anche a questa quantità:
 
-La colonna \code{gflops} rimane invece la metrica di riferimento, poiché
-comprende anche il costo delle comunicazioni MPI previste dal prodotto
-distribuito. Nelle campagne a rank singolo le due colonne differiscono solo per
-il costo residuo delle due collettive degeneri, e il confronto fra kernel viene
-quindi condotto su \code{gflops\_kernel}; nella campagna MPI, dove il costo
-delle collettive è parte del fenomeno studiato, si usa \code{gflops}.
+\[
+C_i=\max_p C_{i,p},
+\qquad
+\overline{C}
+=
+\frac{1}{R}\sum_{i=1}^{R}C_i.
+\]
 
-\section{Costi esclusi dalla metrica ufficiale}
-\label{sec:costi-esclusi}
-\label{sec:tempi-esclusi}
-
-La metrica di prestazione definita nella sezione precedente considera
-esclusivamente il prodotto distribuito vero e proprio. Restano quindi esclusi
-dal tempo ufficiale i costi di preparazione del problema, l'I/O e, nel caso dei
-backend CUDA, le operazioni di trasferimento tra memoria host e memoria device.
-
-In particolare, il preprocessing comprende l'allocazione dei buffer locali,
-la generazione o distribuzione iniziale dei dati, l'eventuale conversione del
-layout di $X$ e l'inizializzazione del backend. Tali operazioni vengono
-eseguite prima delle repetition misurate e non contribuiscono quindi a
-$T_{\mathrm{official}}$.
-
-Per i backend CUDA, anche il trasferimento iniziale della matrice locale $A$
-verso la memoria della GPU appartiene alla fase di setup e viene eseguito una
-sola volta. Durante ciascuna invocazione di \code{local\_gemm} vengono invece
-eseguiti il trasferimento H2D del blocco di $X$, il kernel CUDA e il
-trasferimento D2H del risultato locale $Y$.
-
-La metrica ufficiale utilizza, per la fase locale CUDA, il solo tempo del
-kernel. Di conseguenza i trasferimenti H2D e D2H, insieme all'eventuale
-overhead residuo lato host/runtime, non entrano in $T_{\mathrm{official}}$.
-Essi vengono tuttavia misurati separatamente, così da poter distinguere il
-costo computazionale del kernel dal costo complessivo necessario a utilizzare
-l'acceleratore.
-
-Il programma registra inoltre il tempo wall-clock completo della fase locale
-CUDA:
+La prestazione della sola fase computazionale è quindi
 
 \begin{equation}
-t_{\mathrm{local}}
-\simeq
-t_{\mathrm{H2D},X}
-+
-t_{\mathrm{kernel}}
-+
-t_{\mathrm{D2H},Y}
-+
-t_{\mathrm{overhead}} ,
+P_{\mathrm{compute}}
+=
+\frac{2MNk}{\overline{C}}\cdot10^{-9}.
 \end{equation}
 
-dove $t_{\mathrm{overhead}}$ rappresenta un termine residuo ottenuto per
-differenza e comprende costi host/runtime non attribuiti direttamente ai tre
-intervalli misurati mediante CUDA events. Tale quantità non deve quindi essere
-interpretata come una misura diretta del solo costo di kernel launch.
+Nel file dei risultati questa quantità viene riportata come
+\code{gflops\_compute} e per i backend CUDA il valore basato sul solo kernel
+è riportato anche come \code{gflops\_kernel}.
 
-Anche l'I/O necessario alla produzione dei file di output viene mantenuto fuori
-dai tempi del prodotto. In questo modo le scritture su file non influenzano le
-misure di prestazione, pur rimanendo disponibili per la successiva analisi dei
-risultati.
+Le due metriche rispondono a domande differenti:
 
-La separazione tra tempo ufficiale e costi accessori consente quindi di
-utilizzare una metrica coerente per il confronto tra implementazioni, senza
-rinunciare alla possibilità di valutare il costo reale del trasferimento dei
-dati e dell'inizializzazione dell'acceleratore. I valori effettivamente
-misurati sono riportati e discussi in \cref{sec:ris-trasferimenti}.
+\begin{itemize}
+      \item La metrica complessiva \code{gflops} caratterizza l'esecuzione del prodotto
+      distribuito, includendo il costo delle comunicazioni MPI ma rispettando
+      l'esclusione dei trasferimenti CUDA richiesta dalla traccia.
+      \item La metrica \code{gflops\_compute} isola invece il backend locale.
+\end{itemize}
 
-\section{Ripetizioni e stabilità statistica}
+Nelle
+campagne dedicate al tuning dei kernel CUDA, eseguite con un solo rank MPI,
+il confronto viene quindi effettuato principalmente mediante
+\code{gflops\_kernel}, così da misurare direttamente l'effetto delle scelte
+interne al kernel senza includere le collettive MPI degeneri.
+
+Quando l'oggetto dell'esperimento è invece l'esecuzione distribuita, la
+metrica di riferimento rimane \code{gflops}.
+\color{black}
+
+\section{Ripetizioni e raccolta dei campioni}
 \label{sec:stabilita-misure}
 
-Ogni configurazione sperimentale viene eseguita più volte all'interno della
-stessa esecuzione del programma. Prima delle repetition utilizzate per le
-statistiche vengono effettuate alcune invocazioni di warm-up, i cui tempi non
-vengono registrati.
+Ogni configurazione sperimentale viene eseguita più volte all'interno
+della stessa esecuzione del programma. Prima delle repetition utilizzate
+per le misure vengono effettuate alcune invocazioni di warm-up, escluse
+dalla raccolta dei tempi, in modo da non attribuire alla configurazione
+eventuali costi transitori della prima esecuzione.
 
-Le invocazioni di warm-up hanno lo scopo di portare l'esecuzione in una
-condizione più rappresentativa prima della raccolta dei campioni, evitando che
-la prima misura sia influenzata da costi transitori. Al termine dei warm-up
-vengono eseguite le $R$ repetition misurate secondo il protocollo descritto
-nelle sezioni precedenti.
+Tutte le campagne utilizzano lo stesso protocollo: $5$ invocazioni di
+warm-up seguite da $R=20$ repetition misurate. Per ciascuna repetition
+viene ottenuto il tempo $T_i$ secondo la procedura descritta nelle sezioni
+precedenti, e il valore utilizzato per il calcolo della prestazione è il
+tempo medio $\overline{T}$.
 
-Prima di ciascuna repetition viene eseguita una \code{MPI\_Barrier} sul
-comunicatore della griglia. La barriera è esterna all'intervallo cronometrato e
-serve esclusivamente ad allineare l'inizio della nuova repetition tra i rank.
+I singoli campioni vengono inoltre conservati nei file di output, così da
+poter verificare a posteriori la regolarità delle misure e individuare
+eventuali esecuzioni anomale senza perdere l'informazione contenuta nelle
+singole repetition.
 
-Per ciascuna repetition viene ottenuto il tempo globale $T_i$ definito in
-\cref{eq:t-official-repetition}. L'insieme
+Il seed utilizzato per la generazione dei dati viene mantenuto fisso a
+\num{20252026}. Tutte le configurazioni di una campagna lavorano quindi
+sugli stessi dati, e lo stesso protocollo di misura viene mantenuto nelle
+diverse fasi sperimentali.
 
-\begin{equation}
-\{T_1,T_2,\ldots,T_R\}
-\end{equation}
+La \emph{dispersione} delle repetition viene utilizzata come controllo della
+stabilità delle misure e viene riportata nei risultati quando rilevante.
 
-costituisce il campione utilizzato per l'analisi statistica della
-configurazione.
-
-Il valore principale riportato nei confronti prestazionali è la media
-aritmetica
-
-\begin{equation}
-\overline{T}
-=
-\frac{1}{R}
-\sum_{i=1}^{R} T_i .
-\end{equation}
-
-Alla media vengono affiancate misure di dispersione e statistiche descrittive,
-tra cui deviazione standard campionaria, mediana e minimo. La deviazione
-standard è calcolata come
-
-\begin{equation}
-s =
-\sqrt{
-\frac{1}{R-1}
-\sum_{i=1}^{R}
-(T_i-\overline{T})^2
-}.
-\end{equation}
-
-Per confrontare la variabilità di misure aventi scale temporali differenti
-viene inoltre utilizzato il coefficiente di variazione
-
-\begin{equation}
-CV =
-100 \frac{s}{\overline{T}},
-\label{eq:cv}
-\end{equation}
-
-espresso in percentuale.
-
-Il numero di repetition non viene considerato, da solo, una garanzia di
-stabilità della misura. La dispersione viene invece verificata a posteriori
-attraverso il coefficiente di variazione e, nei casi in cui questo evidenzi
-una variabilità significativa, mediante l'ispezione dei singoli campioni.
-Differenze prestazionali dello stesso ordine della dispersione osservata non
-vengono considerate sufficienti, da sole, per trarre conclusioni sul confronto
-tra due configurazioni.
-
-Oltre ai valori aggregati, il programma produce un file CSV contenente una riga
-per ciascuna repetition misurata. I campioni raw consentono di individuare
-eventuali outlier, variazioni sistematiche nel corso dell'esecuzione o altri
-comportamenti che potrebbero essere nascosti dalla sola media. Le invocazioni
-di warm-up non vengono incluse nei file raw né nelle statistiche finali.
-
-Tutte le campagne descritte nel seguito utilizzano lo stesso protocollo
-statistico: $R = 20$ repetition misurate precedute da $5$ warm-up, con seme
-fissato a \num{20252026}. L'uniformità non è un dettaglio organizzativo: è ciò
-che rende confrontabili fra loro misure appartenenti a fasi diverse senza
-dover riesaminare ogni volta le condizioni in cui sono state prese.
-
-\section{Disegno sperimentale: le fasi}
+\section{Disegno sperimentale}
 \label{sec:disegno-fasi}
 \label{sec:campagne-sperimentali}
 
-Il codice consegnato espone un numero elevato di parametri: la dimensione del
-blocco CUDA, il layout in memoria di $X$, il padding del tile in shared memory,
-la granularità con cui il tile viene dimensionato, il backend locale, la
-precisione numerica, il numero di processi MPI e la forma della griglia. Una
-campagna unica che li facesse variare tutti insieme produrrebbe un numero di
-configurazioni ingestibile e, soprattutto, non permetterebbe di attribuire una
-differenza osservata a una causa precisa.
+Il codice espone diversi parametri che possono influenzare le prestazioni:
+la dimensione del blocco CUDA, il layout di $X$, il padding della shared
+memory, la granularità del tile, il backend locale e la precisione
+numerica. Farli variare tutti contemporaneamente produrrebbe un numero
+elevato di configurazioni e, soprattutto, renderebbe difficile attribuire
+le differenze osservate a una causa specifica.
 
-L'impianto sperimentale è quindi organizzato in \textbf{fasi successive}, dove
-ogni fase riceve in ingresso le decisioni prese dalla precedente e le tratta
-come costanti. Il principio che le ordina è uno solo:
 
-\begin{quote}
-\emph{prima si fissa la configurazione di ciascun kernel, poi si misura;
-confrontare kernel non ancora configurati significherebbe misurare la qualità
-del tuning e non quella dell'implementazione.}
-\end{quote}
+Gli esperimenti sono quindi organizzati in fasi successive. Quando
+possibile viene modificato un solo fattore alla volta, mantenendo invariati
+gli altri. I parametri che interagiscono direttamente vengono invece
+esplorati congiuntamente.
 
-Una sintesi delle fasi è riportata in \cref{tab:fasi-sperimentali}.
+\begin{itemize}
+      \item La \emph{prima fase} è dedicata alla configurazione dei backend CUDA e determina
+      i parametri da utilizzare nei confronti successivi.
+      \item La \emph{seconda fase} verifica
+      come le implementazioni così configurate reagiscano alla variazione della
+      taglia e della forma del problema.
+      \item Una \emph{terza fase} studia l'effetto della
+      precisione numerica, confrontando FP32 e FP64 a parità delle altre
+      condizioni sperimentali.
+\end{itemize}
 
-\begin{table}[H]
-\centering
-\footnotesize
-\caption{Le fasi dell'impianto sperimentale, nell'ordine in cui sono state
-eseguite e in cui sono discusse.}
-\label{tab:fasi-sperimentali}
-\begin{tabular}{@{}clp{0.30\linewidth}p{0.26\linewidth}@{}}
-\toprule
-\textbf{Fase} & \textbf{Oggetto} & \textbf{Variabili controllate} & \textbf{Esito} \\
-\midrule
-1 & Tuning dei backend CUDA &
-\code{BLOCK}, layout di $X$, \code{SMEM\_PAD}, \code{TILE\_GRANULARITY} &
-una configurazione per kernel \\[3pt]
+Le prime tre fasi utilizzano un singolo processo MPI, così da caratterizzare
+il backend locale senza introdurre contesa sulla GPU.
 
-2 & Robustezza dimensionale &
-scala $S$ e forma $M{:}N$, a lavoro $MN$ costante &
-dipendenza da taglia e forma \\[3pt]
 
-3 & Precisione numerica &
-FP32 contro FP64, tutto il resto invariato &
-verifica del roofline \\[3pt]
+\begin{itemize}
+      \item Infine, una \emph{quarta fase}
+      considera invece l'applicazione distribuita completa e studia
+      l'interazione fra decomposizione MPI, comunicazioni collettive ed
+      esecuzione CUDA quando più processi condividono l'unico acceleratore
+      disponibile sul nodo.
+\end{itemize}
 
-4 & Decomposizione MPI su CPU &
-numero di processi $P$ e backend di CPU &
-strong scaling ed efficienza \\[3pt]
+In questo modo le proprietà dei backend locali vengono determinate prima
+in un ambiente controllato, mentre l'ultima fase valuta il comportamento
+della loro composizione con il livello MPI.
 
-5 & MPI + CUDA &
-\multicolumn{2}{l}{\textcolor{todorosso}{\textbf{non eseguita}} --- vedi \cref{sec:fase5-mpi-cuda}} \\
-\bottomrule
-\end{tabular}
-\end{table}
+\subsection{Criterio di selezione dei parametri}\label{sec:criterio-robustezza}
 
-Ogni campagna è definita da uno o più file \code{.conf} raccolti in una
-\emph{suite} \code{.txt}, eseguita dal runner
-\file{script/run\_cuda\_experiments.sh}. I file di configurazione rendono
-espliciti tutti i parametri e sono versionati insieme al codice, sotto
-\file{experiments/fase\_<n>\_<nome>/}; i risultati finiscono nella cartella
-corrispondente sotto \file{results/}, accompagnati dai metadati descritti in
-\cref{sec:ambiente-sperimentale}. Il percorso di ogni tabella dei risultati è
-quindi ricostruibile a partire dal nome della campagna.
+Le campagne della prima fase producono, per ciascun parametro studiato,
+una serie di misure sui cinque valori
 
-\subsection{Criterio di selezione dei parametri}
-\label{sec:criterio-robustezza}
+\[
+k \in \{3,6,8,20,32\}.
+\]
 
-Le campagne della prima fase producono, per ciascun parametro, una griglia di
-misure indicizzata dal valore del parametro e da $k$. Occorre quindi un criterio
-esplicito per passare dalla griglia a una scelta.
+Poiché i parametri di configurazione vengono fissati a tempo di
+compilazione, non è possibile scegliere un valore diverso per ogni $k$.
+Occorre quindi individuare una configurazione che mantenga buone
+prestazioni sull'intero insieme di casi richiesti.
 
-Il criterio non può essere ``il valore migliore'', perché il valore migliore
-dipende da $k$ mentre il binario consegnato ha un unico valore fissato a tempo
-di compilazione. Ciò che serve è il valore che si comporta meglio nel caso
-peggiore fra i $k$ richiesti dalla traccia.
-
-Indicando con $P(v,k)$ la prestazione (in \code{gflops\_kernel}) del parametro
-al valore $v$ per un dato $k$, si definisce la prestazione normalizzata
+Indicando con $P(v,k)$ la prestazione ottenuta dalla configurazione $v$
+per un determinato valore di $k$, si definisce la \textbf{prestazione relativa}:
 
 \begin{equation}
-R(v,k) = \frac{P(v,k)}{\max_{v'} P(v',k)} ,
+R(v,k)
+=
+\frac{P(v,k)}
+     {\max_{v'} P(v',k)}.
 \label{eq:prestazione-normalizzata}
 \end{equation}
 
-cioè la frazione della prestazione del miglior valore \emph{per quello stesso}
-$k$, e la perdita corrispondente
+Per ogni $k$, il valore migliore assume quindi $R=1$, mentre gli altri
+valori esprimono la frazione di prestazione mantenuta rispetto al massimo
+osservato per quello stesso caso.
+
+È utile esprimere la stessa informazione in termini di \textbf{perdita relativa}:
 
 \begin{equation}
-L(v,k) = 1 - R(v,k) .
+L(v,k)=1-R(v,k),
 \end{equation}
 
-Da queste si ricavano le due statistiche usate per decidere:
+e riassumerla mediante due quantità:
 
 \begin{align}
-L_{\text{media}}(v) &= \frac{1}{5}\sum_{k \in \{3,6,8,20,32\}} L(v,k), \\
-L_{\max}(v) &= \max_{k} L(v,k) .
+L_{\mathrm{media}}(v)
+&=
+\frac{1}{5}
+\sum_{k\in\{3,6,8,20,32\}} L(v,k),
+\\
+L_{\max}(v)
+&=
+\max_{k\in\{3,6,8,20,32\}} L(v,k).
 \label{eq:perdita-max}
 \end{align}
 
-Un valore è considerato \textbf{robusto} quando entrambe sono piccole, e in
-caso di quasi-parità si privilegia $L_{\max}$: una configurazione che perde
-poco in media ma crolla su un singolo $k$ è peggiore, ai fini della consegna,
-di una che perde uniformemente un poco ovunque.
+La prima descrive la perdita media della configurazione rispetto al valore
+ottimale per ciascun $k$, mentre la seconda rappresenta il suo caso
+peggiore.
 
-\section{Fase 1 --- Tuning dei backend CUDA}
+La selezione privilegia la robustezza rispetto al caso peggiore:
+le configurazioni vengono ordinate innanzitutto per $L_{\max}$ crescente
+e, a parità, per $L_{\mathrm{media}}$ crescente.
+
+In questo modo viene preferita una configurazione che mantiene \emph{prestazioni
+uniformi} sui diversi valori di $k$, evitando che un buon risultato medio
+nasconda una perdita marcata in uno dei casi richiesti dalla traccia.
+
+La stessa procedura si applica anche quando una configurazione è descritta
+da più parametri e quindi $v$ rappresenta direttamente la loro
+combinazione, come nel caso
+$v=(\code{BLOCK},\code{TILE\_GRANULARITY})$.
+
+\section{Fase 1 - Configurazione dei backend CUDA}
 \label{sec:fase1-tuning}
 
-La prima fase fissa, per ciascun kernel CUDA, i parametri che ne governano la
-geometria di lancio e l'uso della memoria. Tutte le campagne della fase
-condividono lo stesso problema e lo stesso protocollo: $M = N = \num{16384}$,
-doppia precisione, $P = 1$, $k \in \{3,6,8,20,32\}$, 20 repetition dopo 5
-warm-up. L'unica cosa che cambia da una campagna all'altra è il parametro
-studiato.
+La prima fase ha l'obiettivo di determinare una configurazione
+rappresentativa per ciascun backend CUDA prima di procedere ai confronti
+sulle caratteristiche del problema.
 
-La taglia $\num{16384}\times\num{16384}$ non è arbitraria: è la più grande
-che, in doppia precisione, lascia margine sufficiente nei \SI{15.56}{\gibi\byte}
-della scheda ($A$ occupa \SI{2}{\gibi\byte}) e che quindi fornisce parallelismo
-abbondante, evitando che il tuning sia influenzato da una GPU non satura.
+Tutte le campagne utilizzano le stesse condizioni di base:
 
-\subsection{Campagna 1.1 --- Dimensione del blocco}
+\[
+M=N=\num{16384},
+\qquad
+P=1,
+\qquad
+k\in\{3,6,8,20,32\},
+\]
+
+in doppia precisione, con $5$ invocazioni di warm-up e $20$ repetition
+misurate.
+
+La dimensione $\num{16384}\times\num{16384}$ fornisce un problema
+sufficientemente grande da esporre
+\color{red}
+un elevato grado di parallelismo
+\color{black}
+e da
+ridurre il peso relativo dei costi fissi, mantenendo al tempo stesso un
+ampio margine nella memoria della GPU per i buffer ausiliari e per le
+diverse configurazioni dei backend.
+
+La fase considera separatamente i principali parametri che possono
+modificare il comportamento dei kernel: dimensione del blocco, layout di
+$X$, padding e granularità del tile in shared memory. Quando due
+parametri interagiscono direttamente, come nel caso della dimensione del
+blocco e della granularità del tile di
+\kernelname{cuda\_warp\_smem}, essi vengono esplorati congiuntamente.
+
+Le configurazioni selezionate vengono infine utilizzate per confrontare
+\kernelname{cuda\_naive}, \kernelname{cuda\_warp},
+\kernelname{cuda\_warp\_smem} e \kernelname{cublas} nelle stesse condizioni
+sperimentali.
+
+\subsection{Campagna 1.1 - Dimensione del blocco e confronto dei backend}
 \label{sec:camp-block}
 
-Suite \file{experiments/fase\_1\_tuning/campagna\_VAS\_block\_k\_tuning.txt}.
+La prima campagna studia l'effetto della dimensione del blocco sui kernel
+CUDA custom. Vengono considerati:
 
-La campagna misura i tre kernel CUDA custom
-(\kernelname{cuda\_naive}, \kernelname{cuda\_warp} con $X$ column-major e
-\kernelname{cuda\_warp\_smem}) facendo variare la sola dimensione del blocco
+\[
+\code{BLOCK}
+\in
+\{64,128,192,256,384,512,1024\},
+\]
 
-\begin{equation}
-\code{BLOCK} \in \{64, 128, 192, 256, 384, 512, 1024\},
-\end{equation}
+tutti multipli della dimensione del warp e distribuiti su un intervallo
+che comprende configurazioni da due warp fino al massimo di $1024$ thread
+per blocco supportato dall'architettura.
 
-per un totale di $3 \times 7 \times 5 = 105$ configurazioni. I valori sono
-tutti multipli di 32, cioè della dimensione del warp; l'insieme comprende
-intenzionalmente sia divisori di 1024 (64, 128, 256, 512, 1024) sia due valori
-che non lo sono (192 e 384), perché l'argomento teorico sull'occupancy
-(\cref{sec:warp}) prevede che questi ultimi siano penalizzati e tale previsione
-va messa alla prova invece che assunta.
+Lo sweep viene ripetuto sui cinque valori di $k$ richiesti dalla traccia.
+In questo modo è possibile verificare quanto la scelta della geometria di
+lancio dipenda dalla larghezza del multivettore e selezionare un valore che
+mantenga prestazioni robuste sull'intero insieme dei casi, secondo il
+criterio definito in \cref{sec:criterio-robustezza}.
 
-La selezione avviene con il criterio di \cref{sec:criterio-robustezza}. Il
-valore scelto per ciascun kernel viene poi mantenuto fisso in tutte le fasi
-successive.
+La campagna comprende \kernelname{cuda\_naive},
+\kernelname{cuda\_warp} e \kernelname{cuda\_warp\_smem}. Nei primi due
+backend lo sweep agisce direttamente sulla geometria del lancio, mentre
+per \kernelname{cuda\_warp\_smem} la dimensione del blocco determina anche
+il numero di warp che condividono il medesimo tile di $X$ e interagisce
+quindi con le successive scelte relative alla shared memory.
 
-\subsection{Campagna 1.2 --- Layout in memoria di $X$}
+Per questo motivo il valore ottenuto in questa campagna per
+\kernelname{cuda\_warp\_smem} costituisce una configurazione iniziale e
+viene riesaminato congiuntamente a \code{TILE\_GRANULARITY} nella campagna
+dedicata al tiling.
+
+Lo sweep svolge inoltre una seconda funzione. Una volta completate le
+successive campagne di configurazione, le misure dei backend vengono
+ricondotte alle rispettive configurazioni selezionate e confrontate sullo
+stesso problema di riferimento.
+
+Il confronto coinvolge
+
+\[
+\kernelname{cuda\_naive},\qquad
+\kernelname{cuda\_warp},\qquad
+\kernelname{cuda\_warp\_smem},\qquad
+\kernelname{cublas}.
+\]
+
+Per i tre kernel custom vengono utilizzati i parametri selezionati durante
+la Fase 1, mentre cuBLAS costituisce il riferimento esterno e non richiede
+la scelta di una dimensione del blocco da parte del progetto.
+
+Questo confronto non viene trattato come una campagna sperimentale
+separata: rappresenta l'esito conclusivo del processo di configurazione
+iniziato con lo sweep di \code{BLOCK}.
+
+Il confronto permette quindi di valutare separatamente l'effetto delle
+principali scelte introdotte nel capitolo CUDA: il passaggio dalla
+mappatura thread-per-elemento alla mappatura warp-per-row, le due strategie
+adottate per migliorare gli accessi a $X$ e la distanza rispetto alla
+routine GEMM fornita da cuBLAS. Le cause delle differenze osservate vengono
+discusse successivamente alla luce del modello prestazionale e delle
+caratteristiche dei singoli kernel.
+
+\subsection{Campagna 1.2 - Layout in memoria di $X$}
 \label{sec:camp-layout}
 
-Suite \file{experiments/fase\_1\_tuning/campagna\_VAS\_2\_row\_major.txt}.
+La seconda campagna isola l'effetto del layout di $X$ sul backend
+\kernelname{cuda\_warp}. Vengono confrontate le due varianti descritte
+in \cref{sec:x-layout}:
 
-La campagna confronta le due varianti di \kernelname{cuda\_warp} descritte in
-\cref{sec:x-layout}: $X$ row-major, cioè nel layout naturale del progetto, e $X$
-column-major, ottenuta con una conversione eseguita in preprocessing.
+\[
+\code{X\_LAYOUT}
+\in
+\{\text{row-major},\text{column-major}\}.
+\]
 
-È un confronto controllato nel senso stretto del termine: problema, precisione,
-topologia MPI, valori di $k$, protocollo di misura e \code{BLOCK} restano
-identici, e l'unica differenza è da dove il kernel legge gli elementi di $X$.
-La misura column-major di riferimento è quella già raccolta nella campagna 1.1
-allo stesso \code{BLOCK}, e non una nuova esecuzione.
+La mappatura del lavoro rimane invariata: un warp continua a essere
+responsabile di una riga di $Y$ e le lane si dividono la dimensione $j$.
+Cambia soltanto la disposizione fisica del blocco locale di $X$.
 
-Il costo della conversione non entra nella metrica: è preprocessing, viene
-cronometrato a parte nella colonna \code{t\_prep\_convert\_X\_s} e discusso in
-\cref{sec:ris-trasferimenti}.
+Nel layout row-major, per una colonna $c$ fissata, lane consecutive
+accedono a elementi appartenenti a righe successive di $X$ e separati da
+uno stride pari a $k$ elementi. Nel layout column-major gli stessi elementi
 
-\subsection{Campagna 1.3 --- Padding del tile in shared memory}
+\[
+X[j_0][c],\;
+X[j_0+1][c],\;
+\ldots,\;
+X[j_0+31][c]
+\]
+
+sono invece memorizzati consecutivamente. La campagna permette quindi di
+misurare direttamente l'effetto del layout sul pattern di accesso alla
+global memory, mantenendo invariata la struttura del kernel.
+
+Il confronto viene eseguito sui cinque valori di $k$ richiesti dalla
+traccia e utilizzando per \kernelname{cuda\_warp} la dimensione del blocco
+selezionata nella Campagna~1.1. Tutti gli altri parametri sperimentali
+rimangono invariati.
+
+La conversione dal layout row-major al layout per colonne viene eseguita
+prima delle repetition misurate. Il suo costo non contribuisce quindi al
+tempo del kernel, ma viene registrato separatamente tramite
+\code{t\_prep\_convert\_X\_s}.
+
+Il confronto principale della campagna riguarda il tempo di esecuzione del
+kernel. Il tempo di conversione viene mantenuto come informazione
+aggiuntiva, necessaria per valutare il costo richiesto dalla variante
+column-major prima dell'esecuzione delle repetition.
+
+Quando una delle due configurazioni coincide esattamente con un punto già
+misurato nella Campagna~1.1, viene riutilizzato lo stesso campione anziché
+ripetere l'esecuzione.
+
+\subsection{Campagna 1.3 - Padding del tile in shared memory}
 \label{sec:camp-pad}
 
-Suite \file{experiments/fase\_1\_tuning/campagna\_VAS\_4\_smem\_pad\_tuning.txt}.
+La terza campagna riguarda esclusivamente
+\kernelname{cuda\_warp\_smem} e studia l'effetto del padding applicato
+alle righe del tile di $X$ in shared memory.
 
-La campagna riguarda il solo \kernelname{cuda\_warp\_smem} e fa variare
+Vengono confrontate le due configurazioni:
 
-\begin{equation}
-\code{SMEM\_PAD} \in \{0, 1\},
-\end{equation}
+\[
+\code{SMEM\_PAD}\in\{0,1\},
+\]
 
-cioè la colonna aggiuntiva che separa due righe consecutive del tile di $X$ in
-shared memory. \code{BLOCK} è fissato al valore selezionato nella campagna 1.1.
+che producono rispettivamente:
 
-L'analisi di \cref{sec:bank-conflict} formula una previsione puntuale e
-falsificabile: in doppia precisione, senza padding, la riga del tile è lunga
-$k$ scalari e lo stride fra righe vale $2k$ banchi, quindi per $k = 32$ lo
-stride è $0 \bmod 32$ e tutte e 32 le lane insistono sullo stesso banco. Il
-padding deve perciò produrre un guadagno \emph{massimo a $k = 32$} e
-\emph{nullo a $k = 3$}, dove nessun conflitto è previsto. Una campagna che
-mostrasse un guadagno uniforme su tutti i $k$ falsificherebbe la spiegazione,
-anche se il padding risultasse comunque conveniente.
+\[
+\code{tile\_row\_stride}=k
+\qquad
+\text{e}
+\qquad
+\code{tile\_row\_stride}=k+1.
+\]
 
-\subsection{Campagna 1.4 --- Granularità del tile}
+La struttura del kernel, la dimensione del blocco e tutti gli altri
+parametri sperimentali vengono mantenuti invariati.
+
+Il parametro modifica la distanza, in shared memory, fra gli elementi
+letti da lane consecutive durante il consumo del tile. In doppia
+precisione ciascun elemento occupa due parole da 32 bit, per cui la
+distribuzione degli accessi sui 32 bank dipende dallo stride
+
+\[
+2\bigl(k+\code{SMEM\_PAD}\bigr)
+\pmod{32}.
+\]
+
+Il padding è stato introdotto per interrompere pattern periodici
+sfavorevoli, in particolare il caso $k=32$, per il quale in assenza di
+padding lo stride della riga produce una mappatura patologica sui bank.
+
+L'effetto del padding non è però indipendente dal valore di $k$.
+Modificando lo stride della riga cambia infatti anche la mappatura sui
+bank per i casi che non presentano il comportamento patologico di
+$k=32$.
+
+La campagna viene quindi eseguita su tutti i valori
+
+\[
+k\in\{3,6,8,20,32\},
+\]
+
+con l'obiettivo di verificare se il beneficio ottenuto nei casi
+sfavorevoli viene mantenuto senza introdurre penalizzazioni significative
+negli altri.
+
+In questa campagna \code{BLOCK} viene mantenuto al valore di riferimento
+individuato nella Campagna~1.1. L'interazione fra dimensione del blocco e
+granularità del tile viene studiata separatamente nella Campagna~1.4.
+
+\subsection{Campagna 1.4 - Granularità del tile}
 \label{sec:camp-granularita}
 
-Suite
-\file{experiments/fase\_1\_tuning/campagna\_VAS\_5\_smem\_granularity\_tuning.txt}.
+La quarta campagna riguarda esclusivamente
+\kernelname{cuda\_warp\_smem} e studia il parametro
+\code{TILE\_GRANULARITY}, utilizzato durante la scelta della dimensione
+del tile di $X$.
 
-Il numero di righe di $X$ che entrano nel tile non è una costante: viene scelto
-a runtime dal budget di shared memory (\cref{sec:piano-tile}) e poi arrotondato
-verso il basso a un multiplo di \code{TILE\_GRANULARITY}. La campagna fa
-variare
+Il numero di righe caricate contemporaneamente in shared memory non è
+fissato nel sorgente, ma viene determinato a runtime in funzione del
+budget di shared memory disponibile per blocco. Il valore così ottenuto
+viene arrotondato verso il basso a un multiplo di
+\code{TILE\_GRANULARITY}.
 
-\begin{equation}
-\code{TILE\_GRANULARITY} \in \{1, 8, 16, 32\}.
-\end{equation}
+La campagna considera
 
-Granularità e dimensione del blocco non sono indipendenti, perché entrambe
-concorrono a determinare quante righe di $X$ ogni warp riusa prima di passare
-al tile successivo. Per questo motivo la campagna non fissa \code{BLOCK} al
-valore della campagna 1.1, ma ripete l'intero sweep su \code{BLOCK} per ogni
-granularità: $4 \times 7 \times 5 = 140$ configurazioni, di cui la selezione
-individua la coppia $(\code{BLOCK}, g)$ migliore invece dei due parametri
-separatamente.
+\[
+\code{TILE\_GRANULARITY}
+\in
+\{1,8,16,32\}.
+\]
 
-\subsection{Campagna 1.5 --- Confronto fra i kernel a configurazione fissata}
-\label{sec:camp-confronto-kernel}
+Una granularità piccola permette di utilizzare più precisamente il budget
+di shared memory disponibile, mentre una granularità pari alla dimensione
+del warp favorisce tile con un numero di righe multiplo di $32$.
+Quest'ultima scelta evita passi parziali nel ciclo con cui le lane
+attraversano il tile, ma può lasciare inutilizzata una parte del budget
+disponibile.
 
-Suite
-\file{experiments/fase\_1\_tuning/campagna\_VAS\_6\_kernel\_comparison.txt}.
+La granularità non viene studiata indipendentemente dalla dimensione del
+blocco. In \kernelname{cuda\_warp\_smem}, \code{BLOCK} determina il numero
+di warp appartenenti allo stesso blocco e contribuisce ai vincoli che
+determinano quanti blocchi possono risiedere contemporaneamente su uno SM.
+La pianificazione del tile utilizza proprio queste informazioni per
+stabilire il budget di shared memory assegnabile a ciascun blocco.
 
-La campagna chiude la fase: ogni backend viene eseguito con la configurazione
-selezionata dalle campagne precedenti, mentre $M$, $N$, $k$, precisione, numero
-di processi e protocollo di misura restano identici fra i quattro. I backend
-confrontati sono \kernelname{cuda\_naive}, \kernelname{cuda\_warp},
-\kernelname{cuda\_warp\_smem} e \kernelname{cublas}, quest'ultimo nel ruolo di
-riferimento esterno e non di proposta (\cref{sec:cublas}).
+Di conseguenza, modificare \code{BLOCK} può modificare anche la dimensione
+del tile risultante. Per evitare di selezionare separatamente due parametri
+che possono influenzarsi, la campagna esplora congiuntamente
 
-È qui che il tuning paga: poiché ciascun kernel corre nella propria
-configurazione migliore, una differenza osservata è attribuibile
-all'implementazione e non alla sfortuna di un parametro mal scelto. Le tre
-domande a cui la campagna deve rispondere sono:
+\[
+\code{BLOCK}
+\in
+\{64,128,192,256,384,512,1024\}
+\]
 
-\begin{enumerate}[nosep,left=0pt]
-  \item quanto vale il passaggio da un thread per elemento di $Y$
-        (\kernelname{cuda\_naive}) a un warp per riga con riuso di $A$ in
-        registro (\kernelname{cuda\_warp}), cioè il salto di intensità
-        aritmetica della \cref{eq:intensita};
-  \item se la shared memory guadagni qualcosa in doppia precisione --- il
-        roofline di \cref{sec:roofline-gpu} prevede di no per $k \ge 6$, e la
-        conferma di una previsione negativa è a tutti gli effetti un risultato;
-  \item quanto dista una libreria general-purpose dal kernel specializzato
-        quando $k \le 32$.
-\end{enumerate}
+e
 
-\section{Fase 2 --- Caratterizzazione dimensionale}
+\[
+\code{TILE\_GRANULARITY}
+\in
+\{1,8,16,32\}.
+\]
+
+Lo sweep viene ripetuto sui cinque valori di $k$, per un totale di
+$7 \times 4 \times 5 = 140$ configurazioni.
+
+Il valore di \code{SMEM\_PAD} viene invece mantenuto fisso alla
+configurazione selezionata nella Campagna~1.3, così da isolare
+l'interazione fra dimensione del blocco e granularità del tile.
+
+In questo caso una configurazione $v$ del criterio definito in
+\cref{sec:criterio-robustezza} è quindi una coppia
+
+\[
+v =
+(\code{BLOCK},\code{TILE\_GRANULARITY}).
+\]
+
+La selezione viene effettuata sulla coppia nel suo insieme, anziché
+scegliere prima la dimensione del blocco e successivamente la granularità.
+La configurazione risultante sostituisce quindi, per
+\kernelname{cuda\_warp\_smem}, il valore preliminare di \code{BLOCK}
+individuato nella Campagna~1.1.
+
+\section{Fase 2 - Caratterizzazione dimensionale}
 \label{sec:fase2-dimensione}
 
-Suite
-\file{experiments/fase\_2\_caratterizzazione\_dimensionale/campagna\_VAS\_7\_shape\_robustness.txt}.
+La seconda fase verifica se il comportamento dei backend configurati nella
+Fase~1 rimane stabile quando cambiano la dimensione e la forma del problema.
 
-La seconda fase verifica che le configurazioni scelte nella prima non siano
-valide soltanto sul problema su cui sono state scelte. È anche la campagna
-esplicitamente richiesta dalla traccia: misure ripetute per $M$ ed $N$
-crescenti, su almeno tre rapporti fra $M$ ed $N$, con $M = N$ incluso e sui
-cinque $k$ del collaudo.
+La campagna risponde inoltre direttamente alla richiesta della traccia di
+ripetere le misure per valori crescenti di $M$ e $N$ e di considerare
+almeno tre rapporti fra le due dimensioni, includendo il caso quadrato
+$M=N$.
 
-Il disegno è fattoriale con due variabili controllate:
+Vengono controllati due fattori:
 
 \begin{align}
-S &\in \{4096,\ 8192,\ 16384\} && \text{(scala nominale)}, \\
-\text{forma} &\in \{M = N,\ N = 2M,\ M = 3N\} && \text{(rapporto $M{:}N$)} .
+S &\in \{4096,\ 8192,\ 16384\}
+&& \text{(scala nominale)}, \\
+\text{forma}
+&\in \{M=N,\ N=2M,\ M=3N\}
+&& \text{(rapporto fra le dimensioni)}.
 \end{align}
 
-Il punto delicato è che cambiare forma a $S$ fissato non deve cambiare la
-quantità di lavoro, altrimenti l'effetto della forma e quello della taglia
-risulterebbero confusi. Le dimensioni dei casi rettangolari sono quindi scelte
-in modo che $MN$ resti prossimo a $S^2$, come riportato in
-\cref{tab:fase2-punti}: lo scarto è di $-1{,}12\%$ per il caso $N = 2M$ e di
-$+0{,}27\%$ per il caso $M = 3N$, cioè entro lo stesso ordine della dispersione
-delle misure.
+La scala $S$ identifica la quantità nominale di lavoro attraverso il caso
+quadrato $M=N=S$. Per confrontare forme differenti senza modificare
+sostanzialmente il numero di operazioni, le dimensioni dei casi
+rettangolari vengono scelte in modo da mantenere il prodotto $MN$ il più
+vicino possibile a $S^2$.
 
 \begin{table}[H]
 \centering
 \footnotesize
-\caption{I nove punti del disegno fattoriale della Fase 2. A parità di scala il
-prodotto $MN$ è costante entro l'$1{,}2\%$.}
+\caption{Punti della caratterizzazione dimensionale. A parità di scala,
+il prodotto $MN$ rimane entro l'$1{,}2\%$ del valore del caso quadrato.}
 \label{tab:fase2-punti}
 \begin{tabular}{@{}lrrrr@{}}
 \toprule
-\textbf{Scala} & \multicolumn{1}{c}{$M = N$} & \multicolumn{1}{c}{$N = 2M$} & \multicolumn{1}{c}{$M = 3N$} & \textbf{$MN$ nominale} \\
+\textbf{Scala}
+& \multicolumn{1}{c}{$M=N$}
+& \multicolumn{1}{c}{$N=2M$}
+& \multicolumn{1}{c}{$M=3N$}
+& \textbf{$MN$ nominale} \\
 \midrule
-$S = 4096$  & $4096 \times 4096$   & $2880 \times 5760$   & $7104 \times 2368$  & $1{,}68 \cdot 10^{7}$ \\
-$S = 8192$  & $8192 \times 8192$   & $5760 \times 11520$  & $14208 \times 4736$ & $6{,}71 \cdot 10^{7}$ \\
-$S = 16384$ & $16384 \times 16384$ & $11520 \times 23040$ & $28416 \times 9472$ & $2{,}68 \cdot 10^{8}$ \\
+$S=4096$
+& $4096\times4096$
+& $2880\times5760$
+& $7104\times2368$
+& $1{,}68\cdot10^{7}$ \\
+
+$S=8192$
+& $8192\times8192$
+& $5760\times11520$
+& $14208\times4736$
+& $6{,}71\cdot10^{7}$ \\
+
+$S=16384$
+& $16384\times16384$
+& $11520\times23040$
+& $28416\times9472$
+& $2{,}68\cdot10^{8}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Ogni punto viene misurato con i quattro backend nelle configurazioni fissate
-nella Fase 1 e sui cinque $k$, in doppia precisione e con $P = 1$: in totale
-$3 \times 3 \times 4 \times 5 = 180$ configurazioni.
+Per ogni combinazione di scala e forma vengono eseguiti i quattro backend
+CUDA nelle configurazioni selezionate durante la Fase~1 e sui cinque valori
 
-Le due domande sono distinte e la campagna le separa per costruzione. La prima
-riguarda la \emph{taglia}: al crescere di $S$ i costi fissi si ammortizzano e
-la GPU dispone di più warp residenti, quindi ci si attende una crescita del
-throughput che si satura. La seconda riguarda la \emph{forma}: a lavoro
-costante, un rapporto $M{:}N$ diverso cambia il numero di righe di $Y$ e quindi
-il numero di warp disponibili, che con lo schema a un warp per riga è
-esattamente il parallelismo del kernel (\cref{sec:roofline-gpu}). Uno
-scostamento verticale fra le tre curve alla stessa scala è quindi effetto della
-sola forma.
+\[
+k\in\{3,6,8,20,32\}.
+\]
 
-\section{Fase 3 --- Precisione numerica}
+Le misure vengono raccolte in doppia precisione e con un solo rank MPI.
+
+Il disegno comprende quindi
+$3 \times 3 \times 4 \times 5 = 180$
+configurazioni.
+
+Le due variabili permettono di osservare fenomeni differenti:
+
+\begin{itemize}
+      \item Variando $S$ a forma invariata cresce la dimensione complessiva del
+      problema. La campagna permette quindi di verificare come il throughput
+      evolva passando da problemi più piccoli a problemi che espongono una
+      quantità maggiore di lavoro parallelo, e se le prestazioni tendano a
+      stabilizzarsi alle taglie maggiori.
+      \item Variando invece il rapporto $M:N$ a scala fissata, il numero complessivo
+      di operazioni rimane pressoché costante, mentre cambia la geometria del
+      problema. Cambiano, fra le altre cose, il numero di righe da elaborare,
+      la lunghezza della dimensione di riduzione e le dimensioni relative dei
+      buffer $X$ e $Y$.
+
+      Il confronto fra le tre forme permette quindi di verificare quanto ciascun
+      backend sia sensibile alla geometria della matrice, separando per quanto
+      possibile questo effetto da quello dovuto alla sola quantità di lavoro.
+
+\end{itemize}
+
+\section{Fase 3 - Effetto della precisione numerica}
 \label{sec:fase3-precisione}
 
-Suite
-\file{experiments/fase\_3\_precisione/campagna\_VAS\_8\_fp32\_comparison.txt}.
+La terza fase studia l'effetto della precisione numerica sulle prestazioni
+dei backend CUDA. Il confronto viene effettuato fra FP64 e FP32 mantenendo
+invariate, per quanto possibile, tutte le altre caratteristiche
+dell'esecuzione.
 
-La terza fase confronta singola e doppia precisione sui quattro backend CUDA,
-sul caso quadrato più grande ($M = N = \num{16384}$, $P = 1$) e sui cinque $k$.
+La campagna utilizza il caso quadrato di dimensione maggiore,
 
-La suite raccoglie soltanto le venti nuove misure FP32: il riferimento FP64
-è il punto $S = 16384$, forma $M = N$ della Fase 2, misurato con le stesse
-configurazioni dei kernel e lo stesso protocollo. Riutilizzarlo invece di
-rieseguirlo non è solo un risparmio di tempo macchina --- garantisce che le due
-precisioni siano confrontate su misure prodotte dalla stessa campagna e non da
-due sessioni diverse.
+\[
+M=N=\num{16384},
+\qquad
+P=1,
+\]
 
-Lo speedup dovuto alla precisione è definito sul solo tempo di kernel:
+e considera i cinque valori
+
+\[
+k\in\{3,6,8,20,32\}.
+\]
+
+Vengono confrontati i quattro backend
+\kernelname{cuda\_naive},
+\kernelname{cuda\_warp},
+\kernelname{cuda\_warp\_smem}
+e \kernelname{cublas}.
+
+Per i kernel custom vengono mantenuti gli stessi parametri strutturali
+selezionati nella Fase~1. La dimensione del blocco, il layout di $X$,
+il padding della shared memory e la granularità del tile non vengono quindi
+ritarati separatamente per FP32.
+
+Questa scelta permette di isolare il più possibile l'effetto della
+precisione: fra le due build cambia il tipo \code{scalar\_t}, mentre la
+struttura dell'algoritmo e la configurazione scelta per il kernel rimangono
+invariate.
+
+Di conseguenza, la campagna non deve essere interpretata come una ricerca
+della migliore configurazione possibile per ciascuna precisione, ma come
+un confronto controllato fra le due rappresentazioni numeriche.
+
+Le misure FP32 vengono confrontate con il punto FP64 corrispondente già
+raccolto nella Fase~2 per
+$M=N=\num{16384}$.
+
+Il riferimento viene riutilizzato perché dimensioni del problema, backend,
+configurazioni dei kernel, numero di processi, valori di $k$ e protocollo
+di misura coincidono con quelli della presente campagna. Non è quindi
+necessario introdurre una diversa baseline FP64.
+
+Poiché l'obiettivo è isolare l'effetto della precisione sul calcolo GPU,
+il confronto viene effettuato sul tempo del solo kernel. Per ciascun backend
+e valore di $k$ si definisce:
 
 \begin{equation}
 S_{32/64}(k)
 =
-\frac{t_{\mathrm{kernel}}^{\mathrm{FP64}}(k)}
-     {t_{\mathrm{kernel}}^{\mathrm{FP32}}(k)} .
+\frac{
+\overline{t}_{\mathrm{kernel}}^{\mathrm{FP64}}(k)
+}{
+\overline{t}_{\mathrm{kernel}}^{\mathrm{FP32}}(k)
+}.
 \label{eq:speedup-precisione}
 \end{equation}
 
-La previsione del modello di \cref{cap:roofline} è netta e falsificabile: in
-FP64 il nucleo è compute-bound per $k \ge 6$, quindi il tetto non dipende da
-$k$; in FP32 resta memory-bound su tutto l'intervallo della traccia, quindi il
-tetto cresce linearmente con $k$. Il rapporto fra i due deve di conseguenza
-\textbf{crescere con $k$}. Uno speedup piatto e vicino a 2 --- cioè il solo
-rapporto fra le dimensioni degli scalari, quello che si otterrebbe se entrambe
-le precisioni fossero limitate dalla banda --- falsificherebbe il modello.
+Un valore maggiore di uno indica quindi una riduzione del tempo di kernel
+passando dalla doppia alla singola precisione.
 
-\paragraph{Caratterizzazione delle risorse.}
-Al confronto temporale dovrebbe affiancarsi una caratterizzazione delle risorse
-richieste dai kernel nelle due precisioni, ricavata dall'output di
-\code{ptxas}: registri per thread, eventuali spill, stack frame e shared memory
-statica. Non si tratta di un benchmark, ma della verifica di quale meccanismo
-produca lo speedup misurato.
+La precisione modifica contemporaneamente più proprietà dell'esecuzione.
+Passando da FP64 a FP32 si dimezza la dimensione di ciascun elemento in
+memoria e cambia il throughput aritmetico disponibile sulla GPU. Possono
+inoltre cambiare l'utilizzo dei registri e, per i kernel che utilizzano
+shared memory, la quantità di memoria richiesta dal tile.
 
-\begin{daverificare}
-Le compilazioni con \code{-Xptxas -v} non sono ancora state eseguite. Comando:
-\code{make -B KERNEL=<nome> PREC=<double|float> EXTRA\_NVCCFLAGS='-Xptxas -v'}
-per i tre kernel custom nelle due precisioni. Da estrarre: registri per thread,
-spill store/load, shared memory statica. Due limiti da rispettare nella
-lettura: \code{ptxas} riporta la shared memory \emph{statica} e non quella
-dinamica, quindi per \kernelname{cuda\_warp\_smem} il dato va ricostruito dal
-piano runtime come $\code{x\_rows\_per\_tile} \cdot (k + \code{SMEM\_PAD})
-\cdot s$ byte; e \code{blocks\_per\_sm} è una capacità teorica dichiarata
-dall'API dell'occupancy, non l'occupancy raggiunta, che richiederebbe un
-profilo con \code{ncu}.
-\end{daverificare}
+\color{red}
+La campagna permette quindi di osservare come questi effetti complessivi
+si riflettano sul tempo di esecuzione e se il comportamento misurato sia
+coerente con il modello roofline discusso nel \cref{cap:roofline}.
+\color{black}
 
-\section{Fase 4 --- Decomposizione MPI sui backend di CPU}
-\label{sec:fase4-mpi-cpu}
+L'interpretazione delle differenze viene rimandata alla sezione dei
+risultati.
 
-Suite
-\file{experiments/fase\_4\_mpi\_cpu/campagna\_VAS\_9\_mpi\_cpu\_scaling.txt}.
+\section{Fase 4 - Esecuzione distribuita MPI + CUDA}
+\label{sec:fase4-mpi-cuda}
 
-La quarta fase studia la decomposizione MPI, e lo fa sui backend di CPU. La
-scelta è dettata dall'hardware: il nodo ha una sola GPU e, con MPS non attivo,
-più rank CUDA non eseguono in parallelo ma si alternano sulla scheda
-(\cref{sec:serializzazione}). Una campagna di scaling su GPU misurerebbe quindi
-l'alternanza dei contesti e non il parallelismo, mentre sui backend di CPU
-ciascun rank dispone di un core proprio e lo speedup misurato è quello vero.
+Le prime tre fasi caratterizzano i backend CUDA utilizzando un solo
+processo MPI. Questa scelta permette di attribuire le differenze osservate
+alle caratteristiche dei kernel senza introdurre contesa sull'acceleratore.
 
-Il problema globale resta fisso a $M = N = \num{16384}$ in doppia precisione ---
-è quindi uno studio di \emph{strong scaling} --- mentre variano
+La quarta fase considera invece l'esecuzione distribuita completa. Il
+numero di processi MPI viene aumentato mantenendo invariato il problema
+globale, e ciascun rank esegue il prodotto sul proprio blocco locale di
+$A$ secondo il solito protocollo:
 
-\begin{equation}
-P \in \{1, 2, 4, 8\}
-\qquad\text{e}\qquad
-\text{backend} \in
-\{\kernelname{scheme\_a},\ \kernelname{scheme\_a\_jblock},\
-  \kernelname{scheme\_a\_jblock\_rb}\},
-\end{equation}
+\[
+\operatorname{Bcast}(X)
+\longrightarrow
+\operatorname{local\_gemm}
+\longrightarrow
+\operatorname{Reduce}(Y).
+\]
 
-per $3 \times 4 \times 5 = 60$ configurazioni. I backend \kernelname{jblock}
-usano i parametri predefiniti del codice (\code{JBLOCK\_BYTES}
-$= \num{65536}$, \code{RB\_ROWS} automatico).
+L'obiettivo non è caratterizzare nuovamente il kernel locale, ma osservare
+come comunicazioni MPI, decomposizione del problema ed esecuzione CUDA
+interagiscano nel tempo complessivo del prodotto distribuito.
 
-La griglia è $P \times 1$, cioè la decomposizione monodimensionale per righe:
-ogni rank riceve una banda distinta di righe di $A$ e l'intera $X$, che viene
-propagata lungo la colonna della griglia. Il comunicatore di riga contiene
-allora un solo processo e la reduce degenera in una copia locale. La
-configurazione è voluta: isola il costo del broadcast di $X$ e rende il tempo
-misurato quello del calcolo locale più una sola collettiva, che è il caso in cui
-l'effetto del backend sul calcolo è più leggibile.
+Il nodo utilizzato per gli esperimenti dispone di una sola GPU. Tutti i
+rank CUDA selezionano quindi lo stesso device e, per $P>1$, più processi
+con contesti CUDA distinti condividono lo stesso acceleratore.
 
-Il caso $P = 1$ non è uno studio MPI ma la baseline interna necessaria a
-definire
+La campagna non rappresenta pertanto uno scaling su più GPU: aumentare il
+numero di processi suddivide il problema globale in blocchi locali più
+piccoli e modifica il costo delle comunicazioni MPI, ma non aumenta le
+risorse di calcolo disponibili sul device. Al contrario, i rank devono
+contendersi l'unica GPU presente nel sistema.
 
-\begin{equation}
-S(P) = \frac{T(1)}{T(P)},
+Per questo motivo i risultati vengono interpretati come studio
+dell'interazione fra MPI e un acceleratore condiviso, e non come misura
+della scalabilità di un sistema multi-GPU.
+
+Per ogni configurazione vengono conservate le stesse componenti temporali
+utilizzate nelle fasi precedenti:
+
+\[
+t_{\mathrm{Bcast}},
 \qquad
-E(P) = \frac{S(P)}{P},
-\label{eq:speedup-efficienza}
-\end{equation}
+t_{\mathrm{kernel}},
+\qquad
+t_{\mathrm{Reduce}}.
+\]
 
-dove $T$ è il tempo ufficiale della \cref{eq:t-official-mean}. Poiché la
-baseline è presa nella stessa campagna e con lo stesso backend, $S(P)$ misura
-la qualità della parallelizzazione e non il confronto fra implementazioni
-diverse: quest'ultimo si legge orizzontalmente, confrontando i tre backend allo
-stesso $P$.
+La loro evoluzione al crescere di $P$ permette di distinguere due effetti.
+Da un lato cambia il costo della parte MPI, dall'altro ciascun processo
+esegue un prodotto locale più piccolo ma condivide la GPU con gli altri
+rank.
 
-\section{Fase 5 --- MPI + CUDA}
-\label{sec:fase5-mpi-cuda}
+La metrica prestazionale principale rimane quella definita in
+\cref{sec:metrica-prestazione}, aggregando per ogni repetition il tempo
+dei rank mediante il massimo e calcolando successivamente la media sulle
+repetition.
 
-\begin{daverificare}
-La fase non è stata eseguita e non compare quindi in
-\cref{cap:risultati}. Misurerebbe il prodotto distribuito con backend CUDA e
-$P > 1$ sull'unica GPU del nodo. Non è uno strong scaling su più acceleratori e
-non va letta come tale: con MPS non attivo i contesti si alternano, quindi
-$t_{\mathrm{kernel}}$ con $P > 1$ è il throughput aggregato della scheda sul
-problema globale. Il protocollo corretto per questa fase richiede
-l'opzione \code{--group-timing}, che racchiude \code{local\_gemm} fra due
-barriere e produce un tempo di gruppo indipendente da come il driver ha
-alternato i contesti; le barriere entrano però in $T_{\mathrm{official}}$, per
-cui la campagna va tenuta separata da quelle dei GFLOPS ufficiali. Il confronto
-informativo è fra $t_{\mathrm{local}}^{\text{gruppo}}$, il massimo fra i rank di
-$t_{\mathrm{kernel}}$ e la somma dei $t_{\mathrm{kernel}}$ dei rank: vicino al
-massimo significa kernel sovrapposti, vicino alla somma significa kernel in
-fila.
-\end{daverificare}
+La condivisione dell'acceleratore rende inoltre utile una misura aggiuntiva
+della fase locale nel suo complesso. A questo scopo il programma può essere
+eseguito con l'opzione \code{--group-timing}.
+
+In questa modalità i rank vengono sincronizzati immediatamente prima della
+chiamata a \code{local\_gemm} e nuovamente al suo completamento. L'intervallo
+misurato rappresenta quindi il tempo necessario affinché l'intero gruppo
+di processi completi la fase locale a partire da un istante comune.
+
+Indichiamo tale quantità con:
+
+\[
+t_{\mathrm{local}}^{\mathrm{gruppo}}.
+\]
+
+A differenza di $t_{\mathrm{kernel}}$, che descrive l'intervallo misurato
+dal singolo rank mediante eventi CUDA,
+$t_{\mathrm{local}}^{\mathrm{gruppo}}$ osserva il completamento collettivo
+della fase locale e comprende anche i trasferimenti host-device e
+device-host effettuati dalle diverse chiamate a \code{local\_gemm}.
+
+Le esecuzioni con \code{--group-timing} vengono considerate misure
+diagnostiche separate. Le barriere aggiuntive modificano infatti la
+sincronizzazione fra i rank e non devono essere introdotte nelle
+esecuzioni utilizzate per il confronto prestazionale principale.
+
+La campagna viene quindi letta su due livelli: le esecuzioni standard
+descrivono le prestazioni del prodotto distribuito, mentre le esecuzioni
+con group timing vengono utilizzate per caratterizzare il costo collettivo
+della fase CUDA quando più processi condividono lo stesso acceleratore.
+
+La campagna utilizza il backend custom selezionato al termine delle fasi
+precedenti nella sua configurazione FP64 di riferimento. Il confronto con
+cuBLAS viene mantenuto come baseline esterna, mentre le varianti utilizzate
+esclusivamente durante il tuning non vengono nuovamente esplorate.
+
+La fase non cerca quindi un valore di $P$ che massimizzi artificialmente
+le prestazioni sulla GPU condivisa. L'obiettivo è quantificare il costo
+della composizione fra il livello MPI e il backend CUDA e mostrare come
+l'architettura distribuita del programma si comporti nelle condizioni
+hardware effettivamente disponibili.
