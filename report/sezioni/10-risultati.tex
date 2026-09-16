@@ -520,6 +520,544 @@ Le fasi successive modificano quindi le caratteristiche del problema o
 dell'aritmetica, senza introdurre un nuovo tuning.
 
 
+
+
+
+
+
+
+\section{Fase 2 - Caratterizzazione dimensionale}
+\label{sec:ris-fase2}
+
+La seconda fase utilizza le configurazioni consolidate al termine della
+Fase~1 per studiare la dipendenza delle prestazioni dalla dimensione e dalla
+forma del problema.
+
+Il disegno sperimentale comprende le tre scale nominali
+
+$$
+S \in \{4096,8192,16384\}
+$$
+
+e, per ciascuna scala, le tre geometrie $M=N$, $N=2M$ e $M=3N$ definite in
+\cref{tab:fase2-punti}. Le dimensioni rettangolari sono state scelte in modo
+da mantenere $MN$ costante entro circa l'$1{,}2%$ rispetto al caso quadrato
+della stessa scala.
+
+Tutte le misure della caratterizzazione dimensionale sono state eseguite in
+FP64, con $P=1$, $5$ warm-up e $20$ ripetizioni misurate. Per ciascun backend
+sono stati mantenuti i parametri selezionati nella Fase~1.
+
+L'analisi viene separata in tre passaggi. Si considera dapprima il problema
+di riferimento $M=N=16384$, utilizzato per confrontare le configurazioni
+consolidate dei quattro backend. Si studia quindi l'effetto della sola scala,
+mantenendo $M=N$, e infine l'effetto della forma a lavoro complessivo
+pressoché costante.
+
+\subsection{Confronto sul problema di riferimento}
+\label{sec:ris-fase2-riferimento}
+
+Prima di considerare separatamente scala e forma, è utile richiamare il
+confronto conclusivo della Fase~1 sul problema
+
+$$
+M=N=\num{16384}.
+$$
+
+Queste misure costituiscono la baseline prestazionale delle configurazioni
+selezionate dal tuning. Non appartengono alla nuova campagna dimensionale:
+vengono riportate qui come riferimento rispetto al quale leggere le
+variazioni osservate nelle sottosezioni successive.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Confronto conclusivo della Fase~1 sul problema di riferimento
+$M=N=\num{16384}$, FP64, $P=1$.}
+\label{tab:ris-confronto-kernel}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+\textbf{Backend}
+& $k=3$ & $k=6$ & $k=8$ & $k=20$ & $k=32$ \
+\midrule
+\multicolumn{6}{@{}l}{\itshape \code{gflops_kernel}} \
+\kernelname{cuda_naive}
+& 150,3 & 309,3 & 347,0 & 349,2 & 353,7 \
+\kernelname{cuda_warp}
+& 302,1 & 357,5 & 356,2 & 357,7 & 358,3 \
+\kernelname{cuda_warp_smem}
+& 296,9 & 352,6 & 352,3 & 352,3 & 343,7 \
+\kernelname{cublas}
+& 15,4 & 30,9 & 41,1 & 102,8 & 164,3 \
+\midrule
+\multicolumn{6}{@{}l}{\itshape $\overline{t}_{\mathrm{kernel}}$ [ms]} \
+\kernelname{cuda_naive}
+& 10,71 & 10,42 & 12,38 & 30,74 & 48,58 \
+\kernelname{cuda_warp}
+& 5,33 & 9,01 & 12,06 & 30,02 & 47,95 \
+\kernelname{cuda_warp_smem}
+& 5,43 & 9,13 & 12,19 & 30,48 & 49,99 \
+\kernelname{cublas}
+& 104,46 & 104,22 & 104,50 & 104,46 & 104,59 \
+\bottomrule
+\end{tabular}
+\end{table}
+
+Il comportamento più evidente è quello di \kernelname{cuda_warp}. A
+$k=3$ raggiunge $302{,}1$ GFLOPS, circa il doppio dei $150{,}3$ GFLOPS di
+\kernelname{cuda_naive}. A partire da $k=6$, il throughput si stabilizza
+invece nell'intervallo $356$--$358$ GFLOPS.
+
+Il vantaggio rispetto al kernel naive è quindi massimo per i multivettori più
+stretti: lo speedup vale circa $2{,}01\times$ a $k=3$ e $1{,}16\times$ a
+$k=6$, mentre per $k\ge8$ i due kernel si avvicinano progressivamente.
+
+Questo comportamento è coerente con le rispettive mappature. In
+\kernelname{cuda_warp} un warp coopera alla produzione di una riga di $Y$ e
+percorre la dimensione di riduzione $N$ distribuendola fra le lane. In
+\kernelname{cuda_naive}, invece, ciascun thread produce un singolo elemento
+di $Y$ ed esegue autonomamente l'intera riduzione.
+
+Quando $k$ cresce, anche \kernelname{cuda_naive} raggiunge però circa
+$350$ GFLOPS. Il margine disponibile per la variante warp diventa quindi
+molto più piccolo: il vantaggio principale di \kernelname{cuda_warp} non è
+un throughput massimo molto superiore, ma il raggiungimento del regime di
+plateau già per valori inferiori di $k$.
+
+La variante \kernelname{cuda_warp_smem} rimane molto vicina a
+\kernelname{cuda_warp}, senza tuttavia superarla sul problema di riferimento
+in FP64. Per $k\le20$ la differenza rimane inferiore a circa il $2%$, mentre
+a $k=32$ aumenta fino a circa il $4%$.
+
+Nel regime studiato, quindi, lo staging di $X$ in shared memory non produce
+un vantaggio rispetto all'accesso column-major utilizzato da
+\kernelname{cuda_warp}. Questo risultato è specifico alla configurazione
+FP64 considerata e non implica che la strategia shared sia inefficace in
+altri regimi.
+
+Il comportamento di \kernelname{cublas} è qualitativamente differente. Il
+tempo del kernel rimane pressoché costante intorno a
+\SI{104}{\milli\second} per tutti i valori di $k$. Poiché il numero di
+operazioni $2MNk$ cresce linearmente con $k$, il throughput riportato cresce a
+sua volta quasi linearmente, da $15{,}4$ GFLOPS a $k=3$ fino a
+$164{,}3$ GFLOPS a $k=32$.
+
+I soli tempi non consentono di determinare quale kernel interno o quale
+strategia di tiling sia stata selezionata dalla libreria. La conclusione
+direttamente supportata dalla misura è che, sul problema di riferimento in
+FP64 e per $k\le32$, i kernel custom risultano sensibilmente più veloci del
+backend cuBLAS.
+
+\subsection{Effetto della scala}
+\label{sec:ris-fase2-scala}
+
+Per isolare l'effetto della dimensione del problema si considerano soltanto
+le configurazioni quadrate,
+
+$$
+M=N=S,
+$$
+
+facendo variare
+
+$$
+S\in\{4096,8192,16384\}.
+$$
+
+La \cref{tab:ris-fase2-scala} riporta, per tutti i backend, i due estremi
+dell'intervallo di $k$ considerato.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Fase 2: effetto della scala nel caso quadrato. I valori riportati
+sono \code{gflops_kernel}.}
+\label{tab:ris-fase2-scala}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+& \multicolumn{3}{c}{$k = 3$} & \multicolumn{3}{c}{$k = 32$} \
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+\textbf{Backend}
+& 4096 & 8192 & 16384
+& 4096 & 8192 & 16384 \
+\midrule
+\kernelname{cuda_naive}
+& 162,3 & 187,3 & 151,5
+& 287,7 & 354,5 & 349,7 \
+\kernelname{cuda_warp}
+& 269,6 & 297,5 & 302,0
+& 281,5 & 354,1 & 354,9 \
+\kernelname{cuda_warp_smem}
+& 253,5 & 291,5 & 296,8
+& 274,5 & 330,7 & 341,0 \
+\kernelname{cublas}
+& 16,5 & 15,4 & 15,3
+& 184,3 & 164,0 & 163,2 \
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[scpa,
+xlabel={$k$}, ylabel={GFLOPS (kernel-only)},
+xmin=0, xmax=35, ymin=240, ymax=410,
+xtick={3,6,8,20,32},
+legend pos=north west, width=0.8\linewidth, height=6cm]
+
+\addplot[black, dashed, thick, forget plot, samples=2, domain=0:35]{350};
+
+\addplot[blue!70!black, mark=*]
+coordinates {
+(3,302.0) (6,354.3) (8,353.2) (20,354.6) (32,354.9)
+};
+\addlegendentry{$S = 16384$}
+
+\addplot[teal!70!black, mark=triangle*]
+coordinates {
+(3,297.5) (6,348.4) (8,347.8) (20,347.5) (32,354.1)
+};
+\addlegendentry{$S = 8192$}
+
+\addplot[orange!80!black, mark=square*]
+coordinates {
+(3,269.6) (6,275.7) (8,277.4) (20,279.8) (32,281.5)
+};
+\addlegendentry{$S = 4096$}
+
+\end{axis}
+\end{tikzpicture}
+
+\caption{Fase 2: \kernelname{cuda_warp} sul caso quadrato alle tre scale. La
+linea tratteggiata indica il tetto FP64 nominale utilizzato nel modello.}
+\label{fig:ris-fase2-scala}
+\end{figure}
+
+L'effetto della scala è particolarmente chiaro per
+\kernelname{cuda_warp}. A $S=4096$ il throughput rimane compreso fra circa
+$270$ e $282$ GFLOPS su tutto l'intervallo di $k$. Passando a $S=8192$,
+invece, i valori per $k\ge6$ salgono nell'intervallo
+$347$--$354$ GFLOPS; a $S=16384$ rimangono quindi sostanzialmente nello stesso
+regime, fra circa $349$ e $355$ GFLOPS.
+
+Per $k=32$, ad esempio, l'aumento principale avviene fra $S=4096$ e
+$S=8192$:
+
+$$
+281{,}5
+\rightarrow
+354{,}1
+\rightarrow
+354{,}9
+\quad\text{GFLOPS}.
+$$
+
+Il passaggio dalla scala intermedia a quella massima produce quindi un
+incremento trascurabile rispetto a quello osservato fra le prime due scale.
+Per $k=3$ la crescita è invece più graduale:
+
+$$
+269{,}6
+\rightarrow
+297{,}5
+\rightarrow
+302{,}0
+\quad\text{GFLOPS}.
+$$
+
+Il dato mostra che $S=4096$ appartiene, per questo kernel, a un regime
+prestazionale diverso da quello delle due scale maggiori.
+
+Una dimensione più piccola riduce la quantità totale di lavoro eseguita
+durante una singola invocazione del kernel. Questo rende plausibile una
+maggiore incidenza degli effetti legati alla capacità di sostenere
+l'esecuzione sulla GPU. Le sole misure temporali non permettono tuttavia di
+attribuire il deficit osservato a $S=4096$ a un singolo meccanismo, come
+occupancy, latenza, cache o numero insufficiente di blocchi residenti.
+
+È quindi più corretto limitarsi all'osservazione sperimentale: sul caso
+quadrato \kernelname{cuda_warp} raggiunge il regime di plateau solo quando il
+problema è sufficientemente grande.
+
+\kernelname{cuda_warp_smem} presenta un andamento simile ma più graduale.
+A $k=3$ passa da $253{,}5$ GFLOPS a $291{,}5$ e $296{,}8$ GFLOPS; a $k=32$
+passa invece da $274{,}5$ a $330{,}7$ e infine $341{,}0$ GFLOPS. Anche in
+questo caso la scala piccola risulta nettamente meno favorevole, ma il
+throughput continua ad aumentare anche nel passaggio da $S=8192$ a
+$S=16384$.
+
+Il comportamento di \kernelname{cuda_naive} è meno regolare. A $k=32$
+raggiunge $354{,}5$ GFLOPS a $S=8192$ e $349{,}7$ GFLOPS a $S=16384$, mentre
+a $k=3$ il valore massimo viene osservato alla scala intermedia. La crescita
+della dimensione del problema non implica quindi, per questo backend, una
+crescita monotona del throughput.
+
+Anche cuBLAS segue un regime differente dai kernel custom. A $k=3$ il
+throughput rimane sostanzialmente costante, fra circa $15$ e $16$ GFLOPS,
+mentre a $k=32$ diminuisce da $184{,}3$ a circa $163$ GFLOPS aumentando la
+scala.
+
+Nel complesso, la campagna mostra quindi che l'effetto della scala dipende
+fortemente dal backend. Il risultato più netto riguarda
+\kernelname{cuda_warp}: la scala $S=4096$ non raggiunge il plateau
+prestazionale osservato sulle due dimensioni maggiori.
+
+\subsection{Effetto della forma}
+\label{sec:ris-fase2-forma}
+
+L'effetto della geometria viene studiato confrontando, per ciascuna scala, le
+tre forme
+
+$$
+M=N,
+\qquad
+N=2M,
+\qquad
+M=3N.
+$$
+
+Le dimensioni sono state scelte in modo che $MN$ rimanga costante entro circa
+l'$1{,}2%$. A parità di $S$ e $k$, quindi, il numero totale di operazioni
+
+$$
+2MNk
+$$
+
+rimane pressoché invariato. Le differenze di throughput possono essere
+interpretate come sensibilità alla geometria del problema, anziché come
+conseguenza di una variazione significativa del lavoro complessivo.
+
+La \cref{tab:ris-fase2-warp} riporta tutti i punti relativi a
+\kernelname{cuda_warp}.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Fase 2: \code{gflops_kernel} di \kernelname{cuda_warp} sulle tre
+forme e sulle tre scale.}
+\label{tab:ris-fase2-warp}
+\begin{tabular}{@{}llrrrrr@{}}
+\toprule
+\textbf{Scala} & \textbf{Forma}
+& $k=3$ & $k=6$ & $k=8$ & $k=20$ & $k=32$ \
+\midrule
+
+\multirow{3}{*}{$S = 4096$}
+& $M = N$  & 269,6 & 275,7 & 277,4 & 279,8 & 281,5 \
+& $N = 2M$ & 280,8 & 308,9 & 310,4 & 289,0 & 292,0 \
+& $M = 3N$ & 285,7 & 330,0 & 330,5 & 278,0 & 281,4 \
+
+\midrule
+
+\multirow{3}{*}{$S = 8192$}
+& $M = N$  & 297,5 & 348,4 & 347,8 & 347,5 & 354,1 \
+& $N = 2M$ & 296,6 & 353,5 & 351,5 & 354,7 & 357,5 \
+& $M = 3N$ & 297,8 & 343,1 & 342,7 & 345,9 & 347,6 \
+
+\midrule
+
+\multirow{3}{*}{$S = 16384$}
+& $M = N$  & 302,0 & 354,3 & 353,2 & 354,6 & 354,9 \
+& $N = 2M$ & 300,0 & 356,0 & 355,8 & 357,4 & 356,7 \
+& $M = 3N$ & 301,7 & 349,6 & 349,8 & 351,9 & 352,4 \
+
+\bottomrule
+\end{tabular}
+\end{table}
+
+Per \kernelname{cuda_warp}, la sensibilità alla forma è particolarmente
+evidente alla scala più piccola.
+
+A $S=4096$ e $k=6$ il throughput passa da $275{,}7$ GFLOPS nel caso quadrato
+a $308{,}9$ GFLOPS per $N=2M$ e $330{,}0$ GFLOPS per $M=3N$. A $k=8$ si
+osserva un andamento quasi identico:
+
+$$
+277{,}4
+\rightarrow
+310{,}4
+\rightarrow
+330{,}5
+\quad\text{GFLOPS}.
+$$
+
+Lo scarto fra la forma migliore e quella peggiore è quindi vicino al
+$20%$ in entrambi i casi.
+
+La geometria $M=3N$ non è però sistematicamente la migliore. A $k=20$ la
+forma $N=2M$ raggiunge $289{,}0$ GFLOPS, contro $279{,}8$ del quadrato e
+$278{,}0$ di $M=3N$. A $k=32$ si osservano rispettivamente $281{,}5$,
+$292{,}0$ e $281{,}4$ GFLOPS.
+
+Non esiste quindi, già alla scala più piccola, una forma universalmente
+ottimale: l'effetto del rapporto $M:N$ dipende anche da $k$.
+
+A $S=8192$ la dispersione fra le tre geometrie si riduce nettamente. Per
+tutti i valori di $k$ lo scarto fra il throughput massimo e quello minimo
+rimane nell'ordine di pochi punti percentuali.
+
+A $S=16384$ la convergenza è ancora più evidente. A $k=6$, ad esempio, i tre
+valori sono $354{,}3$, $356{,}0$ e $349{,}6$ GFLOPS; a $k=32$ sono
+$354{,}9$, $356{,}7$ e $352{,}4$ GFLOPS. Lo scarto fra forma migliore e
+peggiore rimane inferiore al $2%$ per tutti i valori di $k$ considerati.
+
+Per \kernelname{cuda_warp}, quindi, la sensibilità alla geometria diminuisce
+nettamente al crescere della scala.
+
+Questo comportamento può essere messo in relazione con la struttura del
+kernel. \kernelname{cuda_warp} assegna un warp a ciascuna riga di $Y$.
+Cambiare il rapporto $M:N$ a prodotto quasi costante modifica
+contemporaneamente due aspetti dell'esecuzione: il numero di righe, e quindi
+il numero di warp indipendenti da eseguire, e la lunghezza della riduzione
+lungo $N$ effettuata da ciascun warp.
+
+Nel caso $M=3N$ vengono quindi esposte più righe indipendenti, ma ogni warp
+percorre una dimensione $N$ più corta. Nel caso $N=2M$ avviene il contrario:
+il numero di righe diminuisce, mentre aumenta il lavoro associato a ciascuna
+riduzione.
+
+La campagna non permette di separare quantitativamente questi due effetti.
+Il miglioramento osservato per $M=3N$ a $S=4096$ e $k=6,8$ non deve quindi
+essere interpretato come dimostrazione che un maggior numero di righe sia
+sempre preferibile. I risultati mostrano una sensibilità complessiva alla
+geometria, derivante dalla combinazione di più fattori.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Fase 2: effetto della forma a $k=32$ per tutti i backend. Il lavoro
+$MN$ rimane costante entro circa l'$1{,}2\%$.}
+\label{tab:ris-fase2-forma}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+& \multicolumn{3}{c}{$S = 4096$}
+& \multicolumn{3}{c}{$S = 16384$} \
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+\textbf{Backend}
+& $M{=}N$ & $N{=}2M$ & $M{=}3N$
+& $M{=}N$ & $N{=}2M$ & $M{=}3N$ \
+\midrule
+\kernelname{cuda_naive}
+& 287,7 & 300,7 & 295,8
+& 349,7 & 347,6 & 346,1 \
+\kernelname{cuda_warp}
+& 281,5 & 292,0 & 281,4
+& 354,9 & 356,7 & 352,4 \
+\kernelname{cuda_warp_smem}
+& 274,5 & 262,0 & 263,0
+& 341,0 & 341,6 & 338,8 \
+\kernelname{cublas}
+& 184,3 & 173,4 & 170,8
+& 163,2 & 170,9 & 168,5 \
+\bottomrule
+\end{tabular}
+\end{table}
+
+Il confronto fra backend mostra inoltre che la risposta alla forma dipende
+dalla strategia di calcolo.
+
+A $k=32$ e $S=4096$, ad esempio,
+\kernelname{cuda_naive} migliora passando dal quadrato a $N=2M$, mentre
+\kernelname{cuda_warp_smem} presenta il comportamento opposto e perde
+throughput nelle due geometrie rettangolari. cuBLAS mostra a sua volta una
+riduzione da $184{,}3$ GFLOPS nel caso quadrato a $170{,}8$ GFLOPS per
+$M=3N$.
+
+Alla scala $S=16384$ le differenze a $k=32$ diventano molto più contenute per
+i tre kernel custom. Questo non implica tuttavia che la sensibilità alla
+forma scompaia per ogni valore di $k$.
+
+Un esempio significativo è \kernelname{cuda_naive} a $k=3$: il caso
+quadrato raggiunge circa $151{,}5$ GFLOPS, mentre le geometrie rettangolari
+rimangono intorno a $133$--$134$ GFLOPS. Anche alla scala massima, quindi, la
+forma può continuare ad avere un effetto apprezzabile per specifiche
+combinazioni di backend e $k$.
+
+La conclusione generale della campagna deve pertanto essere formulata in
+termini di sensibilità congiunta a backend, scala e larghezza del
+multivettore. La riduzione della dipendenza dalla forma è particolarmente
+netta per \kernelname{cuda_warp}, ma non può essere estesa senza
+qualificazioni a tutti i backend.
+
+Per \kernelname{cuda_warp_smem}, inoltre, i parametri del piano runtime
+dipendono principalmente da $k$. Nei punti considerati, a parità di $k$, il
+numero di blocchi residenti per SM e il numero di righe di $X$ caricate per
+tile rimangono invariati al cambiare della forma. Le differenze misurate non
+sono quindi attribuibili semplicemente a una diversa scelta del tile da parte
+del planner.
+
+Anche il comportamento di cuBLAS deve essere interpretato con cautela. Nel
+backend utilizzato, il prodotto row-major viene realizzato reinterpretando i
+buffer nella convenzione column-major richiesta dalla libreria. La chiamata
+GEMM presenta quindi dimensioni effettive proporzionali a $(k,M,N)$ e il
+cambiamento del rapporto $M:N$ modifica effettivamente la geometria vista da
+cuBLAS.
+
+I soli tempi raccolti non consentono tuttavia di determinare come la libreria
+modifichi internamente kernel, tiling o strategia di esecuzione al variare
+della forma. Una spiegazione microarchitetturale richiederebbe una
+profilazione dedicata.
+
+\subsection{Sintesi della caratterizzazione dimensionale}
+\label{sec:ris-fase2-sintesi}
+
+La Fase~2 mostra che scala e forma non possono essere considerate proprietà
+indipendenti dal backend utilizzato.
+
+Per \kernelname{cuda_warp} emerge un comportamento particolarmente regolare:
+il problema quadrato con $S=4096$ rimane al di sotto del plateau osservato
+sulle scale maggiori, mentre a $S=8192$ e $S=16384$ il throughput per
+$k\ge6$ si stabilizza intorno ai $350$ GFLOPS. Parallelamente, la sensibilità
+alla forma passa da differenze vicine al $20\%$ nei casi più marcati a
+$S=4096$ a differenze inferiori al $2\%$ a $S=16384$.
+
+Gli altri backend non seguono necessariamente lo stesso andamento.
+\kernelname{cuda_naive} conserva, per alcuni valori di $k$, una dipendenza
+apprezzabile dalla forma anche alla scala massima;
+\kernelname{cuda_warp_smem} mostra una crescita più graduale con la scala;
+cuBLAS mantiene infine un comportamento qualitativamente distinto dai kernel
+custom.
+
+Per le campagne successive viene quindi mantenuto il problema
+
+$$
+M=N=\num{16384}.
+$$
+
+Questa scelta non implica che la dimensione quadrata massima sia ottimale per
+ogni backend. Essa fornisce invece un riferimento sufficientemente grande,
+già utilizzato nella fase di tuning, nel quale
+\kernelname{cuda_warp} ha raggiunto il proprio regime di plateau e mostra
+una ridotta sensibilità alla forma.
+
+Fissare questa geometria consente inoltre alle fasi successive di studiare
+l'effetto della precisione numerica e del parallelismo distribuito senza
+modificare contemporaneamente anche dimensione e forma del problema.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 \section{Fase 2 - Caratterizzazione dimensionale}
 \label{sec:ris-fase2}
 
@@ -539,77 +1077,42 @@ configurazione finale selezionata dalla Fase~1.
 \centering
 \footnotesize
 \caption{Confronto fra i backend configurati sul problema di riferimento,
-$M=N=\num{16384}$, FP64, $P=1$. L'ultima riga riporta la percentuale del
-tetto FP64 nominale raggiunta da \kernelname{cuda\_warp}.}
+$M=N=\num{16384}$, FP64, $P=1$.}
 \label{tab:ris-confronto-kernel}
 \begin{tabular}{@{}lrrrrr@{}}
 \toprule
 \textbf{Backend} & $k=3$ & $k=6$ & $k=8$ & $k=20$ & $k=32$ \\
 \midrule
 \multicolumn{6}{@{}l}{\itshape GFLOPS (kernel-only)} \\
-\kernelname{cuda\_naive}      & 150,3 & 309,3 & 347,0 & 349,2 & 353,7 \\
-\kernelname{cuda\_warp}       & \textbf{302,1} & \textbf{357,5} & \textbf{356,2} & \textbf{357,7} & \textbf{358,3} \\
-\kernelname{cuda\_warp\_smem} & 296,9 & 352,6 & 352,3 & 352,3 & 343,7 \\
-\kernelname{cublas}           & 15,4  & 30,9  & 41,1  & 102,8 & 164,3 \\
+\kernelname{cuda\_naive}      & 151,5 & 307,1 & 342,0 & 345,5 & 349,7 \\
+\kernelname{cuda\_warp}       & \textbf{302,0} & \textbf{354,3} & \textbf{353,2} & \textbf{354,6} & \textbf{354,9} \\
+\kernelname{cuda\_warp\_smem} & 296,8 & 349,8 & 349,6 & 349,5 & 341,0 \\
+\kernelname{cublas}           & 15,3  & 30,7  & 40,8  & 102,0 & 163,2 \\
 \midrule
 \multicolumn{6}{@{}l}{\itshape $t_{\text{kernel}}$ [\si{\milli\second}]} \\
-\kernelname{cuda\_naive}      & 10,71  & 10,42  & 12,38  & 30,74  & 48,58 \\
-\kernelname{cuda\_warp}       & 5,33   & 9,01   & 12,06  & 30,02  & 47,95 \\
-\kernelname{cuda\_warp\_smem} & 5,43   & 9,13   & 12,19  & 30,48  & 49,99 \\
-\kernelname{cublas}           & 104,46 & 104,22 & 104,50 & 104,46 & 104,59 \\
-\midrule
-\% del tetto FP64 (\kernelname{cuda\_warp}) & 86,3 & 102,1 & 101,8 & 102,2 & 102,4 \\
+\kernelname{cuda\_naive}      & 10,63  & 10,49  & 12,56  & 31,08  & 49,12 \\
+\kernelname{cuda\_warp}       & 5,33   & 9,09   & 12,16  & 30,28  & 48,40 \\
+\kernelname{cuda\_warp\_smem} & 5,43   & 9,21   & 12,29  & 30,73  & 50,38 \\
+\kernelname{cublas}           & 105,29 & 105,04 & 105,28 & 105,28 & 105,28 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Il coefficiente di variazione resta sotto lo $0{,}35\%$ per
-\kernelname{cublas}, \kernelname{cuda\_warp} e \kernelname{cuda\_warp\_smem}, e
-sotto l'$1{,}3\%$ per \kernelname{cuda\_naive}: tutte le differenze discusse
-qui sotto, tranne quella fra \kernelname{cuda\_warp} e
-\kernelname{cuda\_warp\_smem}, sono di ordini di grandezza superiori alla
-dispersione.
-
-\begin{figure}[H]
-\centering
-\begin{tikzpicture}
-\begin{axis}[scpa,
-  xlabel={$k$}, ylabel={GFLOPS (kernel-only)},
-  xmin=0, xmax=35, ymin=0, ymax=420,
-  xtick={3,6,8,20,32},
-  legend pos=south east, width=0.82\linewidth, height=6.4cm]
-\addplot[black, dashed, thick, forget plot, samples=2, domain=0:35]{350};
-\node[font=\scriptsize,anchor=north east,fill=white,inner sep=1pt] at (axis cs:34.5,345) {tetto FP64 nominale};
-\addplot[blue!70!black, mark=*] coordinates {(3,302.1) (6,357.5) (8,356.2) (20,357.7) (32,358.3)};
-\addlegendentry{\kernelname{cuda\_warp}}
-\addplot[teal!70!black, mark=triangle*] coordinates {(3,296.9) (6,352.6) (8,352.3) (20,352.3) (32,343.7)};
-\addlegendentry{\kernelname{cuda\_warp\_smem}}
-\addplot[orange!80!black, mark=square*] coordinates {(3,150.3) (6,309.3) (8,347.0) (20,349.2) (32,353.7)};
-\addlegendentry{\kernelname{cuda\_naive}}
-\addplot[red!70!black, mark=diamond*] coordinates {(3,15.4) (6,30.9) (8,41.1) (20,102.8) (32,164.3)};
-\addlegendentry{\kernelname{cublas}}
-\end{axis}
-\end{tikzpicture}
-\caption{Confronto fra i backend configurati sul problema di riferimento in
-doppia precisione. La linea tratteggiata rappresenta il tetto FP64 nominale
-utilizzato nel modello roofline.}
-\label{fig:ris-confronto-kernel}
-\end{figure}
 
 \subsubsection*{Lettura}
 
 \textbf{Il comportamento di \kernelname{cuda\_warp} è coerente con il modello
 roofline.}
 
-Per $k=3$ il kernel raggiunge $302{,}1$ GFLOPS, pari all'$86{,}3\%$ del tetto
+Per $k=3$ il kernel raggiunge $302{,}0$ GFLOPS, pari all'$86{,}3\%$ del tetto
 FP64 nominale adottato nel modello. A partire da $k=6$ la prestazione si
-stabilizza invece in un intervallo molto stretto, fra $356$ e $358$ GFLOPS,
+stabilizza invece in un intervallo molto stretto, fra $353$ e $355$ GFLOPS,
 senza crescere ulteriormente all'aumentare di $k$.
 
 L'andamento è quindi quello atteso nel passaggio da un regime nel quale il
 traffico di memoria limita ancora la prestazione a uno nel quale il throughput
 aritmetico della GPU diventa il vincolo dominante. Il valore misurato supera
-di circa il $2\%$ il tetto nominale di $350$ GFLOPS utilizzato nel modello.
+al più di circa l'$1{,}4\%$ il tetto nominale di $350$ GFLOPS utilizzato nel modello.
 Questo scostamento non modifica la lettura del regime, ma mostra che il tetto
 roofline deve essere interpretato come una stima del limite sostenibile e non
 come una soglia sperimentale esatta. Senza una misura diretta delle frequenze
@@ -660,21 +1163,21 @@ un vantaggio prestazionale sul problema di riferimento.
 \textbf{cuBLAS mostra un comportamento qualitativamente diverso dai kernel
 custom.}
 Il tempo di esecuzione rimane quasi costante, fra
-\SI{104.2}{\milli\second} e \SI{104.6}{\milli\second}, mentre $k$ passa da 3 a
+\SI{105.0}{\milli\second} e \SI{105.3}{\milli\second}, mentre $k$ passa da 3 a
 32. Poiché il numero di operazioni utilizzato nel calcolo dei GFLOPS cresce
 linearmente con $k$, un tempo quasi costante produce a sua volta una crescita
 quasi lineare del throughput riportato:
 
 \[
-15{,}4
+15{,}3
 \rightarrow
-30{,}9
+30{,}7
 \rightarrow
-41{,}1
+40{,}8
 \rightarrow
-102{,}8
+102{,}0
 \rightarrow
-164{,}3
+163{,}2
 \quad\text{GFLOPS}.
 \]
 
@@ -689,12 +1192,11 @@ Ciò che la campagna dimostra direttamente è invece sufficiente per il
 confronto: in FP64 e per i multivettori stretti considerati,
 \kernelname{cublas} rimane sensibilmente più lento dei tre kernel
 specializzati. Il divario rispetto a \kernelname{cuda\_warp} passa da circa
-$19{,}6\times$ a $k=3$ a circa $2{,}2\times$ a $k=32$, restringendosi
+$19{,}7\times$ a $k=3$ a circa $2{,}2\times$ a $k=32$, restringendosi
 progressivamente all'aumentare della larghezza del multivettore.
 
 I nove punti del disegno fattoriale sono quelli di \cref{tab:fase2-punti}: tre
-scale nominali e, per ciascuna, tre forme a prodotto $MN$ costante entro
-l'$1{,}2\%$. Tutte le misure sono in doppia precisione, con $P = 1$ e con le
+scale nominali e, per ciascuna, tre forme a prodotto $MN$ all'incirca costante. Tutte le misure sono in doppia precisione, con $P = 1$ e con le
 configurazioni consolidate in \cref{tab:ris-fase1-sintesi}.
 
 \begin{table}[H]
@@ -763,29 +1265,6 @@ l'$1{,}2\%$.}
 \bottomrule
 \end{tabular}
 \end{table}
-
-\begin{figure}[H]
-\centering
-\begin{tikzpicture}
-\begin{axis}[scpa,
-  xlabel={$k$}, ylabel={GFLOPS (kernel-only)},
-  xmin=0, xmax=35, ymin=240, ymax=410,
-  xtick={3,6,8,20,32},
-  legend pos=north west, width=0.8\linewidth, height=6cm]
-\addplot[black, dashed, thick, forget plot, samples=2, domain=0:35]{350};
-\addplot[blue!70!black, mark=*] coordinates {(3,302.0) (6,354.3) (8,353.2) (20,354.6) (32,354.9)};
-\addlegendentry{$S = 16384$}
-\addplot[teal!70!black, mark=triangle*] coordinates {(3,297.5) (6,348.4) (8,347.8) (20,347.5) (32,354.1)};
-\addlegendentry{$S = 8192$}
-\addplot[orange!80!black, mark=square*] coordinates {(3,269.6) (6,275.7) (8,277.4) (20,279.8) (32,281.5)};
-\addlegendentry{$S = 4096$}
-\end{axis}
-\end{tikzpicture}
-\caption{Fase 2: \kernelname{cuda\_warp} sul caso quadrato alle tre scale. La
-linea tratteggiata è il tetto FP64 nominale. A $S = 4096$ la curva non arriva
-al tetto per nessun $k$.}
-\label{fig:ris-fase2-scala}
-\end{figure}
 
 \subsubsection*{Lettura}
 
@@ -873,11 +1352,14 @@ meccanismi sarebbe necessaria una profilazione specifica.
 \textbf{La scala massima fornisce il regime di riferimento per le fasi
 successive.}
 
-A $S=16384$ le prestazioni dei kernel custom sono ormai poco sensibili alla
-forma e, per \kernelname{cuda\_warp}, il throughput raggiunge il plateau
-osservato nel confronto sul problema di riferimento. Alle scale inferiori,
-invece, sia la dimensione sia la geometria possono ancora modificare in modo
-apprezzabile il comportamento.
+A $S=16384$, \kernelname{cuda\_warp} e
+\kernelname{cuda\_warp\_smem} sono ormai poco sensibili alla forma e, per
+\kernelname{cuda\_warp}, il throughput raggiunge il plateau osservato nel
+confronto sul problema di riferimento. \kernelname{cuda\_naive} conserva
+invece una dipendenza apprezzabile dalla geometria per $k=3$ e $k=6$, mentre
+per i valori maggiori di $k$ le differenze fra le tre forme diventano
+contenute. Alle scale inferiori, sia la dimensione sia la geometria possono
+modificare in modo più marcato il comportamento.
 
 Per questo motivo le Fasi~3 e~4 mantengono
 $M=N=\num{16384}$ come problema di riferimento. La scelta non presuppone che
@@ -1672,7 +2154,7 @@ si usa il throughput della fase locale collettiva.}
 \toprule
 \textbf{Regime} & \textbf{Backend migliore} & \textbf{GFLOPS} & \textbf{\% tetto} & \textbf{Riferimento} \\
 \midrule
-GPU FP64, kernel-only & \kernelname{cuda\_warp} & 358,3 & 102,4 & \cref{tab:ris-confronto-kernel} \\
+GPU FP64, kernel-only & \kernelname{cuda\_warp} & 354,9 & 101,4 & \cref{tab:ris-confronto-kernel} \\
 GPU FP32, kernel-only & \kernelname{cublas} & 4791,9 & 66,9 & \cref{tab:ris-fase3-tetto} \\
 MPI + CUDA FP64, $P=1$ & \kernelname{cuda\_warp} & 335,5 & 95,9 & \cref{tab:ris-fase4-backend} \\
 MPI + CUDA FP64, $P=8$ & \kernelname{cuda\_naive}, $2\times4$ & 302,6 & 86,5 & \cref{sec:ris-fase4-backend} \\

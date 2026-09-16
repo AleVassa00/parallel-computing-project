@@ -779,11 +779,20 @@ S &\in \{4096,\ 8192,\ 16384\}
 && \text{(rapporto fra le dimensioni)}.
 \end{align}
 
-La scala $S$ identifica la quantità nominale di lavoro attraverso il caso
-quadrato $M=N=S$. Per confrontare forme differenti senza modificare
+La scala $S$ definisce la dimensione del problema di riferimento,
+corrispondente al caso quadrato $M=N=S$. Per confrontare forme differenti senza modificare
 sostanzialmente il numero di operazioni, le dimensioni dei casi
-rettangolari vengono scelte in modo da mantenere il prodotto $MN$ il più
-vicino possibile a $S^2$.
+rettangolari vengono scelte in modo tale che
+
+\[
+MN \simeq S^2.
+\]
+
+A parità di $S$ e di $k$, le tre forme richiedono quindi una quantità di
+calcolo pressoché identica, ma presentano rapporti differenti tra le
+dimensioni della matrice. In questo modo è possibile studiare l'effetto
+della forma del problema senza confonderlo con una variazione significativa
+del numero complessivo di operazioni.
 
 \begin{table}[H]
 \centering
@@ -836,7 +845,7 @@ configurazioni.
 Le due variabili permettono di osservare fenomeni differenti:
 
 \begin{itemize}
-      \item Variando $S$ a forma invariata cresce la dimensione complessiva del
+      \item Variando $S$, ma mantendendo il rapporto $M=N$, cresce la dimensione complessiva del
       problema. La campagna permette quindi di verificare come il throughput
       evolva passando da problemi più piccoli a problemi che espongono una
       quantità maggiore di lavoro parallelo, e se le prestazioni tendano a
