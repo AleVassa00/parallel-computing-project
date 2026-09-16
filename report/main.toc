@@ -119,10 +119,20 @@
 \contentsline {paragraph}{La forma conta soprattutto quando la scala è insufficiente.}{68}{section*.47}%
 \contentsline {paragraph}{Il comportamento di cuBLAS è strutturalmente diverso.}{68}{section*.48}%
 \contentsline {section}{\numberline {7.3}Fase 3 - Effetto della precisione numerica}{68}{section.7.3}%
-\contentsline {section}{\numberline {7.4}Fase 4 - Esecuzione distribuita MPI + CUDA}{71}{section.7.4}%
-\contentsline {subsection}{\numberline {7.4.1}Metrica rank-local e tempo collettivo}{71}{subsection.7.4.1}%
-\contentsline {subsection}{\numberline {7.4.2}Effetto del numero di rank}{72}{subsection.7.4.2}%
-\contentsline {subsection}{\numberline {7.4.3}Effetto della griglia MPI}{73}{subsection.7.4.3}%
-\contentsline {subsection}{\numberline {7.4.4}Confronto fra backend nella composizione MPI + CUDA}{74}{subsection.7.4.4}%
-\contentsline {section}{\numberline {7.5}Il costo dei dati: trasferimenti e preprocessing}{74}{section.7.5}%
-\contentsline {section}{\numberline {7.6}Sintesi}{76}{section.7.6}%
+\contentsline {subsection}{\numberline {7.3.1}Confronto tra FP64 e FP32}{69}{subsection.7.3.1}%
+\contentsline {subsection}{\numberline {7.3.2}Comportamento dei kernel custom}{69}{subsection.7.3.2}%
+\contentsline {subsection}{\numberline {7.3.3}Piano di esecuzione di \texttt {cuda\_warp\_smem}}{70}{subsection.7.3.3}%
+\contentsline {subsection}{\numberline {7.3.4}Comportamento di cuBLAS}{71}{subsection.7.3.4}%
+\contentsline {subsection}{\numberline {7.3.5}Sintesi}{72}{subsection.7.3.5}%
+\contentsline {section}{\numberline {7.4}Fase 4 - Esecuzione distribuita MPI + CUDA}{72}{section.7.4}%
+\contentsline {subsection}{\numberline {7.4.1}Il tempo collettivo come metrica}{72}{subsection.7.4.1}%
+\contentsline {subsection}{\numberline {7.4.2}Effetto del numero di rank $P$}{73}{subsection.7.4.2}%
+\contentsline {subsection}{\numberline {7.4.3}Effetto della griglia MPI}{75}{subsection.7.4.3}%
+\contentsline {subsection}{\numberline {7.4.4}Confronto fra backend nella composizione MPI + CUDA}{77}{subsection.7.4.4}%
+\contentsline {subsection}{\numberline {7.4.5}Sintesi della Fase 4}{78}{subsection.7.4.5}%
+\contentsline {paragraph}{La metrica va scelta prima dei numeri.}{78}{section*.63}%
+\contentsline {paragraph}{Più rank non significano più prestazioni, ma nemmeno sempre meno.}{79}{section*.64}%
+\contentsline {paragraph}{La griglia è una scelta di comunicazione, tranne per cuBLAS.}{79}{section*.65}%
+\contentsline {paragraph}{Il quadro dei backend regge.}{79}{section*.66}%
+\contentsline {section}{\numberline {7.5}Il costo dei dati: trasferimenti e preprocessing}{79}{section.7.5}%
+\contentsline {section}{\numberline {7.6}Sintesi}{80}{section.7.6}%

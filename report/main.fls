@@ -576,8 +576,7 @@ INPUT ./img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_block256
 INPUT ./img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_block256_detail.pdf
 INPUT ./img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_block256_detail.pdf
 INPUT ./img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_block256_detail.pdf
-INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmri7.tfm
-INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmri7.tfm
+INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmtk10.tfm
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ts1-lmr8.tfm
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ts1-lmr6.tfm
 INPUT main.aux
@@ -601,7 +600,6 @@ INPUT /usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr7.pfb
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr8.pfb
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr9.pfb
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri10.pfb
-INPUT /usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri7.pfb
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri8.pfb
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri9.pfb
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy10.pfb

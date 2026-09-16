@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.8.27)  16 SEP 2026 22:38
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.8.27)  16 SEP 2026 23:24
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -806,6 +806,12 @@ LaTeX Warning: Label `sec:layout' multiply defined.
 
 LaTeX Warning: Label `sec:layout@cref' multiply defined.
 
+
+LaTeX Warning: Label `eq:speedup-precisione' multiply defined.
+
+
+LaTeX Warning: Label `eq:speedup-precisione@cref' multiply defined.
+
 )
 \openout1 = `main.aux'.
 
@@ -1265,7 +1271,7 @@ Package cleveref Info: loaded `italian' language definitions on input line 1029.
 Package cleveref Info: loaded `italian' language definitions on input line 1.
  [52]
 Capitolo 7.
-<img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_warp_xcolumn.png, id=960, 1080.6774pt x 487.3407pt>
+<img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_warp_xcolumn.png, id=990, 1080.6774pt x 487.3407pt>
 File: img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_warp_xcolumn.png Graphic file (type png)
 <use img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_warp_xcolumn.png>
 Package pdftex.def Info: img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_warp_xcolumn.png  used on input line 71.
@@ -1273,7 +1279,7 @@ Package pdftex.def Info: img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_bloc
 [53
 
 ]
-<img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_naive.png, id=969, 1080.6774pt x 487.3407pt>
+<img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_naive.png, id=999, 1080.6774pt x 487.3407pt>
 File: img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_naive.png Graphic file (type png)
 <use img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_naive.png>
 Package pdftex.def Info: img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_naive.png  used on input line 83.
@@ -1288,7 +1294,7 @@ Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 (hyperref)                removing `math shift' on input line 131.
 
-<img/fase1/campagna_VAS_2_row_major/campagna_VAS_2_layout_comparison.pdf, id=979, 1042.17358pt x 459.92628pt>
+<img/fase1/campagna_VAS_2_row_major/campagna_VAS_2_layout_comparison.pdf, id=1009, 1042.17358pt x 459.92628pt>
 File: img/fase1/campagna_VAS_2_row_major/campagna_VAS_2_layout_comparison.pdf Graphic file (type pdf)
 <use img/fase1/campagna_VAS_2_row_major/campagna_VAS_2_layout_comparison.pdf>
 Package pdftex.def Info: img/fase1/campagna_VAS_2_row_major/campagna_VAS_2_layout_comparison.pdf  used on input line 157.
@@ -1297,12 +1303,12 @@ Package cleveref Info: loaded `italian' language definitions on input line 174.
 [55 <./img/fase1/campagna_VAS_2_row_major/campagna_VAS_2_layout_comparison.pdf>]
 Package cleveref Info: loaded `italian' language definitions on input line 252.
  [56]
-<img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_joint_tuning_summary.pdf, id=1093, 1089.07928pt x 435.35448pt>
+<img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_joint_tuning_summary.pdf, id=1123, 1089.07928pt x 435.35448pt>
 File: img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_joint_tuning_summary.pdf Graphic file (type pdf)
 <use img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_joint_tuning_summary.pdf>
 Package pdftex.def Info: img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_joint_tuning_summary.pdf  used on input line 255.
 (pdftex.def)             Requested size: 443.86319pt x 177.43361pt.
-<img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_block256_detail.pdf, id=1094, 1036.39075pt x 448.50761pt>
+<img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_block256_detail.pdf, id=1124, 1036.39075pt x 448.50761pt>
 File: img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_block256_detail.pdf Graphic file (type pdf)
 <use img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_block256_detail.pdf>
 Package pdftex.def Info: img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_block256_detail.pdf  used on input line 264.
@@ -1329,32 +1335,53 @@ Package cleveref Info: loaded `italian' language definitions on input line 1042.
  [66]
 Package cleveref Info: loaded `italian' language definitions on input line 1106.
  [67]
-Package cleveref Info: loaded `italian' language definitions on input line 1184.
+Package cleveref Info: loaded `italian' language definitions on input line 1178.
  [68]
-Package pgfplots info on input line 1215: Using 'lua backend=false' for axis: ymode=log unsupported (yet).
-Package cleveref Info: loaded `italian' language definitions on input line 1254.
+Package cleveref Info: loaded `italian' language definitions on input line 1279.
  [69]
-Package cleveref Info: loaded `italian' language definitions on input line 1318.
+LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <12> not available
+(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 1320.
+Package cleveref Info: loaded `italian' language definitions on input line 1363.
  [70]
-Package cleveref Info: loaded `italian' language definitions on input line 1404.
+Package cleveref Info: loaded `italian' language definitions on input line 1437.
  [71]
-Package cleveref Info: loaded `italian' language definitions on input line 1479.
+Package cleveref Info: loaded `italian' language definitions on input line 1510.
  [72]
-Package cleveref Info: loaded `italian' language definitions on input line 1531.
- [73]
-Package cleveref Info: loaded `italian' language definitions on input line 1620.
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 1538.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 1538.
+
+Package cleveref Info: loaded `italian' language definitions on input line 1597.
+[73]
+Package cleveref Info: loaded `italian' language definitions on input line 1642.
  [74]
-Package cleveref Info: loaded `italian' language definitions on input line 1691.
+Package cleveref Info: loaded `italian' language definitions on input line 1735.
  [75]
+Package cleveref Info: loaded `italian' language definitions on input line 1857.
+ [76]
+Package cleveref Info: loaded `italian' language definitions on input line 1903.
+ [77]
+Package cleveref Info: loaded `italian' language definitions on input line 1997.
+ [78]
+Package cleveref Info: loaded `italian' language definitions on input line 2077.
+ [79]
 
-LaTeX Warning: Reference `tab:ris-cpu-baseline' on page 1 undefined on input line 1709.
+LaTeX Warning: Reference `tab:ris-fase3-tetto' on page 1 undefined on input line 2126.
 
 
-LaTeX Warning: Reference `tab:ris-cpu-scaling' on page 1 undefined on input line 1710.
+LaTeX Warning: Reference `tab:ris-cpu-baseline' on page 1 undefined on input line 2129.
 
-)
+
+LaTeX Warning: Reference `tab:ris-cpu-scaling' on page 1 undefined on input line 2130.
+
+Package cleveref Info: loaded `italian' language definitions on input line 2151.
+[80])
 Package cleveref Info: loaded `italian' language definitions on input line 49.
- [76] (./main.aux
+ [81] (./main.aux
 Package cleveref Info: loaded `italian' language definitions on input line 8.
 Package cleveref Info: loaded `italian' language definitions on input line 9.
 )
@@ -1370,21 +1397,21 @@ LaTeX Warning: There were undefined references.
 LaTeX Warning: There were multiply-defined labels.
 
 Package rerunfilecheck Info: File `main.out' has not changed.
-(rerunfilecheck)             Checksum: BC6E72BBCE7033A51A20A317091BD474;23745.
+(rerunfilecheck)             Checksum: 3DBEADC1777185CE7AF2B72C93C8085E;24880.
  ) 
 Here is how much of TeX's memory you used:
- 48537 strings out of 467525
- 1119948 string characters out of 5418982
- 1844022 words of memory out of 5000000
- 75959 multiletter control sequences out of 15000+600000
- 781444 words of font info for 345 fonts, out of 8000000 for 9000
+ 48566 strings out of 467525
+ 1120152 string characters out of 5418982
+ 1844260 words of memory out of 5000000
+ 75945 multiletter control sequences out of 15000+600000
+ 774279 words of font info for 357 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  103i,19n,111p,1082b,2285s stack positions out of 10000i,1000n,20000p,200000b,200000s
-</usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmcsc10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmex10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi6.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr6.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy6.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtk10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtt10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtt9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtti10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on main.pdf (80 pages, 1701626 bytes).
+</usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmcsc10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmex10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi6.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr6.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy6.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtk10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtt10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtt9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtti10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
+Output written on main.pdf (85 pages, 1701570 bytes).
 PDF statistics:
- 1698 PDF objects out of 1728 (max. 8388607)
- 1234 compressed objects within 13 object streams
- 366 named destinations out of 1000 (max. 500000)
- 89454 words of extra memory for PDF output out of 106986 (max. 10000000)
+ 1756 PDF objects out of 2073 (max. 8388607)
+ 1290 compressed objects within 13 object streams
+ 384 named destinations out of 1000 (max. 500000)
+ 85918 words of extra memory for PDF output out of 89155 (max. 10000000)
 

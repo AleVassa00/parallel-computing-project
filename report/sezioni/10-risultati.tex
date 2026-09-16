@@ -1144,92 +1144,183 @@ composizione MPI + CUDA dipenda dalla dimensione del problema globale.
 dipenda anche dalla dimensione del problema globale.
 
 
+
+
 \section{Fase 3 - Effetto della precisione numerica}
 \label{sec:ris-fase3}
 \label{sec:c7}
 
-Il riferimento FP64 è il punto $S = 16384$, $M = N$ della Fase 2. Le misure
-FP32 sono nuove, sulle stesse configurazioni e con lo stesso protocollo.
+La terza fase studia l'effetto della precisione numerica sulle prestazioni dei
+quattro backend GPU.
+
+Il problema viene mantenuto fisso a
+
+\[
+M=N=\num{16384},
+\qquad
+P=1,
+\]
+
+utilizzando per ciascun backend le configurazioni consolidate nelle fasi
+precedenti. Anche l'insieme dei valori di $k$ rimane invariato:
+
+\[
+k\in\{3,6,8,20,32\}.
+\]
+
+Il confronto viene eseguito fra doppia precisione (\code{double}, FP64) e
+singola precisione (\code{float}, FP32). I risultati FP64 corrispondono al
+punto quadrato $S=16384$ della Fase~2, mentre le misure FP32 sono state
+ottenute con lo stesso protocollo sperimentale.
+
+Per quantificare il beneficio del cambio di precisione si utilizza lo speedup
+
+\begin{equation}
+S_{32/64}
+=
+\frac{\overline{t}_{\mathrm{kernel}}^{\mathrm{FP64}}}
+     {\overline{t}_{\mathrm{kernel}}^{\mathrm{FP32}}},
+\label{eq:speedup-precisione}
+\end{equation}
+
+calcolato sui tempi del solo kernel. Un valore maggiore di uno indica quindi
+una riduzione del tempo di esecuzione passando da FP64 a FP32.
+
+
+\subsection{Confronto tra FP64 e FP32}
+
+La \cref{tab:ris-fase3} riporta il throughput ottenuto nelle due precisioni e
+lo speedup corrispondente.
 
 \begin{table}[H]
 \centering
 \footnotesize
 \caption{Fase 3: \code{gflops\_kernel} nelle due precisioni e speedup
-$S_{32/64}$ della \cref{eq:speedup-precisione}, $M = N = \num{16384}$, $P = 1$.}
+$S_{32/64}$, con $M=N=\num{16384}$ e $P=1$.}
 \label{tab:ris-fase3}
 \begin{tabular}{@{}lrrrrr@{}}
 \toprule
-\textbf{Backend} & $k=3$ & $k=6$ & $k=8$ & $k=20$ & $k=32$ \\
+\textbf{Backend}
+& $k=3$ & $k=6$ & $k=8$ & $k=20$ & $k=32$ \\
 \midrule
+
 \multicolumn{6}{@{}l}{\itshape GFLOPS in FP32} \\
-\kernelname{cuda\_naive}      & 198,3 & 386,8  & 522,0  & 791,6  & 1107,4 \\
-\kernelname{cuda\_warp}       & 604,4 & 1169,8 & 1414,3 & 1489,3 & \textbf{1945,9} \\
-\kernelname{cuda\_warp\_smem} & 601,2 & 1164,7 & 1457,2 & \textbf{1726,9} & 1473,0 \\
-\kernelname{cublas}           & 426,7 & 861,1  & 1141,0 & 2962,3 & 4791,9 \\
+\kernelname{cuda\_naive}
+& 198,3 & 386,8 & 522,0 & 791,6 & 1107,4 \\
+\kernelname{cuda\_warp}
+& 604,4 & 1169,8 & 1414,3 & 1489,3 & 1945,9 \\
+\kernelname{cuda\_warp\_smem}
+& 601,2 & 1164,7 & 1457,2 & 1726,9 & 1473,0 \\
+\kernelname{cublas}
+& 426,7 & 861,1 & 1141,0 & 2962,3 & 4791,9 \\
+
 \midrule
-\multicolumn{6}{@{}l}{\itshape GFLOPS in FP64 (riferimento, Fase 2)} \\
-\kernelname{cuda\_naive}      & 151,5 & 307,1 & 342,0 & 345,5 & 349,7 \\
-\kernelname{cuda\_warp}       & 302,0 & 354,3 & 353,2 & 354,6 & 354,9 \\
-\kernelname{cuda\_warp\_smem} & 296,8 & 349,8 & 349,6 & 349,5 & 341,0 \\
-\kernelname{cublas}           & 15,3  & 30,7  & 40,8  & 102,0 & 163,2 \\
+\multicolumn{6}{@{}l}{\itshape GFLOPS in FP64} \\
+\kernelname{cuda\_naive}
+& 151,5 & 307,1 & 342,0 & 345,5 & 349,7 \\
+\kernelname{cuda\_warp}
+& 302,0 & 354,3 & 353,2 & 354,6 & 354,9 \\
+\kernelname{cuda\_warp\_smem}
+& 296,8 & 349,8 & 349,6 & 349,5 & 341,0 \\
+\kernelname{cublas}
+& 15,3 & 30,7 & 40,8 & 102,0 & 163,2 \\
+
 \midrule
-\multicolumn{6}{@{}l}{\itshape $S_{32/64} = t_{\text{kernel}}^{\text{FP64}} / t_{\text{kernel}}^{\text{FP32}}$} \\
-\kernelname{cuda\_naive}      & 1,31  & 1,26  & 1,53  & 2,29  & 3,17 \\
-\kernelname{cuda\_warp}       & 2,00  & 3,30  & 4,00  & 4,20  & 5,48 \\
-\kernelname{cuda\_warp\_smem} & 2,03  & 3,33  & 4,17  & 4,94  & 4,32 \\
-\kernelname{cublas}           & 27,89 & 28,08 & 27,97 & 29,04 & 29,37 \\
+\multicolumn{6}{@{}l}{
+\itshape
+$S_{32/64}=
+t_{\mathrm{kernel}}^{\mathrm{FP64}}/
+t_{\mathrm{kernel}}^{\mathrm{FP32}}$
+} \\
+\kernelname{cuda\_naive}
+& 1,31 & 1,26 & 1,53 & 2,29 & 3,17 \\
+\kernelname{cuda\_warp}
+& 2,00 & 3,30 & 4,00 & 4,20 & 5,48 \\
+\kernelname{cuda\_warp\_smem}
+& 2,03 & 3,33 & 4,17 & 4,94 & 4,32 \\
+\kernelname{cublas}
+& 27,89 & 28,08 & 27,97 & 29,04 & 29,37 \\
+
 \bottomrule
 \end{tabular}
 \end{table}
 
-\begin{table}[H]
-\centering
-\footnotesize
-\caption{Fase 3: percentuale del tetto pertinente. In FP64 il tetto è
-\SI{350}{\giga\flop\per\second} e non dipende da $k$, in FP32 è
-$B \cdot k/2 = 224k$ \si{\giga\flop\per\second} e cresce con $k$.}
-\label{tab:ris-fase3-tetto}
-\begin{tabular}{@{}lrrrrr@{}}
-\toprule
-\textbf{Backend} & $k=3$ & $k=6$ & $k=8$ & $k=20$ & $k=32$ \\
-\midrule
-tetto FP32 [GFLOPS] & 672 & 1344 & 1792 & 4480 & 7168 \\
-\midrule
-\kernelname{cuda\_naive}      & 29,5 & 28,8 & 29,1 & 17,7 & 15,4 \\
-\kernelname{cuda\_warp}       & 89,9 & 87,0 & 78,9 & 33,2 & 27,1 \\
-\kernelname{cuda\_warp\_smem} & 89,5 & 86,7 & 81,3 & 38,5 & 20,6 \\
-\kernelname{cublas}           & 63,5 & 64,1 & 63,7 & 66,1 & 66,9 \\
-\bottomrule
-\end{tabular}
-\end{table}
+Il primo risultato della campagna è che il beneficio del passaggio a FP32 non
+è costante. Lo speedup dipende sia dal backend sia dalla larghezza $k$ del
+multivettore.
 
-\begin{figure}[H]
-\centering
-\begin{tikzpicture}
-\begin{axis}[scpa,
-  ymode=log,
-  xlabel={$k$}, ylabel={$S_{32/64}$},
-  xmin=0, xmax=35, ymin=1, ymax=40,
-  xtick={3,6,8,20,32}, ytick={1,2,5,10,20,30},
-  yticklabels={1,2,5,10,20,30},
-  legend pos=south east, width=0.8\linewidth, height=6cm]
-\addplot[black, dashed, thick, forget plot, samples=2, domain=0:35]{2};
-\node[font=\scriptsize,anchor=north west,fill=white,inner sep=1pt] at (axis cs:0.6,1.95) {$S = 2$: entrambe memory-bound};
-\addplot[blue!70!black, mark=*] coordinates {(3,2.00) (6,3.30) (8,4.00) (20,4.20) (32,5.48)};
-\addlegendentry{\kernelname{cuda\_warp}}
-\addplot[teal!70!black, mark=triangle*] coordinates {(3,2.03) (6,3.33) (8,4.17) (20,4.94) (32,4.32)};
-\addlegendentry{\kernelname{cuda\_warp\_smem}}
-\addplot[orange!80!black, mark=square*] coordinates {(3,1.31) (6,1.26) (8,1.53) (20,2.29) (32,3.17)};
-\addlegendentry{\kernelname{cuda\_naive}}
-\addplot[red!70!black, mark=diamond*] coordinates {(3,27.89) (6,28.08) (8,27.97) (20,29.04) (32,29.37)};
-\addlegendentry{\kernelname{cublas}}
-\end{axis}
-\end{tikzpicture}
-\caption{Fase 3: guadagno della singola precisione al variare di $k$. La
-crescita con $k$ dei kernel custom è la previsione del roofline, la piattezza di
-\kernelname{cublas} intorno a 28 misura invece la lentezza del suo percorso FP64.}
-\label{fig:ris-fase3}
-\end{figure}
+Per \kernelname{cuda\_naive} il guadagno rimane limitato per i valori più
+piccoli di $k$: vale $1{,}31\times$ a $k=3$ e $1{,}26\times$ a $k=6$.
+Aumentando $k$, il vantaggio diventa progressivamente più significativo e
+raggiunge $3{,}17\times$ a $k=32$.
+
+Il comportamento di \kernelname{cuda\_warp} è più marcato. Lo speedup parte
+da esattamente $2{,}00\times$ a $k=3$, cresce a $3{,}30\times$ a $k=6$ e
+$4{,}00\times$ a $k=8$, fino a raggiungere $5{,}48\times$ a $k=32$.
+
+Il passaggio dalla doppia alla singola precisione non può quindi essere
+descritto, per i kernel custom, mediante un unico fattore moltiplicativo.
+L'effetto dipende dal modo in cui ciascun kernel utilizza le risorse della GPU
+e varia sensibilmente con $k$.
+
+
+\subsection{Comportamento dei kernel custom}
+
+Il confronto fra i tre kernel sviluppati nel progetto mostra che il cambio di
+precisione modifica anche i rapporti prestazionali osservati in FP64.
+
+In doppia precisione, per $k\ge6$, \kernelname{cuda\_warp} e
+\kernelname{cuda\_warp\_smem} risultavano molto vicini, con throughput
+nell'intorno dei $350$ GFLOPS. In FP32 il comportamento si differenzia
+maggiormente.
+
+Per $k=3,6,8$ i due kernel warp rimangono praticamente indistinguibili, di fatto la differenza rimane contenuta.
+
+Il comportamento cambia invece a $k=20$. In questo caso
+\kernelname{cuda\_warp\_smem} raggiunge
+
+\[
+1726{,}9\ \text{GFLOPS},
+\]
+
+contro
+
+\[
+1489{,}3\ \text{GFLOPS}
+\]
+
+di \kernelname{cuda\_warp}, con un vantaggio di circa il $16\%$.
+
+Il risultato è rilevante perché in FP64 lo staging di $X$ in shared memory non
+aveva prodotto un vantaggio prestazionale rispetto alla variante
+\kernelname{cuda\_warp}. Il cambio di precisione modifica quindi il regime nel
+quale viene eseguito il kernel e rende conveniente, almeno per alcune
+configurazioni, la strategia basata sulla shared memory.
+
+Il vantaggio non è tuttavia uniforme. A $k=32$ il comportamento si ribalta:
+
+\[
+\kernelname{cuda\_warp}
+=
+1945{,}9\ \text{GFLOPS},
+\]
+
+mentre
+
+\[
+\kernelname{cuda\_warp\_smem}
+=
+1473{,}0\ \text{GFLOPS}.
+\]
+
+La variante shared risulta quindi circa il $24\%$ più lenta di
+\kernelname{cuda\_warp}.
+
+
+\subsection{Piano di esecuzione di \kernelname{cuda\_warp\_smem}}
+
+Per interpretare il cambiamento osservato nella variante shared è utile
+considerare il piano di tiling scelto a runtime nelle due precisioni.
 
 \begin{table}[H]
 \centering
@@ -1239,8 +1330,10 @@ crescita con $k$ dei kernel custom è la previsione del roofline, la piattezza d
 \label{tab:ris-fase3-piano}
 \begin{tabular}{@{}rrrrr@{}}
 \toprule
-& \multicolumn{2}{c}{\code{x\_rows\_per\_tile}} & \multicolumn{2}{c}{\code{blocks\_per\_sm}} \\
-\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+& \multicolumn{2}{c}{\code{x\_rows\_per\_tile}}
+& \multicolumn{2}{c}{\code{blocks\_per\_sm}} \\
+\cmidrule(lr){2-3}
+\cmidrule(lr){4-5}
 $k$ & FP64 & FP32 & FP64 & FP32 \\
 \midrule
 3  & 512 & 1344 & 4 & 3 \\
@@ -1252,136 +1345,148 @@ $k$ & FP64 & FP32 & FP64 & FP32 \\
 \end{tabular}
 \end{table}
 
-\subsubsection*{Lettura}
+Il passaggio a FP32 consente generalmente di utilizzare tile più grandi, poiché
+ciascun elemento di $X$ occupa metà dello spazio rispetto alla
+rappresentazione FP64.
 
-\subsubsection*{Lettura}
+Il caso $k=20$ è particolarmente interessante. In FP32 il planner seleziona
+$192$ righe per tile e consente la residenza di $4$ blocchi per SM, contro
+$128$ righe e $3$ blocchi per SM in FP64. Questa configurazione coincide con
+il punto nel quale \kernelname{cuda\_warp\_smem} mostra il vantaggio maggiore
+rispetto a \kernelname{cuda\_warp}.
 
-\textbf{Lo speedup FP32/FP64 cresce con $k$, in accordo con la previsione
-qualitativa del modello.}
-Per \kernelname{cuda\_warp} il rapporto
+A $k=32$ il piano FP32 utilizza invece $160$ righe per tile e $3$ blocchi per
+SM. Rispetto al punto $k=20$ diminuisce quindi il numero di blocchi residenti
+per SM, contemporaneamente all'aumento della quantità di stato richiesta per
+elaborare un multivettore più largo.
+
+Questa correlazione è compatibile con il calo di throughput osservato a
+$k=32$.
+
+
+\subsection{Comportamento di cuBLAS}
+
+Il backend \kernelname{cublas} presenta un comportamento nettamente diverso
+dai kernel custom.
+
+In FP64 il throughput rimane molto basso su tutto l'intervallo considerato:
+passa da $15{,}3$ GFLOPS a $k=3$ a $163{,}2$ GFLOPS a $k=32$.
+
+In FP32, invece, i valori diventano
 
 \[
-S_{32/64}
-=
-\frac{\overline{t}_{\mathrm{kernel}}^{\mathrm{FP64}}}
-     {\overline{t}_{\mathrm{kernel}}^{\mathrm{FP32}}}
+426{,}7,\quad
+861{,}1,\quad
+1141{,}0,\quad
+2962{,}3,\quad
+4791{,}9
+\quad\text{GFLOPS}.
 \]
 
-vale $2{,}00$ a $k=3$, quindi cresce a $3{,}30$, $4{,}00$, $4{,}20$ e
-$5{,}48$ per $k=32$. Il comportamento non è quindi compatibile con uno
-speedup costante determinato unicamente dal dimezzamento della dimensione
-degli elementi.
+Lo speedup FP32/FP64 rimane inoltre quasi costante, compreso fra circa
+$28\times$ e $29\times$ per tutti i valori di $k$.
 
-Il punto $k=3$ è inoltre coerente con il crossover previsto dal roofline
-FP64, collocato dal modello intorno a $k\simeq3{,}1$. In quel regime il
-passaggio da \code{double} a \code{float} dimezza la quantità di byte associata
-agli stessi elementi e uno speedup vicino a due è quindi quello atteso da un
-limite prevalentemente legato al traffico di memoria. Il singolo valore
-$S_{32/64}=2{,}00$ non costituisce però, da solo, una misura diretta del collo
-di bottiglia. Il risultato significativo è l'andamento complessivo dello
-speedup, che aumenta progressivamente con $k$ invece di rimanere piatto.
+Questo valore non deve essere interpretato come un generico beneficio della
+singola precisione pari a circa $28\times$. Esso descrive il rapporto
+prestazionale osservato, sul problema considerato, fra le esecuzioni FP32 e
+FP64 di \kernelname{cublas}. Il fatto che il rapporto rimanga quasi costante
+mostra inoltre che la forte differenza fra le due precisioni si mantiene su
+tutto l'intervallo di $k$ analizzato.
 
-\textbf{In FP32 lo staging di $X$ in shared memory può produrre un vantaggio
-che non era visibile in FP64.}
-A $k=20$, \kernelname{cuda\_warp\_smem} raggiunge $1726{,}9$ GFLOPS contro
-$1489{,}3$ GFLOPS di \kernelname{cuda\_warp}, con un vantaggio di circa il
-$16\%$. In FP64, sullo stesso valore di $k$, i due kernel erano invece
-praticamente indistinguibili.
+Il confronto con i kernel custom cambia anch'esso con la precisione. In FP64
+le implementazioni sviluppate nel progetto risultano sensibilmente più veloci
+di \kernelname{cublas} per tutti i valori di $k$ considerati. In FP32,
+invece, \kernelname{cublas} rimane più lento per i valori minori di $k$, ma
+supera i kernel custom per $k=20$ e $k=32$.
 
-Il confronto è coerente con l'ipotesi che, quando il tetto aritmetico FP64
-cessa di essere il limite dominante, diventi più importante il percorso
-attraverso cui $X$ raggiunge le lane. \kernelname{cuda\_warp\_smem} riduce
-infatti le letture globali ridondanti di $X$ fra i warp dello stesso blocco,
-pagando in cambio il caricamento cooperativo del tile e le sincronizzazioni.
+A $k=20$, \kernelname{cublas} raggiunge
 
-Il risultato non implica tuttavia che la shared memory sia sempre preferibile
-in FP32. Il vantaggio dipende da $k$ e dalle risorse richieste dal kernel, come
-mostra il comportamento del punto successivo.
+\[
+2962{,}3\ \text{GFLOPS},
+\]
 
-\textbf{A $k=32$ il comportamento di \kernelname{cuda\_warp\_smem} cambia
-nuovamente.}
-Il throughput scende a $1473{,}0$ GFLOPS, contro i $1945{,}9$ GFLOPS di
-\kernelname{cuda\_warp}. Anche il piano scelto a runtime cambia: per
-\kernelname{cuda\_warp\_smem} si passa da 192 righe per tile e 4 blocchi
-residenti per SM a $k=20$ a 160 righe e 3 blocchi residenti per SM a $k=32$.
+contro $1726{,}9$ GFLOPS del migliore kernel custom nello stesso punto. A
+$k=32$ il divario aumenta ulteriormente:
 
-Il dato mostra quindi che la configurazione a $k=32$ dispone di un minore
-grado di residenza rispetto al caso $k=20$. È plausibile che l'aumento del
-numero di accumulatori e, più in generale, del consumo di risorse per thread
-contribuisca a questa variazione. I risultati raccolti non permettono però di
-attribuire il calo a una risorsa specifica.
+\[
+4791{,}9\ \text{GFLOPS}
+\]
 
-Il progetto viene compilato con \code{-Xptxas -v}, ma i report di allocazione
-prodotti da \code{ptxas} non sono stati conservati fra i risultati della
-campagna. La pressione sui registri rimane quindi un'interpretazione
-compatibile con i dati, non una misura diretta.
+per \kernelname{cublas}, contro
 
-\textbf{Il roofline FP32 sovrastima progressivamente il throughput dei kernel
-custom ai valori maggiori di $k$.}
-Per \kernelname{cuda\_warp} la quota del tetto utilizzato nel modello passa
-dall'$89{,}9\%$ a $k=3$ all'$87{,}0\%$ a $k=6$, quindi scende al
-$78{,}9\%$, al $33{,}2\%$ e infine al $27{,}1\%$ per $k=32$.
-\kernelname{cuda\_warp\_smem} mostra un andamento analogo.
+\[
+1945{,}9\ \text{GFLOPS}
+\]
 
-Questo risultato evidenzia il limite del modello adottato. L'intensità
-aritmetica utilizzata nel roofline descrive il rapporto fra operazioni e
-traffico associato ad $A$, mettendo in evidenza il riuso esplicito della
-matrice. Non rappresenta invece l'intero traffico del kernel. Gli accessi a
-$X$, il comportamento delle cache, la shared memory, la pressione sui
-registri e l'efficienza dell'esecuzione del warp possono quindi diventare
-rilevanti senza essere rappresentati da quel singolo valore di intensità.
+di \kernelname{cuda\_warp}.
 
-In FP64 tali costi rimangono in larga parte nascosti dal basso tetto
-aritmetico della scheda. In FP32 il margine di calcolo disponibile è molto
-maggiore e il modello basato sul solo traffico di $A$ diventa
-progressivamente meno accurato come previsione quantitativa del throughput.
-La campagna conferma quindi l'utilità del roofline nell'individuare il cambio
-di regime, ma mostra anche la necessità di un modello più completo per
-descrivere i valori assoluti in FP32.
+Il passaggio alla singola precisione modifica quindi non soltanto il
+throughput assoluto dei backend, ma anche il loro ordinamento relativo per i
+valori maggiori di $k$.
 
-\textbf{Il grande speedup di cuBLAS fra FP64 e FP32 riflette due percorsi
-prestazionali molto diversi.}
-Il rapporto $S_{32/64}$ rimane compreso fra circa $28\times$ e $29\times$ su
-tutti i valori di $k$, molto al di sopra di quello osservato per i kernel
-custom. In FP32 cuBLAS raggiunge inoltre una frazione relativamente stabile
-del tetto utilizzato nel modello, fra circa il $63\%$ e il $67\%$, mentre in
-FP64 il suo throughput era molto inferiore.
 
-Il dato non può essere interpretato come un generico ``vantaggio della
-singola precisione'' pari a $28\times$. Mostra piuttosto che le implementazioni
-interne selezionate dalla libreria nelle due precisioni hanno un comportamento
-molto diverso su questo problema. Senza profilazione non è possibile stabilire
-quale kernel interno venga utilizzato, quale strategia di tiling adotti o
-quale componente determini il divario.
+\subsection{Sintesi}
 
-Il confronto prestazionale rimane comunque netto: a $k=32$ cuBLAS raggiunge
-$4791{,}9$ GFLOPS, contro $1945{,}9$ GFLOPS di
-\kernelname{cuda\_warp}. Il risultato ribalta quello osservato in FP64 e
-mostra che la convenienza dei kernel specializzati sviluppati nel progetto è
-legata al regime considerato, non costituisce un vantaggio universale rispetto
-alla libreria.
+La campagna mostra che l'effetto della precisione numerica dipende fortemente
+dall'implementazione e dalla larghezza del multivettore.
+
+Per i kernel custom lo speedup FP32/FP64 tende generalmente ad aumentare con
+$k$, ma con comportamenti differenti. \kernelname{cuda\_naive} presenta il
+guadagno più contenuto, mentre \kernelname{cuda\_warp} raggiunge
+$5{,}48\times$ a $k=32$.
+
+La variante \kernelname{cuda\_warp\_smem} evidenzia inoltre che il cambio di
+precisione può modificare la convenienza delle scelte implementative:
+lo staging di $X$ in shared memory produce un vantaggio rispetto a
+\kernelname{cuda\_warp} a $k=20$, mentre a $k=32$ la variante
+\kernelname{cuda\_warp} torna a essere più veloce.
+
+Il risultato più marcato riguarda infine cuBLAS. La libreria passa da
+prestazioni sensibilmente inferiori ai kernel custom in FP64 a prestazioni
+superiori in FP32 per i valori maggiori di $k$.
+
+Nel complesso, i risultati mostrano che la scelta fra FP32 e FP64 non produce
+un semplice fattore di accelerazione uniforme. La precisione modifica in modo
+significativo il comportamento relativo delle diverse implementazioni e può
+cambiare quale strategia risulti più prestante nel regime sperimentale
+considerato.
+
+
 
 \section{Fase 4 - Esecuzione distribuita MPI + CUDA}
 \label{sec:ris-fase4}
 
 La quarta fase raccoglie 600 configurazioni in doppia precisione, ottenute da
-tre scale, quattro backend, cinque valori di $k$ e tutte le griglie ammissibili
+3 scale, 4 backend, 5 valori di $k$ e tutte le griglie ammissibili
 per $P\in\{1,2,4,8\}$.
 
-Tutti i rank usano la stessa GPU. Aumentare $P$ non aggiunge quindi capacità di
-calcolo, ma suddivide il problema in chiamate locali più piccole e introduce
-contesa fra contesti CUDA. Le esecuzioni includono il group timing, che misura
-il tempo necessario affinché tutti i rank completino la fase locale. Per
-valutare il lavoro sostenuto dal device viene usata la metrica
-\code{gflops\_local\_group}.
+Il punto di partenza è un vincolo dell'hardware, non una scelta: il nodo ha una
+sola GPU, e tutti i rank la usano. Aumentare $P$ non aggiunge quindi capacità di
+calcolo. Suddivide soltanto il problema in chiamate locali più piccole e
+introduce contesa fra contesti CUDA, che senza MPS si alternano sulla scheda.
 
-\subsection{Metrica rank-local e tempo collettivo}
+Per questo motivo tutte le esecuzioni includono il \emph{group timing}, che
+misura il tempo necessario affinché \emph{tutti} i rank completino la fase
+locale. La metrica usata in questa fase è di conseguenza
+\code{gflops\_local\_group}: è l'unica che descrive il lavoro effettivamente
+sostenuto dal device, come la prima sottosezione mostra con i numeri.
+
+L'analisi procede in tre passi:
+\begin{itemize}
+  \item Si verifica prima quale metrica sia lecito usare;
+  \item si studia l'effetto del numero di rank $P$;
+  \item infine quello della forma della griglia $P_r\times P_c$ a parità di $P$.
+\end{itemize}
+Un'ultima sottosezione confronta i
+quattro backend separando i costi che la composizione aggiunge al kernel.
+
+\subsection{Il tempo collettivo come metrica}
 \label{sec:ris-fase4-metrica}
 
 La \cref{tab:ris-fase4-metrica} mostra perché il tempo associato a un singolo
 rank non è sufficiente quando più contesti condividono l'acceleratore. Il
 rapporto confronta il throughput derivato dalla metrica ufficiale con quello
-derivato dalla finestra collettiva. Il CV è calcolato sulle 20 repetition del
+derivato dalla finestra collettiva. Il coefficiente di variazione (CV) è calcolato sulle 20 repetition del
 tempo di gruppo.
 
 \begin{table}[H]
@@ -1410,43 +1515,82 @@ quando più contesti condividono la GPU.} A $S=4096$, $P=8$ e $k=3$ la metrica
 rank-local produce 919,2 GFLOPS, mentre la finestra collettiva ne misura 78,4.
 Il primo valore supera di oltre undici volte il secondo e non può essere
 interpretato come throughput sostenuto dal device. Il singolo rank osserva
-soltanto il proprio tratto di esecuzione, il gruppo deve attendere il
+soltanto il proprio tratto di esecuzione; il gruppo deve attendere il
 completamento di tutti i contesti.
 
-\textbf{La discrepanza non è rumore statistico.} Nel caso più estremo il CV
-del tempo di gruppo è appena lo $0{,}38\%$. Sulle 600 configurazioni il CV
-mediano vale $0{,}30\%$ e il novantesimo percentile $1{,}63\%$. Il fenomeno è
-quindi riproducibile e descrive una differenza semantica fra le metriche.
+\textbf{La discrepanza non è rumore statistico.} Nel caso più estremo il CV del
+tempo di gruppo è appena lo $0{,}38\%$. Sulle 600 configurazioni il CV mediano
+vale $0{,}30\%$ e il novantesimo percentile $1{,}63\%$. Il fenomeno è quindi
+riproducibile e descrive una differenza semantica fra le metriche, non una
+fluttuazione.
 
-\textbf{Le due letture convergono quando ogni invocazione è abbastanza lunga.}
-A $S=16384$ e $k=32$ i due throughput coincidono entro l'$1\%$. Questo non
-rende la misura rank-local collettiva, indica soltanto che in quel regime la
+\textbf{Le due letture convergono quando ogni invocazione è abbastanza lunga.} A
+$S=16384$ e $k=32$ i due throughput coincidono entro l'$1\%$. Questo non rende
+la misura rank-local collettiva: indica soltanto che in quel regime la
 schedulazione dei contesti non crea una finestra invisibile al rank più lento.
 
-\subsection{Effetto del numero di rank}
+\medskip
+
+Tutte le tabelle che seguono riportano perciò \code{gflops\_local\_group}. Dove
+compare anche la metrica ufficiale, è per mostrarne la differenza, non per
+sostituirla.
+
+\subsection{Effetto del numero di rank $P$}
 \label{sec:ris-fase4-rank}
 
-Per separare l'effetto di $P$ dalla scelta a posteriori della griglia, la
-\cref{tab:ris-fase4-rank} usa la famiglia coerente
-$1\times1$, $2\times1$, $2\times2$, $4\times2$. Sono riportati i due estremi
-dell'insieme di $k$ per \kernelname{cuda\_warp}.
+Il numero di rank e la forma della griglia sono due fattori distinti, e vanno
+separati. Per isolare $P$ si usa una sola famiglia di griglie, scelta in modo
+che ogni raddoppio di $P$ raddoppi una sola delle due dimensioni:
+$1\times1$, $2\times1$, $2\times2$, $4\times2$.
+
+La \cref{tab:ris-fase4-rank} riporta il throughput collettivo dei quattro
+backend sulle tre scale, ai due estremi dell'intervallo di $k$.
 
 \begin{table}[H]
 \centering
 \footnotesize
-\caption{Fase 4: throughput collettivo di \kernelname{cuda\_warp}, in GFLOPS,
-al variare della scala e del numero di rank.}
+\caption{Fase 4: throughput della fase locale collettiva
+(\code{gflops\_local\_group}), in GFLOPS, per i quattro backend al variare
+della scala e del numero di rank. Griglie della famiglia coerente
+$1\times1$, $2\times1$, $2\times2$, $4\times2$.}
 \label{tab:ris-fase4-rank}
-\begin{tabular}{@{}rrrrrrrr@{}}
+\begin{tabular}{@{}llrrrrrr@{}}
 \toprule
-& & \multicolumn{2}{c}{$S=4096$} & \multicolumn{2}{c}{$S=8192$} & \multicolumn{2}{c}{$S=16384$} \\
+& & \multicolumn{2}{c}{$S=4096$} & \multicolumn{2}{c}{$S=8192$} & \multicolumn{2}{c}{$S=\num{16384}$} \\
 \cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}
-$P$ & griglia & $k=3$ & $k=32$ & $k=3$ & $k=32$ & $k=3$ & $k=32$ \\
+\textbf{Backend} & $P$ & $k=3$ & $k=32$ & $k=3$ & $k=32$ & $k=3$ & $k=32$ \\
 \midrule
-1 & $1\times1$ & 235,2 & 253,6 & 273,5 & 326,1 & 286,9 & 335,5 \\
-2 & $2\times1$ & 160,8 & 275,9 & 243,3 & 292,5 & 247,9 & 307,3 \\
-4 & $2\times2$ & 118,1 & 270,8 & 217,0 & 291,1 & 273,0 & 305,5 \\
-8 & $4\times2$ & 78,2  & 227,5 & 166,7 & 295,5 & 251,9 & 295,5 \\
+
+\multirow{4}{*}{\kernelname{cuda\_naive}}
+& 1 & 145,1 & 250,7 & 175,7 & 327,1 & 146,6 & 331,3 \\
+& 2 & 97,6 & 270,0 & 174,1 & 290,1 & 166,7 & 301,9 \\
+& 4 & 93,8 & 288,1 & 161,8 & 296,3 & 166,4 & 302,3 \\
+& 8 & 56,0 & 240,3 & 114,8 & 305,0 & 176,4 & 293,1 \\
+
+\midrule
+
+\multirow{4}{*}{\kernelname{cuda\_warp}}
+& 1 & 235,2 & 253,6 & 273,5 & 326,1 & 286,9 & 335,5 \\
+& 2 & 160,8 & 275,9 & 243,3 & 292,5 & 247,9 & 307,3 \\
+& 4 & 118,1 & 270,8 & 217,0 & 291,1 & 273,0 & 305,5 \\
+& 8 & 78,2 & 227,5 & 166,7 & 295,5 & 251,9 & 295,5 \\
+
+\midrule
+
+\multirow{4}{*}{\kernelname{cuda\_warp\_smem}}
+& 1 & 232,8 & 236,3 & 267,8 & 304,1 & 277,3 & 324,4 \\
+& 2 & 156,7 & 245,8 & 239,7 & 278,3 & 251,0 & 289,4 \\
+& 4 & 114,5 & 240,5 & 213,9 & 279,7 & 253,2 & 285,0 \\
+& 8 & 75,8 & 214,9 & 164,8 & 262,8 & 249,1 & 281,6 \\
+
+\midrule
+
+\multirow{4}{*}{\kernelname{cublas}}
+& 1 & 16,8 & 166,0 & 15,1 & 156,3 & 15,0 & 157,9 \\
+& 2 & 13,2 & 134,5 & 15,7 & 163,0 & 13,9 & 146,5 \\
+& 4 & 13,2 & 137,7 & 15,8 & 164,0 & 13,9 & 146,3 \\
+& 8 & 14,4 & 148,6 & 13,2 & 137,0 & 15,6 & 163,5 \\
+
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1457,136 +1601,412 @@ $P$ & griglia & $k=3$ & $k=32$ & $k=3$ & $k=32$ & $k=3$ & $k=32$ \\
 \begin{axis}[scpa,
   xlabel={numero di rank $P$},
   ylabel={GFLOPS della fase locale collettiva},
-  xmin=0.5, xmax=8.5, ymin=220, ymax=350,
+  xmin=0.5, xmax=8.5, ymin=130, ymax=360,
   xtick={1,2,4,8},
-  legend pos=south east, width=0.82\linewidth, height=6.2cm]
-\addplot[blue!70!black, mark=*] coordinates {(1,286.9) (2,247.9) (4,273.0) (8,251.9)};
-\addlegendentry{$k=3$}
-\addplot[teal!70!black, mark=triangle*] coordinates {(1,301.5) (2,301.1) (4,298.3) (8,304.6)};
-\addlegendentry{$k=6$}
-\addplot[orange!80!black, mark=square*] coordinates {(1,326.6) (2,302.3) (4,302.9) (8,309.8)};
-\addlegendentry{$k=8$}
-\addplot[purple!75!black, mark=diamond*] coordinates {(1,336.5) (2,304.9) (4,306.1) (8,302.1)};
-\addlegendentry{$k=20$}
-\addplot[red!70!black, mark=pentagon*] coordinates {(1,335.5) (2,307.3) (4,305.5) (8,295.5)};
-\addlegendentry{$k=32$}
+  legend pos=south east, width=0.82\linewidth, height=6.4cm]
+\addplot[blue!70!black, mark=*] coordinates {(1,331.3) (2,301.9) (4,302.3) (8,293.1)};
+\addlegendentry{\kernelname{cuda\_naive}}
+\addplot[teal!70!black, mark=triangle*] coordinates {(1,335.5) (2,307.3) (4,305.5) (8,295.5)};
+\addlegendentry{\kernelname{cuda\_warp}}
+\addplot[orange!80!black, mark=square*] coordinates {(1,324.4) (2,289.4) (4,285.0) (8,281.6)};
+\addlegendentry{\kernelname{cuda\_warp\_smem}}
+\addplot[purple!75!black, mark=diamond*] coordinates {(1,157.9) (2,146.5) (4,146.3) (8,163.5)};
+\addlegendentry{\kernelname{cublas}}
 \end{axis}
 \end{tikzpicture}
-\caption{Fase 4: throughput collettivo di \kernelname{cuda\_warp} a
-$S=16384$ per la famiglia di griglie della \cref{tab:ris-fase4-rank}.}
+\caption{Fase 4: throughput collettivo a $S=\num{16384}$ e $k=32$ per i
+quattro backend, dalla colonna corrispondente della
+\cref{tab:ris-fase4-rank}.}
 \label{fig:ris-fase4-rank}
 \end{figure}
 
 \subsubsection*{Lettura}
 
-\textbf{Non compare strong scaling, come impone l'hardware.} A $S=16384$ e
-$k=32$ il throughput passa da 335,5 GFLOPS con un rank a 295,5 GFLOPS con otto
-rank. Il lavoro globale è invariato e la GPU è la stessa, quindi un incremento
-proporzionale a $P$ sarebbe impossibile. La perdita del $12\%$ quantifica il
-costo della composizione fra contesti CUDA, blocchi locali più piccoli e
-trasferimenti concorrenti.
+\textbf{Non compare strong scaling, e non potrebbe comparire.} Il lavoro globale
+è invariato e la GPU è una sola: un incremento proporzionale a $P$ sarebbe
+impossibile. A $S=16384$ e $k=32$ tutti e tre i kernel custom perdono invece
+qualcosa passando da uno a otto rank: \kernelname{cuda\_warp} scende da 335,5 a
+295,5 GFLOPS ($-12\%$), \kernelname{cuda\_naive} da 331,3 a 293,1 ($-12\%$) e
+\kernelname{cuda\_warp\_smem} da 324,4 a 281,6 ($-13\%$). La perdita quantifica
+il costo della composizione: alternanza fra contesti CUDA, blocchi locali più
+piccoli e trasferimenti concorrenti.
 
-\textbf{La penalizzazione cresce quando diminuisce il lavoro utile per rank.}
-A $S=4096$ e $k=3$ il throughput scende da 235,2 a 78,2 GFLOPS. Ogni rank
-riceve un blocco più piccolo, sul quale i costi fissi e la schedulazione dei
-contesti pesano maggiormente. A $S=16384$ e $k\ge6$ le curve restano invece
-raccolte fra circa 296 e 337 GFLOPS, segno che la GPU è già saturata dal
-singolo rank e la decomposizione non aggiunge capacità.
+\textbf{Quello che conta non è $P$, ma quanto lavoro resta a ciascun rank.} Lo
+stesso $P=8$ produce effetti completamente diversi a seconda della scala. A
+$S=4096$ e $k=3$ il crollo è verticale: \kernelname{cuda\_warp} passa da 235,2 a
+78,2 GFLOPS ($-67\%$), \kernelname{cuda\_warp\_smem} da 232,8 a 75,8 e
+\kernelname{cuda\_naive} da 145,1 a 56,0. Alla scala massima, con lo stesso $k$
+e lo stesso $P$, \kernelname{cuda\_warp} perde invece solo il $12\%$ (da 286,9 a
+251,9). Nel primo caso ogni rank riceve un ottavo di un problema già piccolo, e
+i costi fissi diventano dominanti.
 
-\textbf{Un miglioramento locale non equivale a scalabilità.} A $S=4096$ e
-$k=32$ il passaggio da uno a due rank porta da 253,6 a 275,9 GFLOPS, poi il
-vantaggio si esaurisce. Suddividere il problema può migliorare l'occupazione in
-un regime sottoutilizzato, ma non trasforma una GPU in più acceleratori.
+\textbf{In alcune configurazioni dividere il problema conviene davvero.} Il caso
+più netto è \kernelname{cuda\_naive} a $S=16384$ e $k=3$, che \emph{sale} da
+146,6 a 176,4 GFLOPS con otto rank, un guadagno del $20\%$. Lo stesso backend a
+$S=4096$ e $k=32$ passa da 250,7 a 288,1 GFLOPS con quattro rank ($+15\%$), e
+cuBLAS a $S=16384$ e $k=32$ da 157,9 a 163,5 ($+4\%$).
+
+Sono esattamente le configurazioni che nelle fasi precedenti risultavano le meno
+efficienti a rank singolo: \kernelname{cuda\_naive} con multivettore stretto e
+cuBLAS in qualunque regime. Dove un solo rank non riesce a tenere occupata la
+GPU, più contesti che si alternano la riempiono meglio. Le misure temporali
+raccolte non permettono però di attribuire il guadagno a un meccanismo
+specifico, e il confronto resta descrittivo.
+
+\textbf{cuBLAS non segue alcun andamento regolare in $P$.} I suoi valori a
+$k=32$ oscillano fra 134,5 e 166,0 GFLOPS su tutte le scale, senza direzione
+definita e senza dipendenza chiara da $P$. La sottosezione successiva mostra il
+motivo: per cuBLAS pesa molto più la forma del blocco locale che il numero di
+rank.
 
 \subsection{Effetto della griglia MPI}
 \label{sec:ris-fase4-griglia}
 
-La griglia stabilisce quale collettiva sostenga la parte maggiore del costo.
-La \cref{tab:ris-fase4-griglia} mostra il caso più grande a $P=8$ e $k=32$.
+A parità di $P$ la griglia $P_r\times P_c$ decide due cose contemporaneamente.
+
+La prima è quale collettiva sostiene il costo maggiore. Il broadcast di $X$
+avviene lungo le colonne della griglia e il suo costo cresce con $P_r$, mentre la
+reduce dei contributi parziali di $Y$ avviene lungo le righe e cresce con $P_c$.
+Le due griglie monodimensionali sono quindi i due estremi: $1\times8$ azzera il
+broadcast e paga tutta la reduce, $8\times1$ fa l'opposto.
+
+La seconda è la forma del blocco locale, $m_{\text{loc}}=M/P_r$ e
+$n_{\text{loc}}=N/P_c$. Cambiare griglia cambia quindi anche la geometria del
+problema che ciascun kernel riceve, esattamente il fattore studiato nella
+Fase~2.
+
+La \cref{tab:ris-fase4-griglia} scompone il tempo dei quattro backend sul punto
+di riferimento $S=16384$, $P=8$, $k=32$.
 
 \begin{table}[H]
 \centering
 \footnotesize
-\caption{Fase 4: scomposizione temporale di \kernelname{cuda\_warp} per le
-quattro griglie a $S=16384$, $P=8$, $k=32$. Tempi in millisecondi.}
+\caption{Fase 4: scomposizione temporale dei quattro backend per le quattro
+griglie a $S=\num{16384}$, $P=8$, $k=32$. Tempi in millisecondi.}
 \label{tab:ris-fase4-griglia}
-\begin{tabular}{@{}rrrrrrrr@{}}
+\begin{tabular}{@{}llrrrrrrr@{}}
 \toprule
-$P_r\times P_c$ & $t_{\mathrm{bcast}}$ & $t_{\mathrm{kernel}}$ & $t_{\mathrm{reduce}}$ & $T$ & $t_{\mathrm{local}}^{\mathrm{gruppo}}$ & GFLOPS & GFLOPS gruppo \\
+\textbf{Backend} & $P_r\times P_c$ & $t_{\mathrm{bcast}}$ & $t_{\mathrm{kernel}}$
+& $t_{\mathrm{reduce}}$ & $T$ & $t_{\mathrm{local}}^{\mathrm{gruppo}}$
+& GFLOPS & GFLOPS gruppo \\
 \midrule
-$1\times8$ & 0,000 & 58,763 & 8,635 & 66,000 & 60,481 & 260,3 & 284,1 \\
-$2\times4$ & 0,342 & 55,736 & 2,085 & 58,022 & 57,555 & 296,1 & 298,5 \\
-$4\times2$ & 1,586 & 55,881 & 0,604 & 57,453 & 58,145 & 299,0 & 295,5 \\
-$8\times1$ & 3,227 & 55,049 & 0,211 & 58,443 & 58,496 & 294,0 & 293,7 \\
+
+\multirow{4}{*}{\kernelname{cuda\_naive}}
+& $1\times8$ & 0,000 & 55,010 & 8,875 & 63,250 & 57,906 & 271,6 & 296,7 \\
+& $2\times4$ & 0,374 & 54,995 & 2,220 & 57,385 & 56,776 & 299,4 & 302,6 \\
+& $4\times2$ & 1,506 & 56,318 & 0,581 & 57,786 & 58,617 & 297,3 & 293,1 \\
+& $8\times1$ & 1,408 & 55,719 & 0,218 & 57,322 & 59,487 & 299,7 & 288,8 \\
+
+\midrule
+
+\multirow{4}{*}{\kernelname{cuda\_warp}}
+& $1\times8$ & 0,000 & 58,763 & 8,635 & 66,000 & 60,481 & 260,3 & 284,1 \\
+& $2\times4$ & 0,342 & 55,736 & 2,085 & 58,022 & 57,555 & 296,1 & 298,5 \\
+& $4\times2$ & 1,586 & 55,881 & 0,604 & 57,453 & 58,145 & 299,0 & 295,5 \\
+& $8\times1$ & 3,227 & 55,049 & 0,211 & 58,443 & 58,496 & 294,0 & 293,7 \\
+
+\midrule
+
+\multirow{4}{*}{\kernelname{cuda\_warp\_smem}}
+& $1\times8$ & 0,000 & 61,158 & 8,652 & 67,886 & 62,850 & 253,1 & 273,3 \\
+& $2\times4$ & 0,379 & 60,132 & 2,201 & 61,918 & 61,974 & 277,5 & 277,2 \\
+& $4\times2$ & 1,356 & 58,684 & 0,593 & 59,954 & 61,000 & 286,6 & 281,6 \\
+& $8\times1$ & 1,543 & 63,288 & 0,206 & 65,012 & 66,868 & 264,3 & 256,9 \\
+
+\midrule
+
+\multirow{4}{*}{\kernelname{cublas}}
+& $1\times8$ & 0,001 & 115,798 & 8,672 & 121,719 & 117,440 & 141,1 & 146,3 \\
+& $2\times4$ & 0,406 & 115,790 & 2,319 & 118,181 & 117,521 & 145,4 & 146,2 \\
+& $4\times2$ & 1,401 & 102,778 & 0,595 & 104,035 & 105,093 & 165,1 & 163,5 \\
+& $8\times1$ & 1,499 & 121,909 & 0,240 & 123,607 & 125,604 & 139,0 & 136,8 \\
+
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsubsection*{Lettura}
 
-\textbf{La griglia sposta il costo fra broadcast e reduce senza modificare in
-modo sostanziale la fase CUDA.} Da $1\times8$ a $8\times1$ il broadcast cresce
-da quasi zero a 3,227 ms, mentre la reduce scende da 8,635 a 0,211 ms. Il tempo
-locale di gruppo resta però fra 57,6 e 60,5 ms, uno scarto inferiore al $5\%$.
+\textbf{Il costo si sposta da una collettiva all'altra, come previsto.} Per
+\kernelname{cuda\_warp} il broadcast cresce da 0,000 a 3,227 ms passando da
+$1\times8$ a $8\times1$, mentre la reduce scende da 8,635 a 0,211 ms. Gli altri
+tre backend mostrano lo stesso ribaltamento sulle stesse griglie: è una
+proprietà della decomposizione, non del kernel.
 
-\textbf{Le griglie intermedie sono il compromesso migliore.} Le configurazioni
-$2\times4$ e $4\times2$ bilanciano le due collettive e raggiungono circa 296
-GFLOPS sia con la metrica ufficiale sia con quella di gruppo. La griglia
-$1\times8$ concentra invece il costo sulla reduce e scende a 260,3 GFLOPS nel
-tempo ufficiale. Il dato mostra che la forma della griglia va scelta in base
-alla comunicazione, non al kernel, che in questo regime rimane stabile.
+\textbf{Le due collettive non costano però lo stesso.} La reduce di $1\times8$
+vale 8,635 ms per \kernelname{cuda\_warp}, il broadcast di $8\times1$ solo
+3,227 ms. Il motivo è nel contenuto dei messaggi: la reduce combina blocchi di
+$Y$ e richiede un'operazione aritmetica su ogni elemento, il broadcast
+replica soltanto $X$. Le griglie bilanciate $2\times4$ e $4\times2$ evitano
+entrambi gli estremi e restano sotto i 2,5 ms complessivi.
+
+\textbf{Per i kernel custom la fase CUDA è quasi indifferente alla griglia, per
+cuBLAS no.} Il tempo di kernel di \kernelname{cuda\_naive} varia solo del
+$2\%$ fra le quattro griglie e quello di \kernelname{cuda\_warp} del $7\%$. Per
+cuBLAS invece si passa da 102,778 ms sulla griglia $4\times2$ a 121,909 ms su
+$8\times1$, cioè il $19\%$ in più. La libreria è sensibile alla forma del blocco
+locale, che qui va da $2048\times16384$ ($8\times1$) a $4096\times8192$
+($4\times2$): è lo stesso effetto osservato nella Fase~2, che ricompare dentro
+la decomposizione MPI.
+
+\textbf{La metrica ufficiale e quella di gruppo divergono soprattutto su
+$1\times8$.} Per \kernelname{cuda\_warp} valgono 260,3 e 284,1 GFLOPS, uno scarto
+del $9\%$; sulle altre tre griglie coincidono entro l'$1\%$. La griglia che
+concentra il costo sulla reduce è anche quella che rende il tempo del singolo
+rank meno rappresentativo del tempo del gruppo.
+
+\medskip
+
+La scomposizione completa non viene ripetuta per ogni $k$: sarebbero ottanta
+righe in cui la colonna del kernel domina tutte le altre e si muove poco. È più
+informativo separare le due componenti che con $k$ cambiano davvero. La
+\cref{tab:ris-fase4-griglia-comm} riporta il costo complessivo delle due
+collettive, e la \cref{tab:ris-fase4-griglia-k} la sua conseguenza sul
+throughput.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Fase 4: costo complessivo delle due collettive,
+$t_{\mathrm{bcast}}+t_{\mathrm{reduce}}$, in millisecondi, a
+$S=\num{16384}$ e $P=8$, per ogni griglia e ogni $k$.}
+\label{tab:ris-fase4-griglia-comm}
+\begin{tabular}{@{}llrrrrr@{}}
+\toprule
+\textbf{Backend} & $P_r\times P_c$ & $k=3$ & $k=6$ & $k=8$ & $k=20$ & $k=32$ \\
+\midrule
+
+\multirow{4}{*}{\kernelname{cuda\_naive}}
+& $1\times8$ & 0,392 & 0,916 & 1,278 & 6,558 & 8,876 \\
+& $2\times4$ & 0,149 & 0,378 & 0,438 & 1,616 & 2,594 \\
+& $4\times2$ & 0,106 & 0,231 & 0,293 & 1,271 & 2,087 \\
+& $8\times1$ & 0,218 & 0,440 & 0,601 & 1,132 & 1,625 \\
+
+\midrule
+
+\multirow{4}{*}{\kernelname{cuda\_warp}}
+& $1\times8$ & 0,373 & 0,867 & 1,317 & 5,937 & 8,636 \\
+& $2\times4$ & 0,146 & 0,386 & 0,429 & 1,657 & 2,428 \\
+& $4\times2$ & 0,101 & 0,209 & 0,302 & 1,282 & 2,190 \\
+& $8\times1$ & 0,219 & 0,438 & 0,604 & 1,966 & 3,438 \\
+
+\midrule
+
+\multirow{4}{*}{\kernelname{cuda\_warp\_smem}}
+& $1\times8$ & 0,392 & 0,889 & 1,265 & 6,671 & 8,653 \\
+& $2\times4$ & 0,145 & 0,378 & 0,439 & 1,702 & 2,580 \\
+& $4\times2$ & 0,108 & 0,219 & 0,291 & 1,261 & 1,949 \\
+& $8\times1$ & 0,232 & 0,448 & 0,602 & 1,897 & 1,749 \\
+
+\midrule
+
+\multirow{4}{*}{\kernelname{cublas}}
+& $1\times8$ & 0,439 & 0,932 & 1,286 & 6,123 & 8,673 \\
+& $2\times4$ & 0,173 & 0,405 & 0,493 & 1,621 & 2,725 \\
+& $4\times2$ & 0,122 & 0,238 & 0,325 & 1,351 & 1,997 \\
+& $8\times1$ & 0,239 & 0,497 & 0,658 & 1,975 & 1,739 \\
+
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Fase 4: throughput collettivo (\code{gflops\_local\_group}) a
+$S=\num{16384}$ e $P=8$, per ogni griglia e ogni $k$.}
+\label{tab:ris-fase4-griglia-k}
+\begin{tabular}{@{}llrrrrr@{}}
+\toprule
+\textbf{Backend} & $P_r\times P_c$ & $k=3$ & $k=6$ & $k=8$ & $k=20$ & $k=32$ \\
+\midrule
+
+\multirow{4}{*}{\kernelname{cuda\_naive}}
+& $1\times8$ & 177,9 & 286,8 & 307,7 & 303,9 & 296,7 \\
+& $2\times4$ & 168,5 & 279,6 & 309,8 & 305,3 & 302,6 \\
+& $4\times2$ & 176,4 & 272,9 & 281,1 & 285,9 & 293,1 \\
+& $8\times1$ & 140,5 & 251,5 & 279,9 & 277,1 & 288,8 \\
+
+\midrule
+
+\multirow{4}{*}{\kernelname{cuda\_warp}}
+& $1\times8$ & 250,5 & 291,0 & 295,4 & 280,0 & 284,1 \\
+& $2\times4$ & 254,3 & 305,7 & 310,6 & 303,5 & 298,5 \\
+& $4\times2$ & 251,9 & 304,6 & 309,8 & 302,1 & 295,5 \\
+& $8\times1$ & 239,8 & 303,0 & 307,4 & 290,7 & 293,7 \\
+
+\midrule
+
+\multirow{4}{*}{\kernelname{cuda\_warp\_smem}}
+& $1\times8$ & 249,4 & 288,2 & 292,7 & 276,2 & 273,3 \\
+& $2\times4$ & 249,2 & 293,2 & 297,9 & 285,2 & 277,2 \\
+& $4\times2$ & 249,1 & 297,3 & 303,6 & 296,8 & 281,6 \\
+& $8\times1$ & 233,6 & 272,1 & 276,8 & 255,9 & 256,9 \\
+
+\midrule
+
+\multirow{4}{*}{\kernelname{cublas}}
+& $1\times8$ & 13,9 & 27,7 & 36,9 & 91,8 & 146,3 \\
+& $2\times4$ & 13,9 & 27,7 & 36,9 & 91,8 & 146,2 \\
+& $4\times2$ & 15,6 & 31,2 & 41,6 & 103,1 & 163,5 \\
+& $8\times1$ & 13,1 & 26,2 & 34,8 & 86,3 & 136,8 \\
+
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection*{Lettura}
+
+\textbf{Sotto $k=8$ la griglia quasi non conta.} A $k=3$ il costo complessivo
+delle collettive resta sotto il mezzo millisecondo per ogni backend e per ogni
+griglia. I messaggi sono troppo piccoli perché la loro distribuzione faccia
+differenza, e infatti nella \cref{tab:ris-fase4-griglia-k} le quattro griglie
+stanno entro pochi punti percentuali per \kernelname{cuda\_warp} (fra 239,8 e
+254,3 GFLOPS).
+
+\textbf{Il costo delle collettive cresce più che proporzionalmente in $k$.} Per
+\kernelname{cuda\_warp} sulla griglia $1\times8$ si passa da 0,373 ms a $k=3$ a
+8,635 ms a $k=32$: $k$ cresce di un fattore 10,7 e il tempo di un fattore 23.
+Le griglie bilanciate contengono molto meglio questa crescita, restando fra
+2,190 e 2,427 ms a $k=32$, cioè quasi quattro volte meno di $1\times8$.
+
+\textbf{Ogni backend ha una griglia preferita, e quasi sempre è la stessa per
+tutti i $k$.} \kernelname{cuda\_warp} preferisce $2\times4$ su tutti e cinque i
+valori di $k$; \kernelname{cuda\_warp\_smem} e cuBLAS preferiscono $4\times2$
+per $k\ge6$; \kernelname{cuda\_naive} è l'unico che cambia, da $1\times8$ ai
+$k$ stretti a $2\times4$ da $k=8$ in poi.
+
+\textbf{Il guadagno ottenibile dalla sola scelta della griglia è maggiore per
+cuBLAS che per i kernel custom.} A $k=32$ la griglia migliore vale il $5\%$ in
+più della peggiore per \kernelname{cuda\_warp} (298,5 contro 284,1) e il $10\%$
+per \kernelname{cuda\_warp\_smem} (281,6 contro 256,9), ma il $20\%$ per cuBLAS
+(163,5 contro 136,8). Per i kernel custom la griglia è una scelta di
+comunicazione; per cuBLAS è anche, e soprattutto, una scelta di geometria del
+blocco locale.
 
 \subsection{Confronto fra backend nella composizione MPI + CUDA}
 \label{sec:ris-fase4-backend}
 
+Le due sottosezioni precedenti hanno misurato quanto costa la composizione.
+Resta da capire \emph{dove} finisce quel costo, e se colpisce i quattro backend
+allo stesso modo.
+
+Il confronto si costruisce su tre livelli annidati, tutti misurati sullo stesso
+punto $S=16384$ e ricavati dalla stessa campagna:
+
+\begin{enumerate}
+  \item il \textbf{kernel} da solo, a rank singolo (\code{gflops\_kernel});
+  \item l'intera \textbf{fase locale} a rank singolo, che aggiunge al kernel il
+  trasferimento H2D di $X$ e il D2H di $Y$;
+  \item l'intera fase locale con \textbf{otto rank} sulla griglia $4\times2$, che
+  aggiunge la condivisione della GPU fra otto contesti.
+\end{enumerate}
+
+La differenza fra il primo e il secondo livello è il costo dei trasferimenti;
+quella fra il secondo e il terzo è il costo della condivisione. Entrambe si
+leggono direttamente nella \cref{tab:ris-fase4-backend}.
+
 \begin{table}[H]
 \centering
 \footnotesize
-\caption{Fase 4: \code{gflops\_local\_group} a $S=16384$, con uno e otto
-rank. Per $P=8$ si usa la griglia $4\times2$.}
+\caption{Fase 4: throughput dei tre livelli di composizione a
+$S=\num{16384}$, in GFLOPS. \emph{Kernel} è \code{gflops\_kernel} a $P=1$;
+\emph{locale} è \code{gflops\_local\_group}, cioè l'intera fase locale
+(trasferimenti inclusi), a $P=1$ e a $P=8$ sulla griglia $4\times2$.}
 \label{tab:ris-fase4-backend}
-\begin{tabular}{@{}lrrrrrr@{}}
+\begin{tabular}{@{}llrrrrr@{}}
 \toprule
-Backend & $P$ & $k=3$ & $k=6$ & $k=8$ & $k=20$ & $k=32$ \\
+\textbf{Backend} & \textbf{Livello} & $k=3$ & $k=6$ & $k=8$ & $k=20$ & $k=32$ \\
 \midrule
-\multirow{2}{*}{\kernelname{cuda\_naive}}
- & 1 & 146,6 & 280,3 & 321,9 & 329,0 & 331,3 \\
- & 8 & 176,4 & 272,9 & 281,1 & 285,9 & 293,1 \\
+
+\multirow{3}{*}{\kernelname{cuda\_naive}}
+& kernel, $P=1$ & 149,6 & 290,9 & 336,5 & 340,5 & 343,1 \\
+& locale, $P=1$ & 146,6 & 280,3 & 321,9 & 329,0 & 331,3 \\
+& locale, $P=8$ & 176,4 & 272,9 & 281,1 & 285,9 & 293,1 \\
+
 \midrule
-\multirow{2}{*}{\kernelname{cuda\_warp}}
- & 1 & 286,9 & 301,5 & 326,6 & 336,5 & 335,5 \\
- & 8 & 251,9 & 304,6 & 309,8 & 302,1 & 295,5 \\
+
+\multirow{3}{*}{\kernelname{cuda\_warp}}
+& kernel, $P=1$ & 298,5 & 315,3 & 341,5 & 348,7 & 349,8 \\
+& locale, $P=1$ & 286,9 & 301,5 & 326,6 & 336,5 & 335,5 \\
+& locale, $P=8$ & 251,9 & 304,6 & 309,8 & 302,1 & 295,5 \\
+
 \midrule
-\multirow{2}{*}{\kernelname{cuda\_warp\_smem}}
- & 1 & 277,3 & 328,5 & 312,9 & 332,3 & 324,4 \\
- & 8 & 249,1 & 297,3 & 303,6 & 296,8 & 281,6 \\
+
+\multirow{3}{*}{\kernelname{cuda\_warp\_smem}}
+& kernel, $P=1$ & 288,1 & 343,2 & 326,5 & 344,1 & 335,7 \\
+& locale, $P=1$ & 277,3 & 328,5 & 312,9 & 332,3 & 324,4 \\
+& locale, $P=8$ & 249,1 & 297,3 & 303,6 & 296,8 & 281,6 \\
+
 \midrule
-\multirow{2}{*}{\kernelname{cublas}}
- & 1 & 15,0 & 30,1 & 39,9 & 99,4 & 157,9 \\
- & 8 & 15,6 & 31,2 & 41,6 & 103,1 & 163,5 \\
+
+\multirow{3}{*}{\kernelname{cublas}}
+& kernel, $P=1$ & 15,1 & 30,2 & 40,2 & 100,4 & 160,6 \\
+& locale, $P=1$ & 15,0 & 30,1 & 39,9 & 99,4 & 157,9 \\
+& locale, $P=8$ & 15,6 & 31,2 & 41,6 & 103,1 & 163,5 \\
+
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsubsection*{Lettura}
 
-\textbf{La composizione distribuita conserva la gerarchia della Fase 1.}
-\kernelname{cuda\_warp} resta il riferimento più robusto, con valori fra 252
-e 305 GFLOPS a otto rank. \kernelname{cuda\_warp\_smem} è vicino ma perde a
-$k=32$, mentre \kernelname{cuda\_naive} recupera terreno al crescere di $k$ e
-arriva a 293,1 GFLOPS. Il costo della condivisione riduce le distanze, ma non
-ribalta il quadro emerso a rank singolo.
+\textbf{I trasferimenti costano circa il $4\%$ ai kernel custom e quasi nulla a
+cuBLAS.} A $k=32$ il passaggio dal kernel alla fase locale completa costa il
+$4{,}1\%$ a \kernelname{cuda\_warp} (da 349,8 a 335,5 GFLOPS), il $3{,}4\%$ a
+\kernelname{cuda\_naive} e a \kernelname{cuda\_warp\_smem}, ma solo l'$1{,}7\%$
+a cuBLAS. Il costo assoluto dei trasferimenti è lo stesso per tutti: cambia il
+denominatore, perché il kernel di cuBLAS dura circa tre volte di più. Un kernel
+lento nasconde i trasferimenti, e questo non è un merito.
 
-\textbf{cuBLAS è quasi insensibile a $P$ perché il suo limite è altrove.} I
-valori a uno e otto rank differiscono di pochi punti percentuali e crescono
-quasi linearmente con $k$. La composizione MPI non corregge quindi il percorso
-GEMM sfavorevole per un multivettore stretto, già identificato nella Fase 1.
+\textbf{La condivisione della GPU costa circa il $12\%$, ma solo dove la GPU era
+già satura.} A $k=32$ il terzo livello perde l'$11{,}9\%$ per
+\kernelname{cuda\_warp}, l'$11{,}5\%$ per \kernelname{cuda\_naive} e il
+$13{,}2\%$ per \kernelname{cuda\_warp\_smem}. A $k=3$, invece, il segno cambia
+per i backend che a rank singolo lasciavano la scheda sottoutilizzata:
+\kernelname{cuda\_naive} guadagna il $20\%$ e cuBLAS il $4\%$.
 
-\textbf{Il confronto più utile è fra la Fase 1 e il tempo collettivo.} A
-$k=32$ \kernelname{cuda\_warp} passa da circa 358 GFLOPS kernel-only a 335,5
-GFLOPS per l'intera fase locale con un rank e a 295,5 GFLOPS con otto rank. I
-due scarti separano il costo dei trasferimenti per invocazione dal costo
-aggiuntivo della condivisione della GPU.
+\textbf{La gerarchia fra backend sopravvive alla composizione, ma si comprime.}
+A $k=3$ il vantaggio di \kernelname{cuda\_warp} su \kernelname{cuda\_naive} vale
+$1{,}96\times$ a rank singolo (286,9 contro 146,6) e si riduce a $1{,}43\times$
+con otto rank (251,9 contro 176,4). Da $k=8$ in poi i tre kernel custom stanno
+entro il $10\%$ l'uno dall'altro a otto rank. La condivisione della GPU
+avvantaggia chi partiva peggio, ma non ribalta l'ordine.
+
+\textbf{cuBLAS resta indietro a tutti i livelli.} Con otto rank vale
+$1{,}8\times$ meno di \kernelname{cuda\_warp} a $k=32$ (163,5 contro 295,5) e
+$16\times$ meno a $k=3$ (15,6 contro 251,9). La composizione MPI non corregge
+il percorso GEMM sfavorevole per un multivettore stretto: lo eredita.
+
+\subsection{Sintesi della Fase 4}
+\label{sec:ris-fase4-sintesi}
+
+La Fase~4 si riassume in quattro affermazioni, tutte sostenute dalle tabelle
+precedenti.
+
+\paragraph{La metrica va scelta prima dei numeri.}
+Con più contesti sulla stessa GPU il tempo del singolo rank può sovrastimare il
+throughput di oltre undici volte. Tutta l'analisi della fase poggia sul tempo
+collettivo, e il CV mediano dello $0{,}30\%$ mostra che quella misura è stabile.
+
+\paragraph{Più rank non significano più prestazioni, ma nemmeno sempre meno.}
+Sul problema grande la composizione costa il $12\%$ circa ai kernel custom. Sul
+problema piccolo con multivettore stretto costa fino al $67\%$. Dove invece un
+solo rank non saturava la GPU, otto rank migliorano il risultato fino al
+$20\%$. Il fattore che decide non è $P$, ma il lavoro che resta a ogni rank.
+
+\paragraph{La griglia è una scelta di comunicazione, tranne per cuBLAS.}
+Le griglie bilanciate $2\times4$ e $4\times2$ evitano i due estremi
+monodimensionali e contengono il costo delle collettive entro 2,5 ms a $k=32$,
+contro gli 8,6 ms di $1\times8$. Per i kernel custom il guadagno ottenibile
+scegliendo bene la griglia vale il $5$–$10\%$; per cuBLAS vale il $20\%$,
+perché la libreria reagisce anche alla forma del blocco locale.
+
+\paragraph{Il quadro dei backend regge.}
+\kernelname{cuda\_warp} resta il riferimento a ogni livello di composizione e a
+ogni $k$. La condivisione della GPU riduce le distanze, soprattutto ai $k$
+stretti dove \kernelname{cuda\_naive} recupera, ma non cambia l'ordine emerso
+nelle fasi a rank singolo.
 
 
 \section{Il costo dei dati: trasferimenti e preprocessing}

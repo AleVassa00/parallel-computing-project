@@ -390,61 +390,75 @@
 \newlabel{sec:ris-fase3@cref}{{[section][3][7]7.3}{[1][68][]68}{}{}{}}
 \newlabel{sec:c7}{{7.3}{68}{Fase 3 - Effetto della precisione numerica}{section.7.3}{}}
 \newlabel{sec:c7@cref}{{[section][3][7]7.3}{[1][68][]68}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.12}{\ignorespaces Fase 3: \texttt  {gflops\_kernel} nelle due precisioni e speedup $S_{32/64}$ della \cref  {eq:speedup-precisione}, $M = N = \num {16384}$, $P = 1$.}}{69}{table.caption.49}\protected@file@percent }
-\newlabel{tab:ris-fase3}{{7.12}{69}{Fase 3: \code {gflops\_kernel} nelle due precisioni e speedup $S_{32/64}$ della \cref {eq:speedup-precisione}, $M = N = \num {16384}$, $P = 1$}{table.caption.49}{}}
-\newlabel{tab:ris-fase3@cref}{{[table][12][7]7.12}{[1][68][]69}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.13}{\ignorespaces Fase 3: percentuale del tetto pertinente. In FP64 il tetto è \SI {350}{\giga \flop \per \second } e non dipende da $k$, in FP32 è $B \cdot k/2 = 224k$ \si {\giga \flop \per \second } e cresce con $k$.}}{69}{table.caption.50}\protected@file@percent }
-\newlabel{tab:ris-fase3-tetto}{{7.13}{69}{Fase 3: percentuale del tetto pertinente. In FP64 il tetto è \SI {350}{\giga \flop \per \second } e non dipende da $k$, in FP32 è $B \cdot k/2 = 224k$ \si {\giga \flop \per \second } e cresce con $k$}{table.caption.50}{}}
-\newlabel{tab:ris-fase3-tetto@cref}{{[table][13][7]7.13}{[1][69][]69}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.8}{\ignorespaces Fase 3: guadagno della singola precisione al variare di $k$. La crescita con $k$ dei kernel custom è la previsione del roofline, la piattezza di \texttt  {cublas} intorno a 28 misura invece la lentezza del suo percorso FP64.}}{69}{figure.caption.51}\protected@file@percent }
-\newlabel{fig:ris-fase3}{{7.8}{69}{Fase 3: guadagno della singola precisione al variare di $k$. La crescita con $k$ dei kernel custom è la previsione del roofline, la piattezza di \kernelname {cublas} intorno a 28 misura invece la lentezza del suo percorso FP64}{figure.caption.51}{}}
-\newlabel{fig:ris-fase3@cref}{{[figure][8][7]7.8}{[1][69][]69}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.14}{\ignorespaces Fase 3: piano di tiling scelto a runtime da \texttt  {cuda\_warp\_smem} nelle due precisioni.}}{70}{table.caption.52}\protected@file@percent }
-\newlabel{tab:ris-fase3-piano}{{7.14}{70}{Fase 3: piano di tiling scelto a runtime da \kernelname {cuda\_warp\_smem} nelle due precisioni}{table.caption.52}{}}
-\newlabel{tab:ris-fase3-piano@cref}{{[table][14][7]7.14}{[1][69][]70}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.4}Fase 4 - Esecuzione distribuita MPI + CUDA}{71}{section.7.4}\protected@file@percent }
-\newlabel{sec:ris-fase4}{{7.4}{71}{Fase 4 - Esecuzione distribuita MPI + CUDA}{section.7.4}{}}
-\newlabel{sec:ris-fase4@cref}{{[section][4][7]7.4}{[1][71][]71}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.4.1}Metrica rank-local e tempo collettivo}{71}{subsection.7.4.1}\protected@file@percent }
-\newlabel{sec:ris-fase4-metrica}{{7.4.1}{71}{Metrica rank-local e tempo collettivo}{subsection.7.4.1}{}}
-\newlabel{sec:ris-fase4-metrica@cref}{{[subsection][1][7,4]7.4.1}{[1][71][]71}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.15}{\ignorespaces Fase 4: confronto fra throughput derivato dai tempi rank-local e throughput della fase locale collettiva per casi rappresentativi di \texttt  {cuda\_warp}.}}{72}{table.caption.55}\protected@file@percent }
-\newlabel{tab:ris-fase4-metrica}{{7.15}{72}{Fase 4: confronto fra throughput derivato dai tempi rank-local e throughput della fase locale collettiva per casi rappresentativi di \kernelname {cuda\_warp}}{table.caption.55}{}}
-\newlabel{tab:ris-fase4-metrica@cref}{{[table][15][7]7.15}{[1][71][]72}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.4.2}Effetto del numero di rank}{72}{subsection.7.4.2}\protected@file@percent }
-\newlabel{sec:ris-fase4-rank}{{7.4.2}{72}{Effetto del numero di rank}{subsection.7.4.2}{}}
-\newlabel{sec:ris-fase4-rank@cref}{{[subsection][2][7,4]7.4.2}{[1][72][]72}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.16}{\ignorespaces Fase 4: throughput collettivo di \texttt  {cuda\_warp}, in GFLOPS, al variare della scala e del numero di rank.}}{72}{table.caption.57}\protected@file@percent }
-\newlabel{tab:ris-fase4-rank}{{7.16}{72}{Fase 4: throughput collettivo di \kernelname {cuda\_warp}, in GFLOPS, al variare della scala e del numero di rank}{table.caption.57}{}}
-\newlabel{tab:ris-fase4-rank@cref}{{[table][16][7]7.16}{[1][72][]72}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.9}{\ignorespaces Fase 4: throughput collettivo di \texttt  {cuda\_warp} a $S=16384$ per la famiglia di griglie della \cref  {tab:ris-fase4-rank}.}}{73}{figure.caption.58}\protected@file@percent }
-\newlabel{fig:ris-fase4-rank}{{7.9}{73}{Fase 4: throughput collettivo di \kernelname {cuda\_warp} a $S=16384$ per la famiglia di griglie della \cref {tab:ris-fase4-rank}}{figure.caption.58}{}}
-\newlabel{fig:ris-fase4-rank@cref}{{[figure][9][7]7.9}{[1][72][]73}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.4.3}Effetto della griglia MPI}{73}{subsection.7.4.3}\protected@file@percent }
-\newlabel{sec:ris-fase4-griglia}{{7.4.3}{73}{Effetto della griglia MPI}{subsection.7.4.3}{}}
-\newlabel{sec:ris-fase4-griglia@cref}{{[subsection][3][7,4]7.4.3}{[1][73][]73}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.17}{\ignorespaces Fase 4: scomposizione temporale di \texttt  {cuda\_warp} per le quattro griglie a $S=16384$, $P=8$, $k=32$. Tempi in millisecondi.}}{73}{table.caption.60}\protected@file@percent }
-\newlabel{tab:ris-fase4-griglia}{{7.17}{73}{Fase 4: scomposizione temporale di \kernelname {cuda\_warp} per le quattro griglie a $S=16384$, $P=8$, $k=32$. Tempi in millisecondi}{table.caption.60}{}}
-\newlabel{tab:ris-fase4-griglia@cref}{{[table][17][7]7.17}{[1][73][]73}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.4.4}Confronto fra backend nella composizione MPI + CUDA}{74}{subsection.7.4.4}\protected@file@percent }
-\newlabel{sec:ris-fase4-backend}{{7.4.4}{74}{Confronto fra backend nella composizione MPI + CUDA}{subsection.7.4.4}{}}
-\newlabel{sec:ris-fase4-backend@cref}{{[subsection][4][7,4]7.4.4}{[1][74][]74}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.18}{\ignorespaces Fase 4: \texttt  {gflops\_local\_group} a $S=16384$, con uno e otto rank. Per $P=8$ si usa la griglia $4\times 2$.}}{74}{table.caption.62}\protected@file@percent }
-\newlabel{tab:ris-fase4-backend}{{7.18}{74}{Fase 4: \code {gflops\_local\_group} a $S=16384$, con uno e otto rank. Per $P=8$ si usa la griglia $4\times 2$}{table.caption.62}{}}
-\newlabel{tab:ris-fase4-backend@cref}{{[table][18][7]7.18}{[1][74][]74}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.5}Il costo dei dati: trasferimenti e preprocessing}{74}{section.7.5}\protected@file@percent }
-\newlabel{sec:ris-trasferimenti}{{7.5}{74}{Il costo dei dati: trasferimenti e preprocessing}{section.7.5}{}}
-\newlabel{sec:ris-trasferimenti@cref}{{[section][5][7]7.5}{[1][74][]74}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.19}{\ignorespaces Scomposizione della fase locale su GPU secondo la \cref  {eq:scomposizione-locale}, in percentuale di $t_{\text  {local}}$.}}{75}{table.caption.64}\protected@file@percent }
-\newlabel{tab:ris-scomposizione}{{7.19}{75}{Scomposizione della fase locale su GPU secondo la \cref {eq:scomposizione-locale}, in percentuale di $t_{\text {local}}$}{table.caption.64}{}}
-\newlabel{tab:ris-scomposizione@cref}{{[table][19][7]7.19}{[1][74][]75}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.20}{\ignorespaces Preprocessing e banda dei trasferimenti, \texttt  {cuda\_warp}, $M = N = \num {16384}$, FP64. Le voci di setup sono pagate una volta sola.}}{75}{table.caption.65}\protected@file@percent }
-\newlabel{tab:ris-prep}{{7.20}{75}{Preprocessing e banda dei trasferimenti, \kernelname {cuda\_warp}, $M = N = \num {16384}$, FP64. Le voci di setup sono pagate una volta sola}{table.caption.65}{}}
-\newlabel{tab:ris-prep@cref}{{[table][20][7]7.20}{[1][75][]75}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.6}Sintesi}{76}{section.7.6}\protected@file@percent }
-\newlabel{sec:ris-sintesi}{{7.6}{76}{Sintesi}{section.7.6}{}}
-\newlabel{sec:ris-sintesi@cref}{{[section][6][7]7.6}{[1][76][]76}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.21}{\ignorespaces Punti rappresentativi a $M=N=\num {16384}$ e $k=32$. Per MPI + CUDA si usa il throughput della fase locale collettiva.}}{76}{table.caption.67}\protected@file@percent }
-\newlabel{tab:ris-sintesi}{{7.21}{76}{Punti rappresentativi a $M=N=\num {16384}$ e $k=32$. Per MPI + CUDA si usa il throughput della fase locale collettiva}{table.caption.67}{}}
-\newlabel{tab:ris-sintesi@cref}{{[table][21][7]7.21}{[1][76][]76}{}{}{}}
-\gdef \@abspage@last{80}
+\newlabel{eq:speedup-precisione}{{7.1}{69}{Fase 3 - Effetto della precisione numerica}{equation.7.1}{}}
+\newlabel{eq:speedup-precisione@cref}{{[equation][1][7]7.1}{[1][69][]69}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.3.1}Confronto tra FP64 e FP32}{69}{subsection.7.3.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {7.12}{\ignorespaces Fase 3: \texttt  {gflops\_kernel} nelle due precisioni e speedup $S_{32/64}$, con $M=N=\num {16384}$ e $P=1$.}}{69}{table.caption.49}\protected@file@percent }
+\newlabel{tab:ris-fase3}{{7.12}{69}{Fase 3: \code {gflops\_kernel} nelle due precisioni e speedup $S_{32/64}$, con $M=N=\num {16384}$ e $P=1$}{table.caption.49}{}}
+\newlabel{tab:ris-fase3@cref}{{[table][12][7]7.12}{[1][69][]69}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.3.2}Comportamento dei kernel custom}{69}{subsection.7.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.3.3}Piano di esecuzione di \texttt  {cuda\_warp\_smem}}{70}{subsection.7.3.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {7.13}{\ignorespaces Fase 3: piano di tiling scelto a runtime da \texttt  {cuda\_warp\_smem} nelle due precisioni.}}{70}{table.caption.50}\protected@file@percent }
+\newlabel{tab:ris-fase3-piano}{{7.13}{70}{Fase 3: piano di tiling scelto a runtime da \kernelname {cuda\_warp\_smem} nelle due precisioni}{table.caption.50}{}}
+\newlabel{tab:ris-fase3-piano@cref}{{[table][13][7]7.13}{[1][70][]70}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.3.4}Comportamento di cuBLAS}{71}{subsection.7.3.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.3.5}Sintesi}{72}{subsection.7.3.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7.4}Fase 4 - Esecuzione distribuita MPI + CUDA}{72}{section.7.4}\protected@file@percent }
+\newlabel{sec:ris-fase4}{{7.4}{72}{Fase 4 - Esecuzione distribuita MPI + CUDA}{section.7.4}{}}
+\newlabel{sec:ris-fase4@cref}{{[section][4][7]7.4}{[1][72][]72}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.4.1}Il tempo collettivo come metrica}{72}{subsection.7.4.1}\protected@file@percent }
+\newlabel{sec:ris-fase4-metrica}{{7.4.1}{72}{Il tempo collettivo come metrica}{subsection.7.4.1}{}}
+\newlabel{sec:ris-fase4-metrica@cref}{{[subsection][1][7,4]7.4.1}{[1][72][]72}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.14}{\ignorespaces Fase 4: confronto fra throughput derivato dai tempi rank-local e throughput della fase locale collettiva per casi rappresentativi di \texttt  {cuda\_warp}.}}{73}{table.caption.51}\protected@file@percent }
+\newlabel{tab:ris-fase4-metrica}{{7.14}{73}{Fase 4: confronto fra throughput derivato dai tempi rank-local e throughput della fase locale collettiva per casi rappresentativi di \kernelname {cuda\_warp}}{table.caption.51}{}}
+\newlabel{tab:ris-fase4-metrica@cref}{{[table][14][7]7.14}{[1][72][]73}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.4.2}Effetto del numero di rank $P$}{73}{subsection.7.4.2}\protected@file@percent }
+\newlabel{sec:ris-fase4-rank}{{7.4.2}{73}{Effetto del numero di rank $P$}{subsection.7.4.2}{}}
+\newlabel{sec:ris-fase4-rank@cref}{{[subsection][2][7,4]7.4.2}{[1][73][]73}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.15}{\ignorespaces Fase 4: throughput della fase locale collettiva (\texttt  {gflops\_local\_group}), in GFLOPS, per i quattro backend al variare della scala e del numero di rank. Griglie della famiglia coerente $1\times 1$, $2\times 1$, $2\times 2$, $4\times 2$.}}{74}{table.caption.53}\protected@file@percent }
+\newlabel{tab:ris-fase4-rank}{{7.15}{74}{Fase 4: throughput della fase locale collettiva (\code {gflops\_local\_group}), in GFLOPS, per i quattro backend al variare della scala e del numero di rank. Griglie della famiglia coerente $1\times 1$, $2\times 1$, $2\times 2$, $4\times 2$}{table.caption.53}{}}
+\newlabel{tab:ris-fase4-rank@cref}{{[table][15][7]7.15}{[1][73][]74}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7.8}{\ignorespaces Fase 4: throughput collettivo a $S=\num {16384}$ e $k=32$ per i quattro backend, dalla colonna corrispondente della \cref  {tab:ris-fase4-rank}.}}{74}{figure.caption.54}\protected@file@percent }
+\newlabel{fig:ris-fase4-rank}{{7.8}{74}{Fase 4: throughput collettivo a $S=\num {16384}$ e $k=32$ per i quattro backend, dalla colonna corrispondente della \cref {tab:ris-fase4-rank}}{figure.caption.54}{}}
+\newlabel{fig:ris-fase4-rank@cref}{{[figure][8][7]7.8}{[1][74][]74}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.4.3}Effetto della griglia MPI}{75}{subsection.7.4.3}\protected@file@percent }
+\newlabel{sec:ris-fase4-griglia}{{7.4.3}{75}{Effetto della griglia MPI}{subsection.7.4.3}{}}
+\newlabel{sec:ris-fase4-griglia@cref}{{[subsection][3][7,4]7.4.3}{[1][75][]75}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.16}{\ignorespaces Fase 4: scomposizione temporale dei quattro backend per le quattro griglie a $S=\num {16384}$, $P=8$, $k=32$. Tempi in millisecondi.}}{75}{table.caption.56}\protected@file@percent }
+\newlabel{tab:ris-fase4-griglia}{{7.16}{75}{Fase 4: scomposizione temporale dei quattro backend per le quattro griglie a $S=\num {16384}$, $P=8$, $k=32$. Tempi in millisecondi}{table.caption.56}{}}
+\newlabel{tab:ris-fase4-griglia@cref}{{[table][16][7]7.16}{[1][75][]75}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.17}{\ignorespaces Fase 4: costo complessivo delle due collettive, $t_{\mathrm  {bcast}}+t_{\mathrm  {reduce}}$, in millisecondi, a $S=\num {16384}$ e $P=8$, per ogni griglia e ogni $k$.}}{76}{table.caption.58}\protected@file@percent }
+\newlabel{tab:ris-fase4-griglia-comm}{{7.17}{76}{Fase 4: costo complessivo delle due collettive, $t_{\mathrm {bcast}}+t_{\mathrm {reduce}}$, in millisecondi, a $S=\num {16384}$ e $P=8$, per ogni griglia e ogni $k$}{table.caption.58}{}}
+\newlabel{tab:ris-fase4-griglia-comm@cref}{{[table][17][7]7.17}{[1][76][]76}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.18}{\ignorespaces Fase 4: throughput collettivo (\texttt  {gflops\_local\_group}) a $S=\num {16384}$ e $P=8$, per ogni griglia e ogni $k$.}}{77}{table.caption.59}\protected@file@percent }
+\newlabel{tab:ris-fase4-griglia-k}{{7.18}{77}{Fase 4: throughput collettivo (\code {gflops\_local\_group}) a $S=\num {16384}$ e $P=8$, per ogni griglia e ogni $k$}{table.caption.59}{}}
+\newlabel{tab:ris-fase4-griglia-k@cref}{{[table][18][7]7.18}{[1][76][]77}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.4.4}Confronto fra backend nella composizione MPI + CUDA}{77}{subsection.7.4.4}\protected@file@percent }
+\newlabel{sec:ris-fase4-backend}{{7.4.4}{77}{Confronto fra backend nella composizione MPI + CUDA}{subsection.7.4.4}{}}
+\newlabel{sec:ris-fase4-backend@cref}{{[subsection][4][7,4]7.4.4}{[1][77][]77}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.19}{\ignorespaces Fase 4: throughput dei tre livelli di composizione a $S=\num {16384}$, in GFLOPS. \emph  {Kernel} è \texttt  {gflops\_kernel} a $P=1$; \emph  {locale} è \texttt  {gflops\_local\_group}, cioè l'intera fase locale (trasferimenti inclusi), a $P=1$ e a $P=8$ sulla griglia $4\times 2$.}}{78}{table.caption.61}\protected@file@percent }
+\newlabel{tab:ris-fase4-backend}{{7.19}{78}{Fase 4: throughput dei tre livelli di composizione a $S=\num {16384}$, in GFLOPS. \emph {Kernel} è \code {gflops\_kernel} a $P=1$; \emph {locale} è \code {gflops\_local\_group}, cioè l'intera fase locale (trasferimenti inclusi), a $P=1$ e a $P=8$ sulla griglia $4\times 2$}{table.caption.61}{}}
+\newlabel{tab:ris-fase4-backend@cref}{{[table][19][7]7.19}{[1][78][]78}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.4.5}Sintesi della Fase 4}{78}{subsection.7.4.5}\protected@file@percent }
+\newlabel{sec:ris-fase4-sintesi}{{7.4.5}{78}{Sintesi della Fase 4}{subsection.7.4.5}{}}
+\newlabel{sec:ris-fase4-sintesi@cref}{{[subsection][5][7,4]7.4.5}{[1][78][]78}{}{}{}}
+\@writefile{toc}{\contentsline {paragraph}{La metrica va scelta prima dei numeri.}{78}{section*.63}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Più rank non significano più prestazioni, ma nemmeno sempre meno.}{79}{section*.64}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{La griglia è una scelta di comunicazione, tranne per cuBLAS.}{79}{section*.65}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Il quadro dei backend regge.}{79}{section*.66}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7.5}Il costo dei dati: trasferimenti e preprocessing}{79}{section.7.5}\protected@file@percent }
+\newlabel{sec:ris-trasferimenti}{{7.5}{79}{Il costo dei dati: trasferimenti e preprocessing}{section.7.5}{}}
+\newlabel{sec:ris-trasferimenti@cref}{{[section][5][7]7.5}{[1][79][]79}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.20}{\ignorespaces Scomposizione della fase locale su GPU secondo la \cref  {eq:scomposizione-locale}, in percentuale di $t_{\text  {local}}$.}}{79}{table.caption.67}\protected@file@percent }
+\newlabel{tab:ris-scomposizione}{{7.20}{79}{Scomposizione della fase locale su GPU secondo la \cref {eq:scomposizione-locale}, in percentuale di $t_{\text {local}}$}{table.caption.67}{}}
+\newlabel{tab:ris-scomposizione@cref}{{[table][20][7]7.20}{[1][79][]79}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.21}{\ignorespaces Preprocessing e banda dei trasferimenti, \texttt  {cuda\_warp}, $M = N = \num {16384}$, FP64. Le voci di setup sono pagate una volta sola.}}{79}{table.caption.68}\protected@file@percent }
+\newlabel{tab:ris-prep}{{7.21}{79}{Preprocessing e banda dei trasferimenti, \kernelname {cuda\_warp}, $M = N = \num {16384}$, FP64. Le voci di setup sono pagate una volta sola}{table.caption.68}{}}
+\newlabel{tab:ris-prep@cref}{{[table][21][7]7.21}{[1][79][]79}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7.6}Sintesi}{80}{section.7.6}\protected@file@percent }
+\newlabel{sec:ris-sintesi}{{7.6}{80}{Sintesi}{section.7.6}{}}
+\newlabel{sec:ris-sintesi@cref}{{[section][6][7]7.6}{[1][80][]80}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7.22}{\ignorespaces Punti rappresentativi a $M=N=\num {16384}$ e $k=32$. Per MPI + CUDA si usa il throughput della fase locale collettiva.}}{80}{table.caption.70}\protected@file@percent }
+\newlabel{tab:ris-sintesi}{{7.22}{80}{Punti rappresentativi a $M=N=\num {16384}$ e $k=32$. Per MPI + CUDA si usa il throughput della fase locale collettiva}{table.caption.70}{}}
+\newlabel{tab:ris-sintesi@cref}{{[table][22][7]7.22}{[1][80][]80}{}{}{}}
+\gdef \@abspage@last{85}
