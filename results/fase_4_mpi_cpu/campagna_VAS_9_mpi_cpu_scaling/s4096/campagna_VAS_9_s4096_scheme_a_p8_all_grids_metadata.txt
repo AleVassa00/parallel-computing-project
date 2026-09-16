@@ -1,19 +1,19 @@
-command=./script/run_cuda_experiments.sh --config /home/avassallo/parallel-computing-project/experiments/fase_1_tuning/campagna_VAS_4_smem_pad_tuning/cuda_warp_smem.conf 
-timestamp=20260915_234656
-name=campagna_VAS_4_smem_pad_tuning_cuda_warp_smem
-experiment=smem-pad-sweep
-config_file=/home/avassallo/parallel-computing-project/experiments/fase_1_tuning/campagna_VAS_4_smem_pad_tuning/cuda_warp_smem.conf
-M=16384
-N=16384
+command=./script/run_cuda_experiments.sh --config /home/avassallo/parallel-computing-project/experiments/fase_4_mpi_cpu/campagna_VAS_9_mpi_cpu_scaling/s4096/scheme_a_p8.conf 
+timestamp=20260916_170532
+name=campagna_VAS_9_s4096_scheme_a_p8_all_grids
+experiment=k-sweep
+config_file=/home/avassallo/parallel-computing-project/experiments/fase_4_mpi_cpu/campagna_VAS_9_mpi_cpu_scaling/s4096/scheme_a_p8.conf
+M=4096
+N=4096
 reps=20
 warmup=5
 seed=20252026
 check=0
 group_timing=0
-a_mode=local
-x_mode=local
+a_mode=global
+x_mode=global
 x_layout=row
-kernel=cuda_warp_smem
+kernel=scheme_a
 kernels=cuda_naive cuda_warp cuda_warp_smem
 k_sweep=3 6 8 20 32
 block_sweep_k=3 6 8 20 32
@@ -27,24 +27,28 @@ tile_granularity=32
 force_generic_k=0
 test_a_padding=0
 nvcc_arch=sm_75
-all_grids=no
+all_grids=8
 btl=self,sm
 bind_to=core
 map_by=core
 report_bindings=0
 grids:
-  np=1 pr=1 pc=1
+  np=8 pr=1 pc=8
+  np=8 pr=2 pc=4
+  np=8 pr=4 pc=2
+  np=8 pr=8 pc=1
 
-git_commit=27b9649695efd6c1abb8a6776fdfa77879599be7
+git_commit=b0b81a2c72c71262686756ee17f44c6740e426f3
 git_status:
- M results/fase_1_tuning/campagna_VAS_4_smem_pad_tuning/campagna_VAS_4_smem_pad_tuning_cuda_warp_smem_metadata.txt
- M results/fase_1_tuning/campagna_VAS_4_smem_pad_tuning/campagna_VAS_4_smem_pad_tuning_cuda_warp_smem_raw.csv
  M script/run_cuda_experiments.sh
 ?? results/campagna_VAS_6_kernel_comparison/
 ?? results/fase_1_tuning/campagna_VAS_3_row_major_padding/
 ?? results/fase_2_caratterizzazione_dimensionale/campagna_VAS_7_shape_robustness_run1/
 ?? results/fase_3_precisione/validazione_fp32/
-?? results/fase_4_mpi_cpu/
+?? results/fase_4_mpi_cpu/campagna_VAS_9_mpi_cpu_scaling/s16384/
+?? results/fase_4_mpi_cpu/campagna_VAS_9_mpi_cpu_scaling/s4096/
+?? results/fase_4_mpi_cpu/campagna_VAS_9_mpi_cpu_scaling/s8192/
+?? results/fase_5_mpi_cuda/
 ?? validation_fp32.log
 
 nvcc:
