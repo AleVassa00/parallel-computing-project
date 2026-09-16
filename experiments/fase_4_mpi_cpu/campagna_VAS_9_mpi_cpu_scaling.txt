@@ -5,6 +5,9 @@
 # variare P = 1, 2, 4, 8. La griglia P x 1 realizza la decomposizione MPI
 # monodimensionale per righe: X viene propagata lungo la colonna della griglia
 # e ciascun rank produce una banda distinta di righe di Y.
+# Le matrici globali vengono generate sul root e poi distribuite ai blocchi
+# locali dei rank (a_mode=global, x_mode=global). I relativi tempi di
+# distribuzione sono riportati separatamente nelle colonne di preprocessing.
 #
 # P=1 e' esclusivamente la baseline interna necessaria per calcolare
 # speedup S(P)=T(1)/T(P) ed efficienza E(P)=S(P)/P. I casi P>1 costituiscono
