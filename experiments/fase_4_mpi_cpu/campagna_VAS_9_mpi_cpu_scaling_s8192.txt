@@ -1,0 +1,20 @@
+# Campagna VAS 9 - strong scaling MPI-CPU, matrici quadrate S=8192.
+# M=N=8192, FP64, k=3 6 8 20 32.
+# Tre backend CPU e tutte le fattorizzazioni ordinate fino a P=8:
+# P=1: 1x1; P=2: 1x2, 2x1;
+# P=4: 1x4, 2x2, 4x1; P=8: 1x8, 2x4, 4x2, 8x1.
+# Input globali distribuiti con MPI (a_mode=global, x_mode=global).
+# Sono 12 file di configurazione e 150 casi aggregati (kernel x k x griglia).
+
+campagna_VAS_9_mpi_cpu_scaling/s8192/scheme_a_p1.conf
+campagna_VAS_9_mpi_cpu_scaling/s8192/scheme_a_p2.conf
+campagna_VAS_9_mpi_cpu_scaling/s8192/scheme_a_p4.conf
+campagna_VAS_9_mpi_cpu_scaling/s8192/scheme_a_p8.conf
+campagna_VAS_9_mpi_cpu_scaling/s8192/scheme_a_jblock_p1.conf
+campagna_VAS_9_mpi_cpu_scaling/s8192/scheme_a_jblock_p2.conf
+campagna_VAS_9_mpi_cpu_scaling/s8192/scheme_a_jblock_p4.conf
+campagna_VAS_9_mpi_cpu_scaling/s8192/scheme_a_jblock_p8.conf
+campagna_VAS_9_mpi_cpu_scaling/s8192/scheme_a_jblock_rb_p1.conf
+campagna_VAS_9_mpi_cpu_scaling/s8192/scheme_a_jblock_rb_p2.conf
+campagna_VAS_9_mpi_cpu_scaling/s8192/scheme_a_jblock_rb_p4.conf
+campagna_VAS_9_mpi_cpu_scaling/s8192/scheme_a_jblock_rb_p8.conf

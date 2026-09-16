@@ -1,0 +1,3 @@
+experiment,kernel,M,N,k,block,smem_pad,np,pr,pc,exit_code
+k-sweep,scheme_a,16384,16384,20,256,1,1,1,1,1
+k-sweep,scheme_a,16384,16384,32,256,1,1,1,1,1

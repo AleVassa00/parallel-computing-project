@@ -1,0 +1,62 @@
+command=./script/run_cuda_experiments.sh --config /home/avassallo/parallel-computing-project/experiments/fase_5_mpi_cuda/campagna_VAS_10_mpi_cuda_hybrid/s16384/cuda_naive_p8.conf 
+timestamp=20260916_142534
+name=campagna_VAS_10_s16384_cuda_naive_p8_all_grids
+experiment=k-sweep
+config_file=/home/avassallo/parallel-computing-project/experiments/fase_5_mpi_cuda/campagna_VAS_10_mpi_cuda_hybrid/s16384/cuda_naive_p8.conf
+M=16384
+N=16384
+reps=20
+warmup=5
+seed=20252026
+check=0
+group_timing=0
+a_mode=global
+x_mode=global
+x_layout=row
+kernel=cuda_naive
+kernels=cuda_naive cuda_warp cuda_warp_smem
+k_sweep=3 6 8 20 32
+block_sweep_k=3 6 8 20 32
+compare_k=3 6 8 20 32
+block=128
+blocks=64 128 192 256 384 512 1024
+prec=double
+smem_pad=1
+smem_pads=0 1
+tile_granularity=32
+force_generic_k=0
+test_a_padding=0
+nvcc_arch=sm_75
+all_grids=8
+btl=self,sm
+bind_to=core
+map_by=core
+report_bindings=0
+grids:
+  np=8 pr=1 pc=8
+  np=8 pr=2 pc=4
+  np=8 pr=4 pc=2
+  np=8 pr=8 pc=1
+
+git_commit=b6dd39ac3d447abf8b05f93872b4042e7ae1e911
+git_status:
+ M script/run_cuda_experiments.sh
+?? results/campagna_VAS_6_kernel_comparison/
+?? results/fase_1_tuning/campagna_VAS_3_row_major_padding/
+?? results/fase_2_caratterizzazione_dimensionale/campagna_VAS_7_shape_robustness_run1/
+?? results/fase_3_precisione/validazione_fp32/
+?? results/fase_5_mpi_cuda/
+?? validation_fp32.log
+
+nvcc:
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2025 NVIDIA Corporation
+Built on Wed_Jan_15_19:20:09_PST_2025
+Cuda compilation tools, release 12.8, V12.8.61
+Build cuda_12.8.r12.8/compiler.35404655_0
+
+mpirun:
+mpirun (Open MPI) 5.0.9
+
+
+gpu:

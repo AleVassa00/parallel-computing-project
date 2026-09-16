@@ -5,10 +5,6 @@ bin/
 
 *.o
 *.d
-*.csv
 
-# CSV gia' versionati, spostati sotto la Fase 1.
-!results/fase_1_tuning/c8_block_k_tuning/*.csv
-!results/fase_1_tuning/campagna_VAS_2_row_major/*.csv
-!results/fase_1_tuning/campagna_VAS_4_smem_pad_tuning/*.csv
-!results/fase_1_tuning/campagna_VAS_5_smem_granularity_tuning/*.csv
+
+
