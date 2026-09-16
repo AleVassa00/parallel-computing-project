@@ -15,481 +15,194 @@
 \@writefile{toc}{\contentsline {section}{\numberline {1.1}Obiettivo}{1}{section.1.1}\protected@file@percent }
 \newlabel{eq:problema}{{1.1}{1}{Obiettivo}{equation.1.1}{}}
 \newlabel{eq:problema@cref}{{[equation][1][1]1.1}{[1][1][]1}{}{}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {2}Il kernel di calcolo}{2}{chapter.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.2}Struttura della relazione}{2}{section.1.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {2}Il kernel di calcolo}{3}{chapter.2}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{cap:problema}{{2}{2}{Il kernel di calcolo}{chapter.2}{}}
-\newlabel{cap:problema@cref}{{[chapter][2][]2}{[1][2][]2}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {2.1}Che cosa calcola il nucleo}{2}{section.2.1}\protected@file@percent }
-\newlabel{sec:definizione}{{2.1}{2}{Che cosa calcola il nucleo}{section.2.1}{}}
-\newlabel{sec:definizione@cref}{{[section][1][2]2.1}{[1][2][]2}{}{}{}}
-\newlabel{eq:definizione}{{2.1}{2}{Che cosa calcola il nucleo}{equation.2.1}{}}
-\newlabel{eq:definizione@cref}{{[equation][1][2]2.1}{[1][2][]2}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.1.1}Conteggio delle operazioni}{2}{subsection.2.1.1}\protected@file@percent }
-\newlabel{eq:flops}{{2.2}{2}{Conteggio delle operazioni}{equation.2.2}{}}
-\newlabel{eq:flops@cref}{{[equation][2][2]2.2}{[1][2][]2}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {2.2}Come vengono memorizzati i dati}{3}{section.2.2}\protected@file@percent }
-\newlabel{sec:layout}{{2.2}{3}{Come vengono memorizzati i dati}{section.2.2}{}}
-\newlabel{sec:layout@cref}{{[section][2][2]2.2}{[1][3][]3}{}{}{}}
-\@writefile{toc}{\contentsline {paragraph}{Perché \texttt  {lda} è separata da \texttt  {n\_loc}.}{3}{section*.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Perché \texttt  {ldx} e \texttt  {ldy} invece sono fissate a $k$.}{3}{section*.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {2.3}Ordine dei cicli: schema A contro schema B}{3}{section.2.3}\protected@file@percent }
-\newlabel{sec:schemi}{{2.3}{3}{Ordine dei cicli: schema A contro schema B}{section.2.3}{}}
-\newlabel{sec:schemi@cref}{{[section][3][2]2.3}{[1][3][]3}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.1}Gli schemi candidati}{4}{subsection.2.3.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.2}La quantificazione: intensità aritmetica}{4}{subsection.2.3.2}\protected@file@percent }
-\newlabel{eq:intensita}{{2.3}{4}{La quantificazione: intensità aritmetica}{equation.2.3}{}}
-\newlabel{eq:intensita@cref}{{[equation][3][2]2.3}{[1][4][]4}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.3}Un limite che non si può superare}{5}{subsection.2.3.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.4}Una proprietà che conta sull'hardware reale}{5}{subsection.2.3.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {2.4}Precisione}{5}{section.2.4}\protected@file@percent }
-\newlabel{sec:precisione}{{2.4}{5}{Precisione}{section.2.4}{}}
-\newlabel{sec:precisione@cref}{{[section][4][2]2.4}{[1][5][]5}{}{}{}}
-\@writefile{toc}{\contentsline {paragraph}{Effetto sul modello roofline.}{5}{section*.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Effetto sulla validazione.}{6}{section*.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {2.5}Generazione riproducibile dei dati}{6}{section.2.5}\protected@file@percent }
-\newlabel{sec:generazione}{{2.5}{6}{Generazione riproducibile dei dati}{section.2.5}{}}
-\newlabel{sec:generazione@cref}{{[section][5][2]2.5}{[1][6][]6}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.1}Il generatore}{6}{subsection.2.5.1}\protected@file@percent }
-\newlabel{eq:gen}{{2.4}{6}{Il generatore}{equation.2.4}{}}
-\newlabel{eq:gen@cref}{{[equation][4][2]2.4}{[1][6][]6}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.2}Le tre conseguenze, tutte usate dal progetto}{6}{subsection.2.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.3}Perché i valori hanno media nulla}{6}{subsection.2.5.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {2.6}L'interfaccia unica del kernel locale}{7}{section.2.6}\protected@file@percent }
-\newlabel{sec:interfaccia}{{2.6}{7}{L'interfaccia unica del kernel locale}{section.2.6}{}}
-\newlabel{sec:interfaccia@cref}{{[section][6][2]2.6}{[1][6][]7}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.1}Ciclo di vita del kernel}{7}{subsection.2.6.1}\protected@file@percent }
-\newlabel{sec:tre-fasi}{{2.6.1}{7}{Ciclo di vita del kernel}{subsection.2.6.1}{}}
-\newlabel{sec:tre-fasi@cref}{{[subsection][1][2,6]2.6.1}{[1][7][]7}{}{}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {2.1}{\ignorespaces Interfaccia di \texttt  {src/kernel/kernel.h}.}}{7}{lstlisting.2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.2}Contesto opaco del backend}{8}{subsection.2.6.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.3}Configurazione delle build}{8}{subsection.2.6.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {3}Parallelizzazione MPI}{9}{chapter.3}\protected@file@percent }
+\newlabel{cap:problema}{{2}{3}{Il kernel di calcolo}{chapter.2}{}}
+\newlabel{cap:problema@cref}{{[chapter][2][]2}{[1][3][]3}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.1}Che cosa calcola il nucleo}{3}{section.2.1}\protected@file@percent }
+\newlabel{sec:definizione}{{2.1}{3}{Che cosa calcola il nucleo}{section.2.1}{}}
+\newlabel{sec:definizione@cref}{{[section][1][2]2.1}{[1][3][]3}{}{}{}}
+\newlabel{eq:problema-nucleo}{{2.1}{3}{Che cosa calcola il nucleo}{equation.2.1}{}}
+\newlabel{eq:problema-nucleo@cref}{{[equation][1][2]2.1}{[1][3][]3}{}{}{}}
+\newlabel{eq:definizione}{{2.2}{3}{Che cosa calcola il nucleo}{equation.2.2}{}}
+\newlabel{eq:definizione@cref}{{[equation][2][2]2.2}{[1][3][]3}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1.1}Conteggio delle operazioni}{3}{subsection.2.1.1}\protected@file@percent }
+\newlabel{eq:flops-totali}{{2.3}{4}{Conteggio delle operazioni}{equation.2.3}{}}
+\newlabel{eq:flops-totali@cref}{{[equation][3][2]2.3}{[1][4][]4}{}{}{}}
+\newlabel{eq:gflops}{{2.4}{4}{Conteggio delle operazioni}{equation.2.4}{}}
+\newlabel{eq:gflops@cref}{{[equation][4][2]2.4}{[1][4][]4}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.2}Come vengono memorizzati i dati}{4}{section.2.2}\protected@file@percent }
+\newlabel{sec:layout}{{2.2}{4}{Come vengono memorizzati i dati}{section.2.2}{}}
+\newlabel{sec:layout@cref}{{[section][2][2]2.2}{[1][4][]4}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.3}Ordine dei cicli e riuso dei dati}{5}{section.2.3}\protected@file@percent }
+\newlabel{sec:schemi}{{2.3}{5}{Ordine dei cicli e riuso dei dati}{section.2.3}{}}
+\newlabel{sec:schemi@cref}{{[section][3][2]2.3}{[1][5][]5}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.1}I due schemi candidati}{6}{subsection.2.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.2}Intensità rispetto al traffico di $A$}{6}{subsection.2.3.2}\protected@file@percent }
+\newlabel{eq:intensita-a}{{2.5}{6}{Intensità rispetto al traffico di $A$}{equation.2.5}{}}
+\newlabel{eq:intensita-a@cref}{{[equation][5][2]2.5}{[1][6][]6}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.3}Il limite rispetto al traffico di $A$}{7}{subsection.2.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.4}Località degli accessi}{7}{subsection.2.3.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.4}Interfaccia comune dei backend locali}{7}{section.2.4}\protected@file@percent }
+\newlabel{sec:interfaccia-locale}{{2.4}{7}{Interfaccia comune dei backend locali}{section.2.4}{}}
+\newlabel{sec:interfaccia-locale@cref}{{[section][4][2]2.4}{[1][7][]7}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.1}Ciclo di vita del backend}{8}{subsection.2.4.1}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {2.1}{\ignorespaces Operazioni principali dell'interfaccia definita in \texttt  {src/kernel/kernel.h}.}}{8}{lstlisting.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.2}Contesto opaco del backend}{8}{subsection.2.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.3}Informazioni sperimentali}{9}{subsection.2.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.4}Selezione del backend}{9}{subsection.2.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {3}Parallelizzazione MPI}{10}{chapter.3}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{cap:mpi}{{3}{9}{Parallelizzazione MPI}{chapter.3}{}}
-\newlabel{cap:mpi@cref}{{[chapter][3][]3}{[1][9][]9}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {3.1}Che cosa significa parallelizzare in MPI}{9}{section.3.1}\protected@file@percent }
-\newlabel{sec:mpi-intro}{{3.1}{9}{Che cosa significa parallelizzare in MPI}{section.3.1}{}}
-\newlabel{sec:mpi-intro@cref}{{[section][1][3]3.1}{[1][9][]9}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {3.2}Perché si taglia $A$, e perché in due direzioni}{10}{section.3.2}\protected@file@percent }
-\newlabel{sec:perche-2d}{{3.2}{10}{Perché si taglia \texorpdfstring {$A$}{A}, e perché in due direzioni}{section.3.2}{}}
-\newlabel{sec:perche-2d@cref}{{[section][2][3]3.2}{[1][10][]10}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.1}Che cosa tagliare}{10}{subsection.3.2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.2}Come tagliare: due possibilità monodimensionali}{10}{subsection.3.2.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Taglio a bande di righe.}{10}{section*.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Taglio a bande di colonne.}{10}{section*.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.3}Il taglio bidimensionale}{10}{subsection.3.2.3}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {3.1}{\ignorespaces Decomposizione dei dati su una griglia $2 \times 3$. Ogni processo possiede un \emph  {rettangolo} di $A$, individuato dalle sue coordinate nella griglia. Il multivettore $X$ \`e tagliato per bande di righe, una per ciascuna banda di colonne di $A$; $Y$ per bande di righe, una per ciascuna banda di righe di $A$. Nessuna delle due \`e mai tagliata lungo $k$.}}{11}{figure.caption.8}\protected@file@percent }
+\newlabel{cap:mpi}{{3}{10}{Parallelizzazione MPI}{chapter.3}{}}
+\newlabel{cap:mpi@cref}{{[chapter][3][]3}{[1][10][]10}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.1}Che cosa significa parallelizzare in MPI}{10}{section.3.1}\protected@file@percent }
+\newlabel{sec:mpi-intro}{{3.1}{10}{Che cosa significa parallelizzare in MPI}{section.3.1}{}}
+\newlabel{sec:mpi-intro@cref}{{[section][1][3]3.1}{[1][10][]10}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.2}Perché si taglia $A$, e perché in due direzioni}{11}{section.3.2}\protected@file@percent }
+\newlabel{sec:perche-2d}{{3.2}{11}{Perché si taglia \texorpdfstring {$A$}{A}, e perché in due direzioni}{section.3.2}{}}
+\newlabel{sec:perche-2d@cref}{{[section][2][3]3.2}{[1][11][]11}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.1}Che cosa tagliare}{11}{subsection.3.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.2}Come tagliare: due possibilità monodimensionali}{11}{subsection.3.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Taglio a bande di righe.}{11}{section*.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Taglio a bande di colonne.}{11}{section*.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.3}Il taglio bidimensionale}{11}{subsection.3.2.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3.1}{\ignorespaces Decomposizione dei dati su una griglia $2 \times 3$. Ogni processo possiede un \emph  {rettangolo} di $A$, individuato dalle sue coordinate nella griglia. Il multivettore $X$ \`e tagliato per bande di righe, una per ciascuna banda di colonne di $A$; $Y$ per bande di righe, una per ciascuna banda di righe di $A$. Nessuna delle due \`e mai tagliata lungo $k$.}}{12}{figure.caption.4}\protected@file@percent }
 \providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
-\newlabel{fig:taglio-2d}{{3.1}{11}{Decomposizione dei dati su una griglia $2 \times 3$. Ogni processo possiede un \emph {rettangolo} di $A$, individuato dalle sue coordinate nella griglia. Il multivettore $X$ \`e tagliato per bande di righe, una per ciascuna banda di colonne di $A$; $Y$ per bande di righe, una per ciascuna banda di righe di $A$. Nessuna delle due \`e mai tagliata lungo $k$}{figure.caption.8}{}}
-\newlabel{fig:taglio-2d@cref}{{[figure][1][3]3.1}{[1][11][]11}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.4}Perché i processi vengono organizzati a griglia}{11}{subsection.3.2.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3.3}Decomposizione a griglia bidimensionale}{11}{section.3.3}\protected@file@percent }
-\newlabel{sec:griglia}{{3.3}{11}{Decomposizione a griglia bidimensionale}{section.3.3}{}}
-\newlabel{sec:griglia@cref}{{[section][3][3]3.3}{[1][11][]11}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.3.1}I due sotto-comunicatori}{12}{subsection.3.3.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.3.2}Chi fa da root, e perché la scelta è verificata}{12}{subsection.3.3.2}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {3.2}{\ignorespaces La stessa griglia, raggruppata nei due modi. Fissando la coordinata di riga si ottengono i comunicatori \texttt  {row\_comm}, fissando quella di colonna i comunicatori \texttt  {col\_comm}. Ogni processo appartiene a esattamente uno di ciascun tipo, e i due si intersecano soltanto in lui.}}{12}{figure.caption.9}\protected@file@percent }
-\newlabel{fig:sottocomunicatori}{{3.2}{12}{La stessa griglia, raggruppata nei due modi. Fissando la coordinata di riga si ottengono i comunicatori \code {row\_comm}, fissando quella di colonna i comunicatori \code {col\_comm}. Ogni processo appartiene a esattamente uno di ciascun tipo, e i due si intersecano soltanto in lui}{figure.caption.9}{}}
-\newlabel{fig:sottocomunicatori@cref}{{[figure][2][3]3.2}{[1][12][]12}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {3.4}Partizionamento degli indici}{13}{section.3.4}\protected@file@percent }
-\newlabel{sec:indici}{{3.4}{13}{Partizionamento degli indici}{section.3.4}{}}
-\newlabel{sec:indici@cref}{{[section][4][3]3.4}{[1][12][]13}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.4.1}Le funzioni}{13}{subsection.3.4.1}\protected@file@percent }
-\newlabel{eq:partizione}{{3.1}{13}{Le funzioni}{equation.3.1}{}}
-\newlabel{eq:partizione@cref}{{[equation][1][3]3.1}{[1][13][]13}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {3.5}Layout dei blocchi locali}{13}{section.3.5}\protected@file@percent }
-\newlabel{sec:layout}{{3.5}{13}{Layout dei blocchi locali}{section.3.5}{}}
-\newlabel{sec:layout@cref}{{[section][5][3]3.5}{[1][13][]13}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.5.1}Perché i conteggi delle collettive tornano}{13}{subsection.3.5.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.5.2}Chi contiene che cosa, e quando}{14}{subsection.3.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.5.3}Perché il multivettore non viene mai tagliato lungo $k$}{14}{subsection.3.5.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3.6}Distribuzione iniziale dei dati}{14}{section.3.6}\protected@file@percent }
-\newlabel{sec:distribuzione-a}{{3.6}{14}{Distribuzione iniziale dei dati}{section.3.6}{}}
-\newlabel{sec:distribuzione-a@cref}{{[section][6][3]3.6}{[1][14][]14}{}{}{}}
-\@writefile{toc}{\contentsline {paragraph}{\texttt  {--a-mode global}.}{14}{section*.10}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{\texttt  {--a-mode local}.}{14}{section*.11}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{\texttt  {--x-mode global}}{15}{section*.12}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{\texttt  {--x-mode local}}{15}{section*.13}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3.7}L'algoritmo distribuito}{15}{section.3.7}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {3.1}{\ignorespaces Il corpo di \texttt  {mpi\_matmul}, senza i cronometri.}}{15}{lstlisting.3.1}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {3.3}{\ignorespaces Le due collettive di una singola invocazione. Il broadcast fa scendere la fetta di $X$ dal processo di riga $0$ a tutti i processi della sua colonna, che ne hanno bisogno perché condividono le stesse colonne di $A$. Dopo il prodotto locale ogni processo possiede un contributo \emph  {parziale} a $Y$: la reduce somma i $\ensuremath  {P_c}$ parziali di una stessa banda di righe e deposita il risultato sul processo di colonna $0$, che ne è il proprietario designato.}}{15}{figure.caption.14}\protected@file@percent }
-\newlabel{fig:collettive}{{3.3}{15}{Le due collettive di una singola invocazione. Il broadcast fa scendere la fetta di $X$ dal processo di riga $0$ a tutti i processi della sua colonna, che ne hanno bisogno perché condividono le stesse colonne di $A$. Dopo il prodotto locale ogni processo possiede un contributo \emph {parziale} a $Y$: la reduce somma i $\Pcol $ parziali di una stessa banda di righe e deposita il risultato sul processo di colonna $0$, che ne è il proprietario designato}{figure.caption.14}{}}
-\newlabel{fig:collettive@cref}{{[figure][3][3]3.3}{[1][15][]15}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {3.8}Modello di costo della comunicazione}{16}{section.3.8}\protected@file@percent }
-\newlabel{sec:modello-comunicazione}{{3.8}{16}{Modello di costo della comunicazione}{section.3.8}{}}
-\newlabel{sec:modello-comunicazione@cref}{{[section][8][3]3.8}{[1][15][]16}{}{}{}}
-\newlabel{eq:costo-messaggio}{{3.3}{16}{Modello di costo della comunicazione}{equation.3.3}{}}
-\newlabel{eq:costo-messaggio@cref}{{[equation][3][3]3.3}{[1][15][]16}{}{}{}}
-\newlabel{eq:costo-comm}{{3.4}{16}{Modello di costo della comunicazione}{equation.3.4}{}}
-\newlabel{eq:costo-comm@cref}{{[equation][4][3]3.4}{[1][16][]16}{}{}{}}
-\newlabel{eq:volume}{{3.5}{16}{Modello di costo della comunicazione}{equation.3.5}{}}
-\newlabel{eq:volume@cref}{{[equation][5][3]3.5}{[1][16][]16}{}{}{}}
-\newlabel{eq:ottimo}{{3.6}{16}{Modello di costo della comunicazione}{equation.3.6}{}}
-\newlabel{eq:ottimo@cref}{{[equation][6][3]3.6}{[1][16][]16}{}{}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {4}Il nucleo di CPU}{18}{chapter.4}\protected@file@percent }
+\newlabel{fig:taglio-2d}{{3.1}{12}{Decomposizione dei dati su una griglia $2 \times 3$. Ogni processo possiede un \emph {rettangolo} di $A$, individuato dalle sue coordinate nella griglia. Il multivettore $X$ \`e tagliato per bande di righe, una per ciascuna banda di colonne di $A$; $Y$ per bande di righe, una per ciascuna banda di righe di $A$. Nessuna delle due \`e mai tagliata lungo $k$}{figure.caption.4}{}}
+\newlabel{fig:taglio-2d@cref}{{[figure][1][3]3.1}{[1][12][]12}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.4}Perché i processi vengono organizzati a griglia}{12}{subsection.3.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.3}Decomposizione a griglia bidimensionale}{12}{section.3.3}\protected@file@percent }
+\newlabel{sec:griglia}{{3.3}{12}{Decomposizione a griglia bidimensionale}{section.3.3}{}}
+\newlabel{sec:griglia@cref}{{[section][3][3]3.3}{[1][12][]12}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3.1}I due sotto-comunicatori}{13}{subsection.3.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3.2}Chi fa da root, e perché la scelta è verificata}{13}{subsection.3.3.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3.2}{\ignorespaces La stessa griglia, raggruppata nei due modi. Fissando la coordinata di riga si ottengono i comunicatori \texttt  {row\_comm}, fissando quella di colonna i comunicatori \texttt  {col\_comm}. Ogni processo appartiene a esattamente uno di ciascun tipo, e i due si intersecano soltanto in lui.}}{13}{figure.caption.5}\protected@file@percent }
+\newlabel{fig:sottocomunicatori}{{3.2}{13}{La stessa griglia, raggruppata nei due modi. Fissando la coordinata di riga si ottengono i comunicatori \code {row\_comm}, fissando quella di colonna i comunicatori \code {col\_comm}. Ogni processo appartiene a esattamente uno di ciascun tipo, e i due si intersecano soltanto in lui}{figure.caption.5}{}}
+\newlabel{fig:sottocomunicatori@cref}{{[figure][2][3]3.2}{[1][13][]13}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.4}Partizionamento degli indici}{14}{section.3.4}\protected@file@percent }
+\newlabel{sec:indici}{{3.4}{14}{Partizionamento degli indici}{section.3.4}{}}
+\newlabel{sec:indici@cref}{{[section][4][3]3.4}{[1][13][]14}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4.1}Le funzioni}{14}{subsection.3.4.1}\protected@file@percent }
+\newlabel{eq:partizione}{{3.1}{14}{Le funzioni}{equation.3.1}{}}
+\newlabel{eq:partizione@cref}{{[equation][1][3]3.1}{[1][14][]14}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.5}Layout dei blocchi locali}{14}{section.3.5}\protected@file@percent }
+\newlabel{sec:layout}{{3.5}{14}{Layout dei blocchi locali}{section.3.5}{}}
+\newlabel{sec:layout@cref}{{[section][5][3]3.5}{[1][14][]14}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5.1}Perché i conteggi delle collettive tornano}{14}{subsection.3.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5.2}Chi contiene che cosa, e quando}{15}{subsection.3.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5.3}Perché il multivettore non viene mai tagliato lungo $k$}{15}{subsection.3.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.6}Distribuzione iniziale dei dati}{15}{section.3.6}\protected@file@percent }
+\newlabel{sec:distribuzione-a}{{3.6}{15}{Distribuzione iniziale dei dati}{section.3.6}{}}
+\newlabel{sec:distribuzione-a@cref}{{[section][6][3]3.6}{[1][15][]15}{}{}{}}
+\@writefile{toc}{\contentsline {paragraph}{\texttt  {--a-mode global}.}{15}{section*.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\texttt  {--a-mode local}.}{15}{section*.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\texttt  {--x-mode global}}{16}{section*.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\texttt  {--x-mode local}}{16}{section*.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.7}L'algoritmo distribuito}{16}{section.3.7}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {3.1}{\ignorespaces Il corpo di \texttt  {mpi\_matmul}, senza i cronometri.}}{16}{lstlisting.3.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3.3}{\ignorespaces Le due collettive di una singola invocazione. Il broadcast fa scendere la fetta di $X$ dal processo di riga $0$ a tutti i processi della sua colonna, che ne hanno bisogno perché condividono le stesse colonne di $A$. Dopo il prodotto locale ogni processo possiede un contributo \emph  {parziale} a $Y$: la reduce somma i $\ensuremath  {P_c}$ parziali di una stessa banda di righe e deposita il risultato sul processo di colonna $0$, che ne è il proprietario designato.}}{16}{figure.caption.10}\protected@file@percent }
+\newlabel{fig:collettive}{{3.3}{16}{Le due collettive di una singola invocazione. Il broadcast fa scendere la fetta di $X$ dal processo di riga $0$ a tutti i processi della sua colonna, che ne hanno bisogno perché condividono le stesse colonne di $A$. Dopo il prodotto locale ogni processo possiede un contributo \emph {parziale} a $Y$: la reduce somma i $\Pcol $ parziali di una stessa banda di righe e deposita il risultato sul processo di colonna $0$, che ne è il proprietario designato}{figure.caption.10}{}}
+\newlabel{fig:collettive@cref}{{[figure][3][3]3.3}{[1][16][]16}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.8}Modello di costo della comunicazione}{17}{section.3.8}\protected@file@percent }
+\newlabel{sec:modello-comunicazione}{{3.8}{17}{Modello di costo della comunicazione}{section.3.8}{}}
+\newlabel{sec:modello-comunicazione@cref}{{[section][8][3]3.8}{[1][16][]17}{}{}{}}
+\newlabel{eq:costo-messaggio}{{3.3}{17}{Modello di costo della comunicazione}{equation.3.3}{}}
+\newlabel{eq:costo-messaggio@cref}{{[equation][3][3]3.3}{[1][16][]17}{}{}{}}
+\newlabel{eq:costo-comm}{{3.4}{17}{Modello di costo della comunicazione}{equation.3.4}{}}
+\newlabel{eq:costo-comm@cref}{{[equation][4][3]3.4}{[1][17][]17}{}{}{}}
+\newlabel{eq:volume}{{3.5}{17}{Modello di costo della comunicazione}{equation.3.5}{}}
+\newlabel{eq:volume@cref}{{[equation][5][3]3.5}{[1][17][]17}{}{}{}}
+\newlabel{eq:ottimo}{{3.6}{17}{Modello di costo della comunicazione}{equation.3.6}{}}
+\newlabel{eq:ottimo@cref}{{[equation][6][3]3.6}{[1][17][]17}{}{}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {4}Il nucleo di CPU}{19}{chapter.4}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{cap:kernel-cpu}{{4}{18}{Il nucleo di CPU}{chapter.4}{}}
-\newlabel{cap:kernel-cpu@cref}{{[chapter][4][]4}{[1][18][]18}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {4.1}Tre backend, una sola idea}{18}{section.4.1}\protected@file@percent }
-\newlabel{sec:tre-backend}{{4.1}{18}{Tre backend, una sola idea}{section.4.1}{}}
-\newlabel{sec:tre-backend@cref}{{[section][1][4]4.1}{[1][18][]18}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {4.2}Il backend di riferimento}{18}{section.4.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2.1}Perché specializzare $k$ a compile-time}{18}{subsection.4.2.1}\protected@file@percent }
-\newlabel{sec:specializzazione}{{4.2.1}{18}{Perché specializzare $k$ a compile-time}{subsection.4.2.1}{}}
-\newlabel{sec:specializzazione@cref}{{[subsection][1][4,2]4.2.1}{[1][18][]18}{}{}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {4.1}{\ignorespaces Generazione delle specializzazioni (estratto di \texttt  {src/kernel/scheme\_a.c}).}}{19}{lstlisting.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2.2}Il fallback generico, e perché la traccia lo richiede}{19}{subsection.4.2.2}\protected@file@percent }
-\newlabel{eq:passaggi}{{4.1}{19}{Il fallback generico, e perché la traccia lo richiede}{equation.4.1}{}}
-\newlabel{eq:passaggi@cref}{{[equation][1][4]4.1}{[1][19][]19}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {4.3}Perché $\texttt  {KB} = 32$}{20}{section.4.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4.4}Ciò che il compilatore vede}{20}{section.4.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4.5}Il primo limite: la rilettura di $X$}{20}{section.4.5}\protected@file@percent }
-\newlabel{sec:rilettura-x}{{4.5}{20}{Il primo limite: la rilettura di $X$}{section.4.5}{}}
-\newlabel{sec:rilettura-x@cref}{{[section][5][4]4.5}{[1][20][]20}{}{}{}}
-\newlabel{eq:traffico-x}{{4.2}{20}{Il primo limite: la rilettura di $X$}{equation.4.2}{}}
-\newlabel{eq:traffico-x@cref}{{[equation][2][4]4.2}{[1][20][]20}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {4.6}Secondo backend: $X$ mattonellata in cache}{21}{section.4.6}\protected@file@percent }
-\newlabel{sec:jblock}{{4.6}{21}{Secondo backend: $X$ mattonellata in cache}{section.4.6}{}}
-\newlabel{sec:jblock@cref}{{[section][6][4]4.6}{[1][21][]21}{}{}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {4.2}{\ignorespaces Struttura di \texttt  {src/kernel/scheme\_a\_jblock.c}.}}{21}{lstlisting.4.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Il prezzo.}{21}{section*.15}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Un principio già visto.}{21}{section*.16}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4.7}Terzo backend: register blocking sulle righe}{21}{section.4.7}\protected@file@percent }
-\newlabel{sec:jblock-rb}{{4.7}{21}{Terzo backend: register blocking sulle righe}{section.4.7}{}}
-\newlabel{sec:jblock-rb@cref}{{[section][7][4]4.7}{[1][21][]21}{}{}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {4.3}{\ignorespaces Struttura di \texttt  {src/kernel/scheme\_a\_jblock\_rb.c}.}}{22}{lstlisting.4.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Chi sceglie RB.}{22}{section*.17}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {5}I backend CUDA}{23}{chapter.5}\protected@file@percent }
+\newlabel{cap:kernel-cpu}{{4}{19}{Il nucleo di CPU}{chapter.4}{}}
+\newlabel{cap:kernel-cpu@cref}{{[chapter][4][]4}{[1][19][]19}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4.1}Tre backend, una sola idea}{19}{section.4.1}\protected@file@percent }
+\newlabel{sec:tre-backend}{{4.1}{19}{Tre backend, una sola idea}{section.4.1}{}}
+\newlabel{sec:tre-backend@cref}{{[section][1][4]4.1}{[1][19][]19}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4.2}Il backend di riferimento}{19}{section.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2.1}Perché specializzare $k$ a compile-time}{19}{subsection.4.2.1}\protected@file@percent }
+\newlabel{sec:specializzazione}{{4.2.1}{19}{Perché specializzare $k$ a compile-time}{subsection.4.2.1}{}}
+\newlabel{sec:specializzazione@cref}{{[subsection][1][4,2]4.2.1}{[1][19][]19}{}{}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {4.1}{\ignorespaces Generazione delle specializzazioni (estratto di \texttt  {src/kernel/scheme\_a.c}).}}{20}{lstlisting.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2.2}Il fallback generico, e perché la traccia lo richiede}{20}{subsection.4.2.2}\protected@file@percent }
+\newlabel{eq:passaggi}{{4.1}{20}{Il fallback generico, e perché la traccia lo richiede}{equation.4.1}{}}
+\newlabel{eq:passaggi@cref}{{[equation][1][4]4.1}{[1][20][]20}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4.3}Perché $\texttt  {KB} = 32$}{21}{section.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4.4}Ciò che il compilatore vede}{21}{section.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4.5}Il primo limite: la rilettura di $X$}{21}{section.4.5}\protected@file@percent }
+\newlabel{sec:rilettura-x}{{4.5}{21}{Il primo limite: la rilettura di $X$}{section.4.5}{}}
+\newlabel{sec:rilettura-x@cref}{{[section][5][4]4.5}{[1][21][]21}{}{}{}}
+\newlabel{eq:traffico-x}{{4.2}{21}{Il primo limite: la rilettura di $X$}{equation.4.2}{}}
+\newlabel{eq:traffico-x@cref}{{[equation][2][4]4.2}{[1][21][]21}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4.6}Secondo backend: $X$ mattonellata in cache}{22}{section.4.6}\protected@file@percent }
+\newlabel{sec:jblock}{{4.6}{22}{Secondo backend: $X$ mattonellata in cache}{section.4.6}{}}
+\newlabel{sec:jblock@cref}{{[section][6][4]4.6}{[1][22][]22}{}{}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {4.2}{\ignorespaces Struttura di \texttt  {src/kernel/scheme\_a\_jblock.c}.}}{22}{lstlisting.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Il prezzo.}{22}{section*.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Un principio già visto.}{22}{section*.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4.7}Terzo backend: register blocking sulle righe}{22}{section.4.7}\protected@file@percent }
+\newlabel{sec:jblock-rb}{{4.7}{22}{Terzo backend: register blocking sulle righe}{section.4.7}{}}
+\newlabel{sec:jblock-rb@cref}{{[section][7][4]4.7}{[1][22][]22}{}{}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {4.3}{\ignorespaces Struttura di \texttt  {src/kernel/scheme\_a\_jblock\_rb.c}.}}{23}{lstlisting.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Chi sceglie RB.}{23}{section*.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {5}I backend CUDA}{24}{chapter.5}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{cap:cuda}{{5}{23}{I backend CUDA}{chapter.5}{}}
-\newlabel{cap:cuda@cref}{{[chapter][5][]5}{[1][23][]23}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {5.1}Struttura comune}{24}{section.5.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5.2}Misurazione del backend CUDA}{25}{section.5.2}\protected@file@percent }
-\newlabel{sec:misurazione-cuda}{{5.2}{25}{Misurazione del backend CUDA}{section.5.2}{}}
-\newlabel{sec:misurazione-cuda@cref}{{[section][2][5]5.2}{[1][25][]25}{}{}{}}
-\newlabel{eq:scomposizione-locale}{{5.1}{25}{Misurazione del backend CUDA}{equation.5.1}{}}
-\newlabel{eq:scomposizione-locale@cref}{{[equation][1][5]5.1}{[1][25][]25}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {5.3}Preprocessing e occupazione della GPU}{26}{section.5.3}\protected@file@percent }
-\newlabel{sec:preprocessing-cuda}{{5.3}{26}{Preprocessing e occupazione della GPU}{section.5.3}{}}
-\newlabel{sec:preprocessing-cuda@cref}{{[section][3][5]5.3}{[1][25][]26}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3.1}Gestione della memoria disponibile}{26}{subsection.5.3.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5.4}\texttt  {cuda\_naive}}{26}{section.5.4}\protected@file@percent }
-\newlabel{sec:naive}{{5.4}{26}{\kernelname {cuda\_naive}}{section.5.4}{}}
-\newlabel{sec:naive@cref}{{[section][4][5]5.4}{[1][26][]26}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {5.5}\texttt  {cuda\_warp}: un warp per riga}{28}{section.5.5}\protected@file@percent }
-\newlabel{sec:warp}{{5.5}{28}{\kernelname {cuda\_warp}: un warp per riga}{section.5.5}{}}
-\newlabel{sec:warp@cref}{{[section][5][5]5.5}{[1][28][]28}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.5.1}Gestione di $k$}{29}{subsection.5.5.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.5.2}La maschera dello shuffle}{29}{subsection.5.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.5.3}Il problema residuo: gli accessi a $X$}{29}{subsection.5.5.3}\protected@file@percent }
-\newlabel{sec:difetto-x}{{5.5.3}{29}{Il problema residuo: gli accessi a $X$}{subsection.5.5.3}{}}
-\newlabel{sec:difetto-x@cref}{{[subsection][3][5,5]5.5.3}{[1][29][]29}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {5.6}Primo rimedio: cambio di layout di $X$}{30}{section.5.6}\protected@file@percent }
-\newlabel{sec:x-layout}{{5.6}{30}{Primo rimedio: cambio di layout di $X$}{section.5.6}{}}
-\newlabel{sec:x-layout@cref}{{[section][6][5]5.6}{[1][30][]30}{}{}{}}
-\newlabel{eq:xcol}{{5.7}{30}{Primo rimedio: cambio di layout di $X$}{equation.5.7}{}}
-\newlabel{eq:xcol@cref}{{[equation][7][5]5.7}{[1][30][]30}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {5.7}\texttt  {cuda\_warp\_smem}: staging di $X$ in shared memory}{30}{section.5.7}\protected@file@percent }
-\newlabel{sec:smem}{{5.7}{30}{\kernelname {cuda\_warp\_smem}: staging di $X$ in shared memory}{section.5.7}{}}
-\newlabel{sec:smem@cref}{{[section][7][5]5.7}{[1][30][]30}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.7.1}Caricamento cooperativo di $X$}{31}{subsection.5.7.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.7.2}Riuso del tile fra i warp del blocco}{31}{subsection.5.7.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.7.3}Bank conflict e padding della shared memory}{32}{subsection.5.7.3}\protected@file@percent }
-\newlabel{sec:bank-conflict}{{5.7.3}{32}{Bank conflict e padding della shared memory}{subsection.5.7.3}{}}
-\newlabel{sec:bank-conflict@cref}{{[subsection][3][5,7]5.7.3}{[1][32][]32}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.7.4}Scelta della dimensione del tile}{33}{subsection.5.7.4}\protected@file@percent }
-\newlabel{sec:piano-tile}{{5.7.4}{33}{Scelta della dimensione del tile}{subsection.5.7.4}{}}
-\newlabel{sec:piano-tile@cref}{{[subsection][4][5,7]5.7.4}{[1][33][]33}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.7.5}Sincronizzazione e warp inattivi}{34}{subsection.5.7.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5.8}Due rimedi allo stesso problema}{34}{section.5.8}\protected@file@percent }
-\newlabel{sec:due-rimedi}{{5.8}{34}{Due rimedi allo stesso problema}{section.5.8}{}}
-\newlabel{sec:due-rimedi@cref}{{[section][8][5]5.8}{[1][34][]34}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {5.9}\texttt  {cublas}: il riferimento esterno}{35}{section.5.9}\protected@file@percent }
-\newlabel{sec:cublas}{{5.9}{35}{\kernelname {cublas}: il riferimento esterno}{section.5.9}{}}
-\newlabel{sec:cublas@cref}{{[section][9][5]5.9}{[1][35][]35}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.9.1}Adattamento fra row-major e column-major}{35}{subsection.5.9.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.9.2}Significato del confronto}{36}{subsection.5.9.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5.10}Più rank MPI sulla stessa GPU}{36}{section.5.10}\protected@file@percent }
-\newlabel{sec:serializzazione}{{5.10}{36}{Più rank MPI sulla stessa GPU}{section.5.10}{}}
-\newlabel{sec:serializzazione@cref}{{[section][10][5]5.10}{[1][36][]36}{}{}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {6}Metodologia sperimentale}{38}{chapter.6}\protected@file@percent }
-\@writefile{lof}{\addvspace {10\p@ }}
-\@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{cap:metodologia}{{6}{38}{Metodologia sperimentale}{chapter.6}{}}
-\newlabel{cap:metodologia@cref}{{[chapter][6][]6}{[1][38][]38}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.1}Ambiente sperimentale}{38}{section.6.1}\protected@file@percent }
-\newlabel{sec:ambiente-sperimentale}{{6.1}{38}{Ambiente sperimentale}{section.6.1}{}}
-\newlabel{sec:ambiente-sperimentale@cref}{{[section][1][6]6.1}{[1][38][]38}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {6.1}{\ignorespaces Configurazione dell'ambiente sperimentale.}}{38}{table.caption.18}\protected@file@percent }
-\newlabel{tab:ambiente-sperimentale}{{6.1}{38}{Configurazione dell'ambiente sperimentale}{table.caption.18}{}}
-\newlabel{tab:ambiente-sperimentale@cref}{{[table][1][6]6.1}{[1][38][]38}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.2}Protocollo di misura}{39}{section.6.2}\protected@file@percent }
-\newlabel{sec:protocollo-misura}{{6.2}{39}{Protocollo di misura}{section.6.2}{}}
-\newlabel{sec:protocollo-misura@cref}{{[section][2][6]6.2}{[1][39][]39}{}{}{}}
-\@writefile{toc}{\contentsline {paragraph}{Misura della fase CUDA.}{40}{section*.19}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6.3}Definizione della metrica di prestazione}{40}{section.6.3}\protected@file@percent }
-\newlabel{sec:metrica-prestazione}{{6.3}{40}{Definizione della metrica di prestazione}{section.6.3}{}}
-\newlabel{sec:metrica-prestazione@cref}{{[section][3][6]6.3}{[1][40][]40}{}{}{}}
-\newlabel{sec:metriche}{{6.3}{40}{Definizione della metrica di prestazione}{section.6.3}{}}
-\newlabel{sec:metriche@cref}{{[section][3][6]6.3}{[1][40][]40}{}{}{}}
-\newlabel{eq:t-official-cpu-local}{{6.11}{40}{Definizione della metrica di prestazione}{equation.6.11}{}}
-\newlabel{eq:t-official-cpu-local@cref}{{[equation][11][6]6.11}{[1][40][]40}{}{}{}}
-\newlabel{eq:t-official-cuda-local}{{6.12}{40}{Definizione della metrica di prestazione}{equation.6.12}{}}
-\newlabel{eq:t-official-cuda-local@cref}{{[equation][12][6]6.12}{[1][40][]40}{}{}{}}
-\newlabel{eq:t-official-repetition}{{6.13}{40}{Definizione della metrica di prestazione}{equation.6.13}{}}
-\newlabel{eq:t-official-repetition@cref}{{[equation][13][6]6.13}{[1][40][]40}{}{}{}}
-\newlabel{eq:t-official-mean}{{6.16}{41}{Definizione della metrica di prestazione}{equation.6.16}{}}
-\newlabel{eq:t-official-mean@cref}{{[equation][16][6]6.16}{[1][41][]41}{}{}{}}
-\newlabel{eq:gflops}{{6.18}{41}{Definizione della metrica di prestazione}{equation.6.18}{}}
-\newlabel{eq:gflops@cref}{{[equation][18][6]6.18}{[1][41][]41}{}{}{}}
-\@writefile{toc}{\contentsline {paragraph}{Metriche ausiliarie.}{41}{section*.20}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6.4}Costi esclusi dalla metrica ufficiale}{42}{section.6.4}\protected@file@percent }
-\newlabel{sec:costi-esclusi}{{6.4}{42}{Costi esclusi dalla metrica ufficiale}{section.6.4}{}}
-\newlabel{sec:costi-esclusi@cref}{{[section][4][6]6.4}{[1][41][]42}{}{}{}}
-\newlabel{sec:tempi-esclusi}{{6.4}{42}{Costi esclusi dalla metrica ufficiale}{section.6.4}{}}
-\newlabel{sec:tempi-esclusi@cref}{{[section][4][6]6.4}{[1][41][]42}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.5}Ripetizioni e stabilità statistica}{42}{section.6.5}\protected@file@percent }
-\newlabel{sec:stabilita-misure}{{6.5}{42}{Ripetizioni e stabilità statistica}{section.6.5}{}}
-\newlabel{sec:stabilita-misure@cref}{{[section][5][6]6.5}{[1][42][]42}{}{}{}}
-\newlabel{eq:cv}{{6.24}{43}{Ripetizioni e stabilità statistica}{equation.6.24}{}}
-\newlabel{eq:cv@cref}{{[equation][24][6]6.24}{[1][43][]43}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.6}Disegno sperimentale: le fasi}{43}{section.6.6}\protected@file@percent }
-\newlabel{sec:disegno-fasi}{{6.6}{43}{Disegno sperimentale: le fasi}{section.6.6}{}}
-\newlabel{sec:disegno-fasi@cref}{{[section][6][6]6.6}{[1][43][]43}{}{}{}}
-\newlabel{sec:campagne-sperimentali}{{6.6}{43}{Disegno sperimentale: le fasi}{section.6.6}{}}
-\newlabel{sec:campagne-sperimentali@cref}{{[section][6][6]6.6}{[1][43][]43}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {6.2}{\ignorespaces Le fasi dell'impianto sperimentale, nell'ordine in cui sono state eseguite e in cui sono discusse.}}{44}{table.caption.21}\protected@file@percent }
-\newlabel{tab:fasi-sperimentali}{{6.2}{44}{Le fasi dell'impianto sperimentale, nell'ordine in cui sono state eseguite e in cui sono discusse}{table.caption.21}{}}
-\newlabel{tab:fasi-sperimentali@cref}{{[table][2][6]6.2}{[1][44][]44}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.6.1}Criterio di selezione dei parametri}{44}{subsection.6.6.1}\protected@file@percent }
-\newlabel{sec:criterio-robustezza}{{6.6.1}{44}{Criterio di selezione dei parametri}{subsection.6.6.1}{}}
-\newlabel{sec:criterio-robustezza@cref}{{[subsection][1][6,6]6.6.1}{[1][44][]44}{}{}{}}
-\newlabel{eq:prestazione-normalizzata}{{6.25}{44}{Criterio di selezione dei parametri}{equation.6.25}{}}
-\newlabel{eq:prestazione-normalizzata@cref}{{[equation][25][6]6.25}{[1][44][]44}{}{}{}}
-\newlabel{eq:perdita-max}{{6.28}{45}{Criterio di selezione dei parametri}{equation.6.28}{}}
-\newlabel{eq:perdita-max@cref}{{[equation][28][6]6.28}{[1][44][]45}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.7}Fase 1 --- Tuning dei backend CUDA}{45}{section.6.7}\protected@file@percent }
-\newlabel{sec:fase1-tuning}{{6.7}{45}{Fase 1 --- Tuning dei backend CUDA}{section.6.7}{}}
-\newlabel{sec:fase1-tuning@cref}{{[section][7][6]6.7}{[1][45][]45}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.7.1}Campagna 1.1 --- Dimensione del blocco}{45}{subsection.6.7.1}\protected@file@percent }
-\newlabel{sec:camp-block}{{6.7.1}{45}{Campagna 1.1 --- Dimensione del blocco}{subsection.6.7.1}{}}
-\newlabel{sec:camp-block@cref}{{[subsection][1][6,7]6.7.1}{[1][45][]45}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.7.2}Campagna 1.2 --- Layout in memoria di $X$}{45}{subsection.6.7.2}\protected@file@percent }
-\newlabel{sec:camp-layout}{{6.7.2}{45}{Campagna 1.2 --- Layout in memoria di $X$}{subsection.6.7.2}{}}
-\newlabel{sec:camp-layout@cref}{{[subsection][2][6,7]6.7.2}{[1][45][]45}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.7.3}Campagna 1.3 --- Padding del tile in shared memory}{46}{subsection.6.7.3}\protected@file@percent }
-\newlabel{sec:camp-pad}{{6.7.3}{46}{Campagna 1.3 --- Padding del tile in shared memory}{subsection.6.7.3}{}}
-\newlabel{sec:camp-pad@cref}{{[subsection][3][6,7]6.7.3}{[1][46][]46}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.7.4}Campagna 1.4 --- Granularità del tile}{46}{subsection.6.7.4}\protected@file@percent }
-\newlabel{sec:camp-granularita}{{6.7.4}{46}{Campagna 1.4 --- Granularità del tile}{subsection.6.7.4}{}}
-\newlabel{sec:camp-granularita@cref}{{[subsection][4][6,7]6.7.4}{[1][46][]46}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.7.5}Campagna 1.5 --- Confronto fra i kernel a configurazione fissata}{46}{subsection.6.7.5}\protected@file@percent }
-\newlabel{sec:camp-confronto-kernel}{{6.7.5}{46}{Campagna 1.5 --- Confronto fra i kernel a configurazione fissata}{subsection.6.7.5}{}}
-\newlabel{sec:camp-confronto-kernel@cref}{{[subsection][5][6,7]6.7.5}{[1][46][]46}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.8}Fase 2 --- Caratterizzazione dimensionale}{47}{section.6.8}\protected@file@percent }
-\newlabel{sec:fase2-dimensione}{{6.8}{47}{Fase 2 --- Caratterizzazione dimensionale}{section.6.8}{}}
-\newlabel{sec:fase2-dimensione@cref}{{[section][8][6]6.8}{[1][47][]47}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {6.3}{\ignorespaces I nove punti del disegno fattoriale della Fase 2. A parità di scala il prodotto $MN$ è costante entro l'$1{,}2\%$.}}{47}{table.caption.22}\protected@file@percent }
-\newlabel{tab:fase2-punti}{{6.3}{47}{I nove punti del disegno fattoriale della Fase 2. A parità di scala il prodotto $MN$ è costante entro l'$1{,}2\%$}{table.caption.22}{}}
-\newlabel{tab:fase2-punti@cref}{{[table][3][6]6.3}{[1][47][]47}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.9}Fase 3 --- Precisione numerica}{47}{section.6.9}\protected@file@percent }
-\newlabel{sec:fase3-precisione}{{6.9}{47}{Fase 3 --- Precisione numerica}{section.6.9}{}}
-\newlabel{sec:fase3-precisione@cref}{{[section][9][6]6.9}{[1][47][]47}{}{}{}}
-\newlabel{eq:speedup-precisione}{{6.34}{48}{Fase 3 --- Precisione numerica}{equation.6.34}{}}
-\newlabel{eq:speedup-precisione@cref}{{[equation][34][6]6.34}{[1][48][]48}{}{}{}}
-\@writefile{toc}{\contentsline {paragraph}{Caratterizzazione delle risorse.}{48}{section*.23}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6.10}Fase 4 --- Decomposizione MPI sui backend di CPU}{48}{section.6.10}\protected@file@percent }
-\newlabel{sec:fase4-mpi-cpu}{{6.10}{48}{Fase 4 --- Decomposizione MPI sui backend di CPU}{section.6.10}{}}
-\newlabel{sec:fase4-mpi-cpu@cref}{{[section][10][6]6.10}{[1][48][]48}{}{}{}}
-\newlabel{eq:speedup-efficienza}{{6.36}{49}{Fase 4 --- Decomposizione MPI sui backend di CPU}{equation.6.36}{}}
-\newlabel{eq:speedup-efficienza@cref}{{[equation][36][6]6.36}{[1][49][]49}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.11}Fase 5 --- MPI + CUDA}{49}{section.6.11}\protected@file@percent }
-\newlabel{sec:fase5-mpi-cuda}{{6.11}{49}{Fase 5 --- MPI + CUDA}{section.6.11}{}}
-\newlabel{sec:fase5-mpi-cuda@cref}{{[section][11][6]6.11}{[1][49][]49}{}{}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {7}Risultati}{50}{chapter.7}\protected@file@percent }
-\@writefile{lof}{\addvspace {10\p@ }}
-\@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{cap:risultati}{{7}{50}{Risultati}{chapter.7}{}}
-\newlabel{cap:risultati@cref}{{[chapter][7][]7}{[1][50][]50}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.1}Stato della raccolta dati}{50}{section.7.1}\protected@file@percent }
-\newlabel{sec:stato-dati}{{7.1}{50}{Stato della raccolta dati}{section.7.1}{}}
-\newlabel{sec:stato-dati@cref}{{[section][1][7]7.1}{[1][50][]50}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.1}{\ignorespaces Stato delle campagne al momento di questa versione della relazione.}}{50}{table.caption.24}\protected@file@percent }
-\newlabel{tab:stato-campagne}{{7.1}{50}{Stato delle campagne al momento di questa versione della relazione}{table.caption.24}{}}
-\newlabel{tab:stato-campagne@cref}{{[table][1][7]7.1}{[1][50][]50}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.2}Fase 1 --- Tuning dei backend CUDA}{50}{section.7.2}\protected@file@percent }
-\newlabel{sec:ris-fase1}{{7.2}{50}{Fase 1 --- Tuning dei backend CUDA}{section.7.2}{}}
-\newlabel{sec:ris-fase1@cref}{{[section][2][7]7.2}{[1][50][]50}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.2.1}Campagna 1.1 --- Dimensione del blocco}{51}{subsection.7.2.1}\protected@file@percent }
-\newlabel{sec:ris-block}{{7.2.1}{51}{Campagna 1.1 --- Dimensione del blocco}{subsection.7.2.1}{}}
-\newlabel{sec:ris-block@cref}{{[subsection][1][7,2]7.2.1}{[1][50][]51}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.2}{\ignorespaces Campagna 1.1: perdita rispetto al miglior \texttt  {BLOCK} per lo stesso $k$, in percentuale. In grassetto il valore selezionato per ciascun kernel.}}{51}{table.caption.25}\protected@file@percent }
-\newlabel{tab:ris-block-perdite}{{7.2}{51}{Campagna 1.1: perdita rispetto al miglior \code {BLOCK} per lo stesso $k$, in percentuale. In grassetto il valore selezionato per ciascun kernel}{table.caption.25}{}}
-\newlabel{tab:ris-block-perdite@cref}{{[table][2][7]7.2}{[1][50][]51}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.3}{\ignorespaces Campagna 1.1: \texttt  {gflops\_kernel} al \texttt  {BLOCK} selezionato.}}{51}{table.caption.26}\protected@file@percent }
-\newlabel{tab:ris-block-assolute}{{7.3}{51}{Campagna 1.1: \code {gflops\_kernel} al \code {BLOCK} selezionato}{table.caption.26}{}}
-\newlabel{tab:ris-block-assolute@cref}{{[table][3][7]7.3}{[1][51][]51}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.1}{\ignorespaces Campagna 1.1: prestazione normalizzata per $(\texttt  {BLOCK}, k)$ a sinistra, perdita media e massima sui cinque $k$ a destra. Le celle \texttt  {FAIL} sono i lanci non riusciti a \texttt  {BLOCK}$=1024$.}}{52}{figure.caption.27}\protected@file@percent }
-\newlabel{fig:ris-block}{{7.1}{52}{Campagna 1.1: prestazione normalizzata per $(\code {BLOCK}, k)$ a sinistra, perdita media e massima sui cinque $k$ a destra. Le celle \code {FAIL} sono i lanci non riusciti a \code {BLOCK}$=1024$}{figure.caption.27}{}}
-\newlabel{fig:ris-block@cref}{{[figure][1][7]7.1}{[1][51][]52}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.2}{\ignorespaces Campagna 1.1: stessa lettura per \texttt  {cuda\_naive}, l'unico kernel che completa anche a \texttt  {BLOCK}$=1024$.}}{53}{figure.caption.28}\protected@file@percent }
-\newlabel{fig:ris-block-naive}{{7.2}{53}{Campagna 1.1: stessa lettura per \kernelname {cuda\_naive}, l'unico kernel che completa anche a \code {BLOCK}$=1024$}{figure.caption.28}{}}
-\newlabel{fig:ris-block-naive@cref}{{[figure][2][7]7.2}{[1][52][]53}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.2.2}Campagna 1.2 --- Layout in memoria di $X$}{54}{subsection.7.2.2}\protected@file@percent }
-\newlabel{sec:ris-layout}{{7.2.2}{54}{Campagna 1.2 --- Layout in memoria di $X$}{subsection.7.2.2}{}}
-\newlabel{sec:ris-layout@cref}{{[subsection][2][7,2]7.2.2}{[1][54][]54}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.4}{\ignorespaces Campagna 1.2: \texttt  {cuda\_warp} con $X$ row-major e column-major, \texttt  {BLOCK}$=128$. L'ultima colonna è il costo della conversione di $X$, che è preprocessing e non entra in $T$.}}{54}{table.caption.30}\protected@file@percent }
-\newlabel{tab:ris-layout}{{7.4}{54}{Campagna 1.2: \kernelname {cuda\_warp} con $X$ row-major e column-major, \code {BLOCK}$=128$. L'ultima colonna è il costo della conversione di $X$, che è preprocessing e non entra in $T$}{table.caption.30}{}}
-\newlabel{tab:ris-layout@cref}{{[table][4][7]7.4}{[1][54][]54}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.3}{\ignorespaces Campagna 1.2: prestazioni assolute (sinistra) e vantaggio del layout column-major (destra). CV massimo: $0{,}63\%$ row-major, $0{,}67\%$ column-major.}}{54}{figure.caption.31}\protected@file@percent }
-\newlabel{fig:ris-layout}{{7.3}{54}{Campagna 1.2: prestazioni assolute (sinistra) e vantaggio del layout column-major (destra). CV massimo: $0{,}63\%$ row-major, $0{,}67\%$ column-major}{figure.caption.31}{}}
-\newlabel{fig:ris-layout@cref}{{[figure][3][7]7.3}{[1][54][]54}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.2.3}Campagna 1.3 --- Padding del tile in shared memory}{55}{subsection.7.2.3}\protected@file@percent }
-\newlabel{sec:ris-pad}{{7.2.3}{55}{Campagna 1.3 --- Padding del tile in shared memory}{subsection.7.2.3}{}}
-\newlabel{sec:ris-pad@cref}{{[subsection][3][7,2]7.2.3}{[1][55][]55}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.5}{\ignorespaces Campagna 1.3: effetto di \texttt  {SMEM\_PAD} su \texttt  {cuda\_warp\_smem}, \texttt  {BLOCK}$=256$. \texttt  {x\_rows\_per\_tile} è il numero di righe di $X$ che il pianificatore fa entrare nel tile.}}{55}{table.caption.33}\protected@file@percent }
-\newlabel{tab:ris-pad}{{7.5}{55}{Campagna 1.3: effetto di \code {SMEM\_PAD} su \kernelname {cuda\_warp\_smem}, \code {BLOCK}$=256$. \code {x\_rows\_per\_tile} è il numero di righe di $X$ che il pianificatore fa entrare nel tile}{table.caption.33}{}}
-\newlabel{tab:ris-pad@cref}{{[table][5][7]7.5}{[1][55][]55}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.2.4}Campagna 1.4 --- Granularità del tile}{56}{subsection.7.2.4}\protected@file@percent }
-\newlabel{sec:ris-granularita}{{7.2.4}{56}{Campagna 1.4 --- Granularità del tile}{subsection.7.2.4}{}}
-\newlabel{sec:ris-granularita@cref}{{[subsection][4][7,2]7.2.4}{[1][56][]56}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.6}{\ignorespaces Campagna 1.4: prestazione normalizzata di \texttt  {cuda\_warp\_smem} per ogni coppia $(\texttt  {BLOCK}, g)$, in percentuale dell'ottimo per lo stesso $k$. Media sui cinque $k$ e caso peggiore. In grassetto la coppia selezionata.}}{56}{table.caption.35}\protected@file@percent }
-\newlabel{tab:ris-granularita}{{7.6}{56}{Campagna 1.4: prestazione normalizzata di \kernelname {cuda\_warp\_smem} per ogni coppia $(\code {BLOCK}, g)$, in percentuale dell'ottimo per lo stesso $k$. Media sui cinque $k$ e caso peggiore. In grassetto la coppia selezionata}{table.caption.35}{}}
-\newlabel{tab:ris-granularita@cref}{{[table][6][7]7.6}{[1][56][]56}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.4}{\ignorespaces Campagna 1.4: tuning congiunto di \texttt  {BLOCK} e granularità. A sinistra la prestazione normalizzata media sui cinque $k$, a destra il caso peggiore.}}{56}{figure.caption.36}\protected@file@percent }
-\newlabel{fig:ris-granularita}{{7.4}{56}{Campagna 1.4: tuning congiunto di \code {BLOCK} e granularità. A sinistra la prestazione normalizzata media sui cinque $k$, a destra il caso peggiore}{figure.caption.36}{}}
-\newlabel{fig:ris-granularita@cref}{{[figure][4][7]7.4}{[1][56][]56}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.5}{\ignorespaces Campagna 1.4: dettaglio a \texttt  {BLOCK}$=256$. A destra il piano di tiling effettivamente scelto a runtime, che dipende da $k$ e non da $g$ se non attraverso l'arrotondamento.}}{57}{figure.caption.37}\protected@file@percent }
-\newlabel{fig:ris-granularita-dettaglio}{{7.5}{57}{Campagna 1.4: dettaglio a \code {BLOCK}$=256$. A destra il piano di tiling effettivamente scelto a runtime, che dipende da $k$ e non da $g$ se non attraverso l'arrotondamento}{figure.caption.37}{}}
-\newlabel{fig:ris-granularita-dettaglio@cref}{{[figure][5][7]7.5}{[1][56][]57}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.2.5}Campagna 1.5 --- Confronto fra i kernel}{57}{subsection.7.2.5}\protected@file@percent }
-\newlabel{sec:ris-confronto-kernel}{{7.2.5}{57}{Campagna 1.5 --- Confronto fra i kernel}{subsection.7.2.5}{}}
-\newlabel{sec:ris-confronto-kernel@cref}{{[subsection][5][7,2]7.2.5}{[1][57][]57}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.7}{\ignorespaces Campagna 1.5: \texttt  {gflops\_kernel} e tempo di kernel, $M = N = \num {16384}$, FP64, $P = 1$. L'ultima riga è la percentuale del tetto FP64 nominale di \cref  {tab:picchi-gpu} raggiunta dal miglior kernel.}}{58}{table.caption.39}\protected@file@percent }
-\newlabel{tab:ris-confronto-kernel}{{7.7}{58}{Campagna 1.5: \code {gflops\_kernel} e tempo di kernel, $M = N = \num {16384}$, FP64, $P = 1$. L'ultima riga è la percentuale del tetto FP64 nominale di \cref {tab:picchi-gpu} raggiunta dal miglior kernel}{table.caption.39}{}}
-\newlabel{tab:ris-confronto-kernel@cref}{{[table][7][7]7.7}{[1][57][]58}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.6}{\ignorespaces Campagna 1.5: confronto fra backend in doppia precisione. La distanza dal tetto, non il valore assoluto, è il risultato.}}{58}{figure.caption.40}\protected@file@percent }
-\newlabel{fig:ris-confronto-kernel}{{7.6}{58}{Campagna 1.5: confronto fra backend in doppia precisione. La distanza dal tetto, non il valore assoluto, è il risultato}{figure.caption.40}{}}
-\newlabel{fig:ris-confronto-kernel@cref}{{[figure][6][7]7.6}{[1][58][]58}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.8}{\ignorespaces Configurazione selezionata per ciascun backend CUDA, usata invariata nelle fasi 2 e 3.}}{59}{table.caption.42}\protected@file@percent }
-\newlabel{tab:ris-fase1-sintesi}{{7.8}{59}{Configurazione selezionata per ciascun backend CUDA, usata invariata nelle fasi 2 e 3}{table.caption.42}{}}
-\newlabel{tab:ris-fase1-sintesi@cref}{{[table][8][7]7.8}{[1][59][]59}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.3}Fase 2 --- Scala del problema e forma di $A$}{59}{section.7.3}\protected@file@percent }
-\newlabel{sec:ris-fase2}{{7.3}{59}{Fase 2 --- Scala del problema e forma di $A$}{section.7.3}{}}
-\newlabel{sec:ris-fase2@cref}{{[section][3][7]7.3}{[1][59][]59}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.9}{\ignorespaces Fase 2: \texttt  {gflops\_kernel} di \texttt  {cuda\_warp} su tutti i nove punti.}}{59}{table.caption.43}\protected@file@percent }
-\newlabel{tab:ris-fase2-warp}{{7.9}{59}{Fase 2: \code {gflops\_kernel} di \kernelname {cuda\_warp} su tutti i nove punti}{table.caption.43}{}}
-\newlabel{tab:ris-fase2-warp@cref}{{[table][9][7]7.9}{[1][59][]59}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.10}{\ignorespaces Fase 2: effetto della sola scala, caso quadrato, tutti i backend.}}{60}{table.caption.44}\protected@file@percent }
-\newlabel{tab:ris-fase2-scala}{{7.10}{60}{Fase 2: effetto della sola scala, caso quadrato, tutti i backend}{table.caption.44}{}}
-\newlabel{tab:ris-fase2-scala@cref}{{[table][10][7]7.10}{[1][59][]60}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.11}{\ignorespaces Fase 2: effetto della sola forma a $k = 32$, a lavoro costante entro l'$1{,}2\%$.}}{60}{table.caption.45}\protected@file@percent }
-\newlabel{tab:ris-fase2-forma}{{7.11}{60}{Fase 2: effetto della sola forma a $k = 32$, a lavoro costante entro l'$1{,}2\%$}{table.caption.45}{}}
-\newlabel{tab:ris-fase2-forma@cref}{{[table][11][7]7.11}{[1][60][]60}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.7}{\ignorespaces Fase 2: \texttt  {cuda\_warp} sul caso quadrato alle tre scale. La linea tratteggiata è il tetto FP64 nominale. A $S = 4096$ la curva non arriva al tetto per nessun $k$.}}{60}{figure.caption.46}\protected@file@percent }
-\newlabel{fig:ris-fase2-scala}{{7.7}{60}{Fase 2: \kernelname {cuda\_warp} sul caso quadrato alle tre scale. La linea tratteggiata è il tetto FP64 nominale. A $S = 4096$ la curva non arriva al tetto per nessun $k$}{figure.caption.46}{}}
-\newlabel{fig:ris-fase2-scala@cref}{{[figure][7][7]7.7}{[1][60][]60}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.4}Fase 3 --- FP32 contro FP64}{61}{section.7.4}\protected@file@percent }
-\newlabel{sec:ris-fase3}{{7.4}{61}{Fase 3 --- FP32 contro FP64}{section.7.4}{}}
-\newlabel{sec:ris-fase3@cref}{{[section][4][7]7.4}{[1][61][]61}{}{}{}}
-\newlabel{sec:c7}{{7.4}{61}{Fase 3 --- FP32 contro FP64}{section.7.4}{}}
-\newlabel{sec:c7@cref}{{[section][4][7]7.4}{[1][61][]61}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.12}{\ignorespaces Fase 3: \texttt  {gflops\_kernel} nelle due precisioni e speedup $S_{32/64}$ della \cref  {eq:speedup-precisione}, $M = N = \num {16384}$, $P = 1$.}}{61}{table.caption.48}\protected@file@percent }
-\newlabel{tab:ris-fase3}{{7.12}{61}{Fase 3: \code {gflops\_kernel} nelle due precisioni e speedup $S_{32/64}$ della \cref {eq:speedup-precisione}, $M = N = \num {16384}$, $P = 1$}{table.caption.48}{}}
-\newlabel{tab:ris-fase3@cref}{{[table][12][7]7.12}{[1][61][]61}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.13}{\ignorespaces Fase 3: percentuale del tetto pertinente. In FP64 il tetto è \SI {350}{\giga \flop \per \second } e non dipende da $k$; in FP32 è $B \cdot k/2 = 224k$ \si {\giga \flop \per \second } e cresce con $k$ (\cref  {tab:picchi-gpu}).}}{62}{table.caption.49}\protected@file@percent }
-\newlabel{tab:ris-fase3-tetto}{{7.13}{62}{Fase 3: percentuale del tetto pertinente. In FP64 il tetto è \SI {350}{\giga \flop \per \second } e non dipende da $k$; in FP32 è $B \cdot k/2 = 224k$ \si {\giga \flop \per \second } e cresce con $k$ (\cref {tab:picchi-gpu})}{table.caption.49}{}}
-\newlabel{tab:ris-fase3-tetto@cref}{{[table][13][7]7.13}{[1][61][]62}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.8}{\ignorespaces Fase 3: guadagno della singola precisione al variare di $k$. La crescita con $k$ dei kernel custom è la previsione del roofline; la piattezza di \texttt  {cublas} intorno a 28 misura invece la lentezza del suo percorso FP64.}}{62}{figure.caption.50}\protected@file@percent }
-\newlabel{fig:ris-fase3}{{7.8}{62}{Fase 3: guadagno della singola precisione al variare di $k$. La crescita con $k$ dei kernel custom è la previsione del roofline; la piattezza di \kernelname {cublas} intorno a 28 misura invece la lentezza del suo percorso FP64}{figure.caption.50}{}}
-\newlabel{fig:ris-fase3@cref}{{[figure][8][7]7.8}{[1][62][]62}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.14}{\ignorespaces Fase 3: piano di tiling scelto a runtime da \texttt  {cuda\_warp\_smem} nelle due precisioni.}}{62}{table.caption.51}\protected@file@percent }
-\newlabel{tab:ris-fase3-piano}{{7.14}{62}{Fase 3: piano di tiling scelto a runtime da \kernelname {cuda\_warp\_smem} nelle due precisioni}{table.caption.51}{}}
-\newlabel{tab:ris-fase3-piano@cref}{{[table][14][7]7.14}{[1][62][]62}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.5}Fase 4 --- Strong scaling MPI sui backend di CPU}{63}{section.7.5}\protected@file@percent }
-\newlabel{sec:ris-fase4}{{7.5}{63}{Fase 4 --- Strong scaling MPI sui backend di CPU}{section.7.5}{}}
-\newlabel{sec:ris-fase4@cref}{{[section][5][7]7.5}{[1][63][]63}{}{}{}}
-\newlabel{sec:c3}{{7.5}{63}{Fase 4 --- Strong scaling MPI sui backend di CPU}{section.7.5}{}}
-\newlabel{sec:c3@cref}{{[section][5][7]7.5}{[1][63][]63}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.5.1}Il nucleo di CPU a rank singolo}{64}{subsection.7.5.1}\protected@file@percent }
-\newlabel{sec:ris-cpu-baseline}{{7.5.1}{64}{Il nucleo di CPU a rank singolo}{subsection.7.5.1}{}}
-\newlabel{sec:ris-cpu-baseline@cref}{{[subsection][1][7,5]7.5.1}{[1][63][]64}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.15}{\ignorespaces Fase 4, $P = 1$: tempo ufficiale, throughput e le due bande effettive derivate. $\tau = T/(MN)$ è il costo per elemento di $A$; $B_A = MNs/T$ e $B_X = MNks/T$ sono grandezze \emph  {derivate}, non misurate, definite come in \cref  {sec:rilettura-x}.}}{64}{table.caption.53}\protected@file@percent }
-\newlabel{tab:ris-cpu-baseline}{{7.15}{64}{Fase 4, $P = 1$: tempo ufficiale, throughput e le due bande effettive derivate. $\tau = T/(MN)$ è il costo per elemento di $A$; $B_A = MNs/T$ e $B_X = MNks/T$ sono grandezze \emph {derivate}, non misurate, definite come in \cref {sec:rilettura-x}}{table.caption.53}{}}
-\newlabel{tab:ris-cpu-baseline@cref}{{[table][15][7]7.15}{[1][63][]64}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.5.2}Scaling a problema fisso}{65}{subsection.7.5.2}\protected@file@percent }
-\newlabel{sec:ris-scaling}{{7.5.2}{65}{Scaling a problema fisso}{subsection.7.5.2}{}}
-\newlabel{sec:ris-scaling@cref}{{[subsection][2][7,5]7.5.2}{[1][65][]65}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.16}{\ignorespaces Fase 4: throughput ufficiale (\texttt  {gflops}) al variare di $P$.}}{65}{table.caption.55}\protected@file@percent }
-\newlabel{tab:ris-fase4-gflops}{{7.16}{65}{Fase 4: throughput ufficiale (\code {gflops}) al variare di $P$}{table.caption.55}{}}
-\newlabel{tab:ris-fase4-gflops@cref}{{[table][16][7]7.16}{[1][65][]65}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.17}{\ignorespaces Fase 4: efficienza parallela $E(P) = S(P)/P$ della \cref  {eq:speedup-efficienza}, rispetto alla baseline $P = 1$ dello stesso backend.}}{65}{table.caption.56}\protected@file@percent }
-\newlabel{tab:ris-fase4-efficienza}{{7.17}{65}{Fase 4: efficienza parallela $E(P) = S(P)/P$ della \cref {eq:speedup-efficienza}, rispetto alla baseline $P = 1$ dello stesso backend}{table.caption.56}{}}
-\newlabel{tab:ris-fase4-efficienza@cref}{{[table][17][7]7.17}{[1][65][]65}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.18}{\ignorespaces Fase 4: scomposizione del tempo a $k = 32$, in \si {\milli \second }. La reduce è degenere perché la griglia è $P \times 1$.}}{65}{table.caption.57}\protected@file@percent }
-\newlabel{tab:ris-fase4-composizione}{{7.18}{65}{Fase 4: scomposizione del tempo a $k = 32$, in \si {\milli \second }. La reduce è degenere perché la griglia è $P \times 1$}{table.caption.57}{}}
-\newlabel{tab:ris-fase4-composizione@cref}{{[table][18][7]7.18}{[1][65][]65}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.9}{\ignorespaces Fase 4: strong scaling a $k = 32$. Lo speedup è calcolato sulla baseline $P = 1$ dello stesso backend, quindi le tre curve non sono confrontabili in valore assoluto: \texttt  {scheme\_a\_jblock\_rb} scala bene perché parte da un tempo tre volte più alto.}}{66}{figure.caption.58}\protected@file@percent }
-\newlabel{fig:ris-fase4-speedup}{{7.9}{66}{Fase 4: strong scaling a $k = 32$. Lo speedup è calcolato sulla baseline $P = 1$ dello stesso backend, quindi le tre curve non sono confrontabili in valore assoluto: \kernelname {scheme\_a\_jblock\_rb} scala bene perché parte da un tempo tre volte più alto}{figure.caption.58}{}}
-\newlabel{fig:ris-fase4-speedup@cref}{{[figure][9][7]7.9}{[1][65][]66}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.6}Il costo dei dati: trasferimenti e preprocessing}{67}{section.7.6}\protected@file@percent }
-\newlabel{sec:ris-trasferimenti}{{7.6}{67}{Il costo dei dati: trasferimenti e preprocessing}{section.7.6}{}}
-\newlabel{sec:ris-trasferimenti@cref}{{[section][6][7]7.6}{[1][67][]67}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.19}{\ignorespaces Scomposizione della fase locale su GPU secondo la \cref  {eq:scomposizione-locale}, in percentuale di $t_{\text  {local}}$.}}{67}{table.caption.60}\protected@file@percent }
-\newlabel{tab:ris-scomposizione}{{7.19}{67}{Scomposizione della fase locale su GPU secondo la \cref {eq:scomposizione-locale}, in percentuale di $t_{\text {local}}$}{table.caption.60}{}}
-\newlabel{tab:ris-scomposizione@cref}{{[table][19][7]7.19}{[1][67][]67}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.20}{\ignorespaces Preprocessing e banda dei trasferimenti, \texttt  {cuda\_warp}, $M = N = \num {16384}$, FP64. Le voci di setup sono pagate una volta sola.}}{67}{table.caption.61}\protected@file@percent }
-\newlabel{tab:ris-prep}{{7.20}{67}{Preprocessing e banda dei trasferimenti, \kernelname {cuda\_warp}, $M = N = \num {16384}$, FP64. Le voci di setup sono pagate una volta sola}{table.caption.61}{}}
-\newlabel{tab:ris-prep@cref}{{[table][20][7]7.20}{[1][67][]67}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.7}Sintesi}{68}{section.7.7}\protected@file@percent }
-\newlabel{sec:ris-sintesi}{{7.7}{68}{Sintesi}{section.7.7}{}}
-\newlabel{sec:ris-sintesi@cref}{{[section][7][7]7.7}{[1][68][]68}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.21}{\ignorespaces Migliore configurazione misurata per ciascun regime, a $M = N = \num {16384}$.}}{68}{table.caption.63}\protected@file@percent }
-\newlabel{tab:ris-sintesi}{{7.21}{68}{Migliore configurazione misurata per ciascun regime, a $M = N = \num {16384}$}{table.caption.63}{}}
-\newlabel{tab:ris-sintesi@cref}{{[table][21][7]7.21}{[1][68][]68}{}{}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {8}Conclusioni}{69}{chapter.8}\protected@file@percent }
-\@writefile{lof}{\addvspace {10\p@ }}
-\@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{cap:conclusioni}{{8}{69}{Conclusioni}{chapter.8}{}}
-\newlabel{cap:conclusioni@cref}{{[chapter][8][]8}{[1][69][]69}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {8.1}Che cosa \`e stato realizzato}{69}{section.8.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {8.2}Che cosa dicono i dati finora}{69}{section.8.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {8.3}Lavori futuri}{70}{section.8.3}\protected@file@percent }
-\newlabel{sec:lavori-futuri}{{8.3}{70}{Lavori futuri}{section.8.3}{}}
-\newlabel{sec:lavori-futuri@cref}{{[section][3][8]8.3}{[1][70][]70}{}{}{}}
-\@writefile{toc}{\contentsline {paragraph}{Blocking del ciclo su $j$ sul nucleo di CPU.}{70}{section*.64}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Parallelizzazione OpenMP interna al processo.}{70}{section*.65}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{MPI CUDA-aware.}{70}{section*.66}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{MPS per la condivisione della GPU.}{70}{section*.67}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Profilazione con \texttt  {ncu}.}{70}{section*.68}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {A}Interfaccia a riga di comando e formato dei dati}{71}{appendix.Alph1}\protected@file@percent }
-\@writefile{lof}{\addvspace {10\p@ }}
-\@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{app:cli}{{A}{71}{Interfaccia a riga di comando e formato dei dati}{appendix.Alph1}{}}
-\newlabel{app:cli@cref}{{[chapter][1][]A}{[1][71][]71}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {A.1}Opzioni del driver}{71}{section.Alph1.1}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {A.1}{\ignorespaces Opzioni di \texttt  {bin/matmul\_mpi}.}}{71}{table.caption.69}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {A.2}Colonne del CSV}{71}{section.Alph1.2}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {A.2}{\ignorespaces Struttura dell'intestazione CSV.}}{72}{table.caption.70}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {A.3}Opzioni di build}{72}{section.Alph1.3}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {A.3}{\ignorespaces Variabili del \texttt  {Makefile}.}}{73}{table.caption.71}\protected@file@percent }
-\newlabel{tab:opzioni-build}{{A.3}{73}{Variabili del \code {Makefile}}{table.caption.71}{}}
-\newlabel{tab:opzioni-build@cref}{{[table][3][1]A.3}{[1][72][]73}{}{}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {B}Riproduzione dei risultati}{74}{appendix.Alph2}\protected@file@percent }
-\@writefile{lof}{\addvspace {10\p@ }}
-\@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{app:riproducibilita}{{B}{74}{Riproduzione dei risultati}{appendix.Alph2}{}}
-\newlabel{app:riproducibilita@cref}{{[chapter][2][]B}{[1][74][]74}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {B.1}Build}{74}{section.Alph2.1}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {B.1}{\ignorespaces Compilazione delle configurazioni usate nelle campagne.}}{74}{lstlisting.Alph2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {B.2}Validazione}{74}{section.Alph2.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {B.3}Esecuzione singola}{74}{section.Alph2.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {B.4}Campagne}{75}{section.Alph2.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {B.5}Unione dei CSV di una campagna}{75}{section.Alph2.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {B.6}Note operative sul server}{75}{section.Alph2.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {B.7}Compilazione di questa relazione}{76}{section.Alph2.7}\protected@file@percent }
-\gdef \@abspage@last{80}
+\newlabel{cap:cuda}{{5}{24}{I backend CUDA}{chapter.5}{}}
+\newlabel{cap:cuda@cref}{{[chapter][5][]5}{[1][24][]24}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.1}Struttura comune}{25}{section.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5.2}Misurazione del backend CUDA}{26}{section.5.2}\protected@file@percent }
+\newlabel{sec:misurazione-cuda}{{5.2}{26}{Misurazione del backend CUDA}{section.5.2}{}}
+\newlabel{sec:misurazione-cuda@cref}{{[section][2][5]5.2}{[1][26][]26}{}{}{}}
+\newlabel{eq:scomposizione-locale}{{5.1}{26}{Misurazione del backend CUDA}{equation.5.1}{}}
+\newlabel{eq:scomposizione-locale@cref}{{[equation][1][5]5.1}{[1][26][]26}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.3}Preprocessing e occupazione della GPU}{27}{section.5.3}\protected@file@percent }
+\newlabel{sec:preprocessing-cuda}{{5.3}{27}{Preprocessing e occupazione della GPU}{section.5.3}{}}
+\newlabel{sec:preprocessing-cuda@cref}{{[section][3][5]5.3}{[1][26][]27}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3.1}Gestione della memoria disponibile}{27}{subsection.5.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5.4}\texttt  {cuda\_naive}}{27}{section.5.4}\protected@file@percent }
+\newlabel{sec:naive}{{5.4}{27}{\kernelname {cuda\_naive}}{section.5.4}{}}
+\newlabel{sec:naive@cref}{{[section][4][5]5.4}{[1][27][]27}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.5}\texttt  {cuda\_warp}: un warp per riga}{29}{section.5.5}\protected@file@percent }
+\newlabel{sec:warp}{{5.5}{29}{\kernelname {cuda\_warp}: un warp per riga}{section.5.5}{}}
+\newlabel{sec:warp@cref}{{[section][5][5]5.5}{[1][29][]29}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5.1}Gestione di $k$}{30}{subsection.5.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5.2}La maschera dello shuffle}{30}{subsection.5.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5.3}Il problema residuo: gli accessi a $X$}{30}{subsection.5.5.3}\protected@file@percent }
+\newlabel{sec:difetto-x}{{5.5.3}{30}{Il problema residuo: gli accessi a $X$}{subsection.5.5.3}{}}
+\newlabel{sec:difetto-x@cref}{{[subsection][3][5,5]5.5.3}{[1][30][]30}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.6}Primo rimedio: cambio di layout di $X$}{31}{section.5.6}\protected@file@percent }
+\newlabel{sec:x-layout}{{5.6}{31}{Primo rimedio: cambio di layout di $X$}{section.5.6}{}}
+\newlabel{sec:x-layout@cref}{{[section][6][5]5.6}{[1][31][]31}{}{}{}}
+\newlabel{eq:xcol}{{5.7}{31}{Primo rimedio: cambio di layout di $X$}{equation.5.7}{}}
+\newlabel{eq:xcol@cref}{{[equation][7][5]5.7}{[1][31][]31}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.7}\texttt  {cuda\_warp\_smem}: staging di $X$ in shared memory}{31}{section.5.7}\protected@file@percent }
+\newlabel{sec:smem}{{5.7}{31}{\kernelname {cuda\_warp\_smem}: staging di $X$ in shared memory}{section.5.7}{}}
+\newlabel{sec:smem@cref}{{[section][7][5]5.7}{[1][31][]31}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.7.1}Caricamento cooperativo di $X$}{32}{subsection.5.7.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.7.2}Riuso del tile fra i warp del blocco}{32}{subsection.5.7.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.7.3}Bank conflict e padding della shared memory}{33}{subsection.5.7.3}\protected@file@percent }
+\newlabel{sec:bank-conflict}{{5.7.3}{33}{Bank conflict e padding della shared memory}{subsection.5.7.3}{}}
+\newlabel{sec:bank-conflict@cref}{{[subsection][3][5,7]5.7.3}{[1][33][]33}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.7.4}Scelta della dimensione del tile}{34}{subsection.5.7.4}\protected@file@percent }
+\newlabel{sec:piano-tile}{{5.7.4}{34}{Scelta della dimensione del tile}{subsection.5.7.4}{}}
+\newlabel{sec:piano-tile@cref}{{[subsection][4][5,7]5.7.4}{[1][34][]34}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.7.5}Sincronizzazione e warp inattivi}{35}{subsection.5.7.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5.8}Due rimedi allo stesso problema}{35}{section.5.8}\protected@file@percent }
+\newlabel{sec:due-rimedi}{{5.8}{35}{Due rimedi allo stesso problema}{section.5.8}{}}
+\newlabel{sec:due-rimedi@cref}{{[section][8][5]5.8}{[1][35][]35}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.9}\texttt  {cublas}: il riferimento esterno}{36}{section.5.9}\protected@file@percent }
+\newlabel{sec:cublas}{{5.9}{36}{\kernelname {cublas}: il riferimento esterno}{section.5.9}{}}
+\newlabel{sec:cublas@cref}{{[section][9][5]5.9}{[1][36][]36}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.9.1}Adattamento fra row-major e column-major}{36}{subsection.5.9.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.9.2}Significato del confronto}{37}{subsection.5.9.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5.10}Più rank MPI sulla stessa GPU}{37}{section.5.10}\protected@file@percent }
+\newlabel{sec:serializzazione}{{5.10}{37}{Più rank MPI sulla stessa GPU}{section.5.10}{}}
+\newlabel{sec:serializzazione@cref}{{[section][10][5]5.10}{[1][37][]37}{}{}{}}
+\gdef \@abspage@last{41}

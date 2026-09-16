@@ -10,123 +10,204 @@ ereditano senza rimetterle in discussione.
 \section{Che cosa calcola il nucleo}
 \label{sec:definizione}
 
-Il nucleo calcola $Y \leftarrow A X$, con $A$ densa $M \times N$ e $X$
-multivettore $N \times k$. Elemento per elemento:
+Il nucleo realizza il prodotto fra una matrice densa $A$ e un
+multivettore $X$:
+
 \begin{equation}
-  Y[i][c] \;=\; \sum_{j=0}^{N-1} A[i][j]\, X[j][c],
-  \qquad 0 \le i < M,\ 0 \le c < k .
-  \label{eq:definizione}
+    Y \leftarrow AX,
+    \qquad
+    A \in \mathbb{R}^{M\times N},
+    \quad
+    X \in \mathbb{R}^{N\times k},
+    \quad
+    Y \in \mathbb{R}^{M\times k}.
+    \label{eq:problema-nucleo}
 \end{equation}
 
-La traccia fissa i gradi di libertà: $M$ ed $N$ sono scelte dall'utente a
-runtime, $k$ deve funzionare per valore \emph{generico} e il collaudo deve
-coprire almeno $k = 3,\ 6,\ 8,\ 20,\ 32$. Il progetto rispetta entrambe le
-richieste, ma con una distinzione che conviene anticipare subito: sui cinque
-$k$ del collaudo il nucleo di CPU usa funzioni specializzate a tempo di
-compilazione, mentre ogni altro $k$ passa da un percorso generico con
-prestazioni diverse (\cref{cap:kernel-cpu}).
+Elemento per elemento, il risultato è definito da:
+
+\begin{equation}
+    Y[i][c]
+    =
+    \sum_{j=0}^{N-1} A[i][j]\,X[j][c],
+    \qquad
+    0 \le i < M,
+    \quad
+    0 \le c < k.
+    \label{eq:definizione}
+\end{equation}
+
+Le dimensioni $M$ e $N$ vengono scelte a runtime. Anche $k$ è un parametro
+del problema e il codice deve supportarne valori generici. Come richiesto
+dalla traccia, il collaudo comprende nel particolare:
+
+\[
+k \in \{3,6,8,20,32\}.
+\]
+
+La caratteristica distintiva del problema è che $k$ è piccolo rispetto
+alle dimensioni della matrice $A$. Il prodotto può quindi essere visto come
+l'applicazione della stessa matrice a un numero limitato di vettori,
+raccolti nelle colonne di $X$.
 
 \subsection{Conteggio delle operazioni}
 
-Il conteggio si costruisce in due passi.
+Per ogni elemento $Y[i][c]$ devono essere combinati $N$ termini del tipo:
 
-\emph{Passo 1 - un singolo elemento.} Ogni $Y[i][c]$ è una somma di $N$
-prodotti: servono $N$ moltiplicazioni e $N-1$ addizioni, ma la convenzione
-standard, e quella imposta dalla traccia, arrotonda a $2$ FLOP per termine.
+\[
+A[i][j]\,X[j][c].
+\]
 
-\emph{Passo 2 - tutta la matrice.} Gli elementi di $Y$ sono $M \cdot k$.
+Adottando la convenzione utilizzata dalla traccia, ogni termine viene
+conteggiato come due operazioni floating point, una moltiplicazione e
+un'addizione. Il lavoro associato a un elemento di $Y$ è quindi pari a $2N$ FLOP.
 
-Quindi:
+Poiché $Y$ contiene $M k$ elementi, il numero complessivo di operazioni
+associato al prodotto globale è:
+
 \begin{equation}
-  \mathrm{FLOP}(M,N,k) = 2\,M\,N\,k ,
-  \qquad
-  \mathrm{GFLOPS} = \frac{2\,M\,N\,k}{T \cdot 10^{9}} .
-  \label{eq:flops}
+    \mathrm{FLOP}(M,N,k)
+    =
+    2MNk.
+    \label{eq:flops-totali}
 \end{equation}
 
-Su questa formula la traccia impone tre vincoli, che vale la pena enunciare
-qui perché condizionano tutta la metodologia di misura:
+Se $T$ indica il tempo medio necessario per una singola invocazione del
+nucleo, la prestazione viene espressa come:
 
-\begin{enumerate}[nosep,left=0pt]
-  \item $T$ è il tempo \textbf{medio per invocazione}, ottenuto ripetendo il
-        nucleo più volte sulla stessa matrice.
-  \item In $T$ entra \textbf{solo il calcolo}: preprocessamento, I/O ed
-        eventuali trasferimenti da e verso la scheda CUDA restano fuori. La
-        traccia consente però di misurarli e discuterli a parte, ed è quello
-        che il progetto fa. Che cosa esattamente venga cronometrato, e con
-        quale orologio, è trattato in \cref{sec:metriche}.
-  \item $M$ ed $N$ sono le dimensioni della matrice \textbf{globale}, anche
-        quando l'esecuzione è distribuita. È proprio questo che
-        rende leggibile lo speedup: il lavoro totale non cambia con il numero
-        di processi, cambia solo $T$.
-\end{enumerate}
+\begin{equation}
+    \mathrm{GFLOPS}
+    =
+    \frac{2MNk}{T\cdot10^9}.
+    \label{eq:gflops}
+\end{equation}
+
+Le dimensioni $M$ e $N$ presenti nel numeratore sono sempre quelle della
+matrice globale, anche quando il prodotto viene distribuito fra più
+processi MPI: quindi il numero di operazioni associato al problema rimane
+invariato al variare della configurazione parallela.
+
+La traccia richiede che $T$ sia ottenuto ripetendo il nucleo più volte
+sulla stessa matrice e considerando il tempo medio per invocazione.
+Preprocessing, operazioni di I/O e trasferimenti dei dati da e verso la
+GPU non contribuiscono alla misura prestazionale ufficiale, anche se il
+progetto li misura separatamente per caratterizzarne il costo.
+
+Nel caso distribuito, la definizione precisa delle fasi comprese nel tempo
+del prodotto e il modo in cui i tempi dei diversi rank vengono combinati
+sono descritti in \cref{sec:metriche}.
 
 \section{Come vengono memorizzati i dati}
 \label{sec:layout}
 
-Tutte e tre le matrici sono \textbf{row-major}: \emph{gli elementi di una stessa
-riga sono adiacenti}.
+Dopo la distribuzione, ciascun processo opera su tre buffer locali:
 
-La matrice $A$ ha inoltre una propria \emph{leading dimension} \code{lda}, cioè
-la distanza in elementi fra l'inizio di una riga e l'inizio della successiva
-nella rappresentazione in memoria.
-La leading dimension è stata introdotta per permettere \emph{padding} fra righe consecutive
-e per ricevere direttamente blocchi non contigui mediante datatype MPI derivati.
-In realtà, le matrici X e Y la leading dimension è \emph{sempre} fissata a $k$,
-che è il numero di colonne, e quindi le righe sono compatte.
-La leading dimensione è sfruttata:
 \[
-  A[i][j] \;=\; \code{A\_loc}[\,i \cdot \code{lda} + j\,], \qquad
-  X[j][c] \;=\; \code{X\_loc}[\,j \cdot \code{ldx} + c\,], \qquad
-  Y[i][c] \;=\; \code{Y\_loc}[\,i \cdot \code{ldy} + c\,].
+A_{\mathrm{loc}}
+\in \mathbb{R}^{m_{\mathrm{loc}}\times n_{\mathrm{loc}}},
+\qquad
+X_{\mathrm{loc}}
+\in \mathbb{R}^{n_{\mathrm{loc}}\times k},
+\qquad
+Y_{\mathrm{loc}}
+\in \mathbb{R}^{m_{\mathrm{loc}}\times k}.
 \]
-Quando \code{lda} coincide con il numero di colonne il buffer è compatto;
-quando è maggiore, fra una riga e l'altra restano delle celle inutilizzate, per l'appunto il \emph{padding}.
 
-\paragraph{Perché \code{lda} è separata da \code{n\_loc}.}
-Il blocco che un processo possiede è una sottomatrice di $A$, quindi
-\textbf{non è contiguo nella matrice globale}: le sue righe sono distanti $N$
-elementi l'una dall'altra. La distribuzione usa per questo un datatype
-derivato \code{MPI\_Type\_vector}, con stride $N$ dal lato del mittente e
-stride \code{lda} dal lato del ricevente, così il blocco viene depositato
-direttamente nel buffer locale senza copie intermedie (\cref{cap:mpi}).
-Tenere \code{lda} come parametro indipendente aggiunge a questo la possibilità
-di avere padding fra le righe locali.s
+La rappresentazione di riferimento utilizzata dal progetto è \textbf{row-major}:
+gli elementi appartenenti alla stessa riga sono quindi memorizzati in
+posizioni consecutive.
 
-\paragraph{Perché \code{ldx} e \code{ldy} invece sono fissate a $k$.}
-L'interfaccia del kernel (\cref{app:interfaccia}) le espone e ogni backend le
-onora, ma il driver distribuito impone $\code{ldx} = \code{ldy} = k$, cioè
-buffer compatti. La ragione è nelle collettive: il \code{MPI\_Bcast} di $X$ e
-il \code{MPI\_Reduce} di $Y$ lavorano con conteggi contigui, e descrivere uno
-stride richiederebbe di costruire un datatype derivato a ogni invocazione,
-\emph{dentro} la regione cronometrata. $A$ invece non attraversa nessuna
-collettiva, ed è per questo che è l'unica delle tre a potersi permettere il
-padding.
+L'interfaccia dei backend associa a ciascuna matrice una \emph{leading dimension},
+indicata per ciascuna matrice rispettivamente con \code{lda}, \code{ldx} e \code{ldy}. La leading
+dimension esprime, in numero di elementi, la distanza fra l'inizio di due
+righe consecutive del buffer. Gli elementi vengono quindi indirizzati come
 
-Il fatto che le $k$ colonne di $X$ siano adiacenti in memoria non è un
-dettaglio di comodo: è la proprietà su cui si regge tutta la
-\cref{sec:schemi}.
+\[
+A[i][j]
+=
+\code{A\_loc}
+\left[i\cdot\code{lda}+j\right],
+\]
 
-\begin{ipotesi}{}
-{Un backend CUDA prevede in alternativa una disposizione
-\textbf{column-major} di $X$, ma come opzione di build e con effetti discussi al
-momento giusto (\cref{cap:kernel-cuda}); il default, e tutto ciò che segue, è
-row-major.}
-\end{ipotesi}
+\[
+X[j][c]
+=
+\code{X\_loc}
+\left[j\cdot\code{ldx}+c\right],
+\qquad
+Y[i][c]
+=
+\code{Y\_loc}
+\left[i\cdot\code{ldy}+c\right].
+\]
 
-\section{Ordine dei cicli: schema A contro schema B}
-\label{sec:schemi}
+Una leading dimension uguale al numero di colonne corrisponde a una
+\emph{rappresentazione compatta}. Se invece è maggiore, fra la parte utile di due
+righe consecutive rimangono alcuni elementi inutilizzati, che costituiscono
+il \emph{padding}.
 
-La \cref{eq:definizione} contiene tre indici, $i$, $j$ e $c$.
-Indipendentemente dall'ordine in cui viene
-scelto di scandire gli indici, l'operazione produce lo stesso risultato,
-ma il diverso ordine con il quale vengono scanditi non danno affatto le stesse prestazioni.
-È il primo punto in cui il progetto si
-allontana da una trascrizione letterale della definizione.
+In particolare per la matrice locale $A$ il progetto permette:
 
-\subsection{Gli schemi candidati}
+\[
+\code{lda}\ge n_{\mathrm{loc}}.
+\]
 
-I due candidati sono:
+Il numero $n_{\mathrm{loc}}$ specifica quindi quanti elementi della riga
+appartengono effettivamente alla matrice locale, mentre \code{lda} ne
+descrive la disposizione fisica in memoria. Separare le due quantità
+permette di introdurre padding senza modificare né le dimensioni logiche
+del problema né l'interfaccia del backend.
+
+La distinzione è utile anche durante la distribuzione MPI: un blocco
+bidimensionale estratto dalla matrice globale non è, in generale, una
+singola regione contigua del buffer row-major: i segmenti appartenenti a
+righe differenti sono separati dallo stride della matrice globale.
+La distribuzione utilizza datatype MPI derivati per descrivere tale
+struttura e depositare i dati nella rappresentazione locale rispettando
+la \code{lda} scelta. I dettagli della distribuzione sono descritti nel
+\cref{cap:mpi}.
+
+Per quanto riguarda invece $X_{\mathrm{loc}}$ e $Y_{\mathrm{loc}}$ l'interfaccia mantiene
+ugualmente esplicite le rispettive leading dimension, ma la pipeline
+distribuita utilizza buffer compatti, cioè con:
+
+\[
+\code{ldx}=\code{ldy}=k.
+\]
+
+Questa scelta semplifica le comunicazioni eseguite a ogni invocazione del
+prodotto. Le porzioni di $X$ coinvolte nel broadcast e i contributi di $Y$
+coinvolti nella riduzione possono essere trattati come regioni contigue
+di memoria, senza introdurre padding o ulteriori descrizioni del layout
+nel percorso ripetuto dell'algoritmo.
+
+La matrice $A$, al contrario, viene distribuita durante il preprocessing
+e rimane poi residente nel processo. Il suo buffer locale può quindi
+utilizzare una leading dimension più generale senza modificare le
+comunicazioni ripetute del prodotto.
+
+La compattezza delle righe di $X$ è inoltre rilevante per l'ordine dei
+cicli discusso nella sezione successiva, perché gli elementi:
+
+\[
+X[j][0],X[j][1],\ldots,X[j][k-1]
+\]
+
+occupano posizioni consecutive in memoria.
+
+Un backend CUDA considera anche una rappresentazione alternativa di $X$
+per colonne. Si tratta di una variante specifica, introdotta e discussa
+nel \cref{cap:cuda}. Salvo quando indicato esplicitamente, nel
+seguito si assume il normale layout row-major.
+
+\section{Ordine dei cicli e riuso dei dati}\label{sec:schemi}
+
+La \cref{eq:definizione} coinvolge tre indici, $i$, $j$ e $c$.
+Cambiare l'ordine con cui vengono percorsi non modifica il risultato
+matematico, ma modifica il modo in cui i dati vengono riutilizzati e
+acceduti in memoria. Due implementazioni equivalenti dal punto di vista
+numerico possono quindi avere comportamenti prestazionali molto diversi.
+
 
 \begin{center}
 \begin{minipage}[t]{0.47\linewidth}
@@ -154,202 +235,256 @@ for i:
 \end{minipage}
 \end{center}
 
-Lo schema~B è la trascrizione letterale della definizione, ed è esattamente
-l'esecuzione di $k$ prodotti matrice-vettore indipendenti, uno per colonna.
-Lo schema~A scambia i due cicli interni, cambiando anche il ``ruolo'' della matrice $A$.
+\subsection{I due schemi candidati}
 
-Si segua una singola riga $i$.
+Lo \emph{schema~B} segue direttamente la definizione elemento per elemento.
+Per ogni riga $i$ e per ogni colonna $c$ di $Y$, percorre l'intera
+dimensione $j$ e calcola:
 
-\emph{Schema B.} Il ciclo su $c$ sta fuori e quello su $j$ dentro, quindi per
-ogni colonna $c$ il ciclo interno percorre l'intera riga
-$A[i][0 \ldots N{-}1]$. Finita una colonna si ricomincia da capo con la
-successiva, sulle stesse celle. La riga viene dunque letta $k$ volte, per un
-totale di $kN$ letture di $A$ a fronte delle $N$ celle che la riga contiene.
-
-\emph{Schema A.} Il ciclo su $j$ sta fuori e quello su $c$ dentro. Il valore
-$a = A[i][j]$ viene letto una volta sola e consumato subito da tutti e $k$ gli
-accumulatori, con gli aggiornamenti
-$\code{acc}[c] \mathrel{+}= a \cdot X[j][c]$ per $c = 0 \ldots k-1$; poi si
-passa a $j+1$ e quel valore di $A$ non serve più. La riga viene letta una volta
-sola, per un totale di $N$ letture. Il riuso di $A$ vale quindi esattamente
-$k$, e vale per costruzione: non dipende dalla taglia del problema né da
-condizioni sul valore di $k$.
-
-Perché il risparmio sia reale gli accumulatori devono stare in registro, e
-perché il compilatore possa tenerceli deve conoscerne il numero a tempo di
-compilazione: è il motivo delle specializzazioni su $k$ descritte in
-\cref{sec:specializzazione}.
-
-Si potrebbe obiettare che le riletture dello schema~B le assorbe la cache, e in
-parte è così, ma solo finché la dimensione della riga è contenibile nella cache.
-Una riga di $A$ occupa $N s$
-byte, dove  $s$ è la dimensione in byte di ogni elemento della matrice
-e $N$ è la dimensione che la traccia chiede di far crescere: il caso
-interessante è proprio quello in cui la riga eccede i livelli di cache vicini
-al calcolo o, sulla GPU, quello in cui la riga eccede la shared memory di un blocco. Il modello che segue
-conta perciò il traffico verso la memoria principale, che è il livello che
-finisce per determinare il tempo.
-
-\subsection{La quantificazione: intensità aritmetica}
-
-L'\emph{intensità aritmetica} $\Ai$ è il rapporto fra i FLOP eseguiti e i byte
-che attraversano il livello di memoria considerato. Detta $s$ la dimensione in
-byte dello scalare, e contando il solo traffico su $A$ come giustificato in
-\cref{sec:traffico}:
-
-\begin{equation}
-  \Ai_{\text{A}} \;=\; \frac{2\,M N k}{M N s} \;=\; \frac{2k}{s},
-  \qquad
-  \Ai_{\text{B}} \;=\; \frac{2\,M N k}{k\,M N s} \;=\; \frac{2}{s} .
-  \label{eq:intensita}
-\end{equation}
-
-Il numeratore è lo stesso: i FLOP da fare sono fissati dal problema. Cambia il
-denominatore, perché lo schema~B legge gli $MN$ elementi di $A$ una volta per
-ciascuna delle $k$ colonne.
-
-In FP64 ($s = 8$) questo significa $\Ai_{\text{A}} = k/4$ contro
-$\Ai_{\text{B}} = 1/4$ \si{\flop\per\byte}: lo schema~A guadagna esattamente
-un fattore $k$, e a $k = 32$ porta l'intensità da $0{,}25$ a
-\SI{8}{\flop\per\byte}. 
-
-È questo salto che sposta il nucleo da un regime saldamente memory-bound a un
-regime in cui, sulla GPU in doppia precisione, il limite può diventare il
-calcolo. La discussione quantitativa, con i picchi reali della scheda, è nel
-\cref{cap:roofline}.
-
-\subsection{Un limite che non si può superare}
-
-$\Ai_{\text{A}} = 2k/s$ è il \textbf{massimo} ottenibile: gli $MN$ elementi di
-$A$ vanno letti almeno una volta e i FLOP sono fissati, quindi nessuna
-riorganizzazione ulteriore può migliorare il rapporto. Tutto il lavoro di
-ottimizzazione successivo, su CPU come su GPU, riguarda allora il traffico su
-$X$ e la capacità di tenere i $k$ accumulatori in registro, non l'intensità
-rispetto ad $A$, che è già al suo limite.
-
-Con un'eccezione, che la traccia rende rilevante chiedendo $k$ generico. Tenere
-$k$ accumulatori in registro è possibile finché $k$ è abbastanza piccolo: oltre
-una certa ampiezza il nucleo di CPU blocca le colonne a gruppi di
-$\code{KB} = 32$ e rilegge $A$ una volta per gruppo, cosicché in generale
 \[
-  \Ai_{\text{A}}(k) \;=\; \frac{2k}{s \cdot \lceil k/\code{KB} \rceil}.
+Y[i][c]
+=
+\sum_j A[i][j]X[j][c].
 \]
-Per i cinque $k$ del collaudo il ciclo sui blocchi è degenere, $A$ viene letta
-una volta sola e si ricade nella \cref{eq:intensita}; per $k = 64$ i passaggi
-sono due e l'intensità si ferma al valore che aveva a $k = 32$. Il dettaglio,
-con il microbenchmark che lo misura, è in \cref{sec:specializzazione}.
 
-\subsection{Una proprietà che conta sull'hardware reale}
+Può quindi essere interpretato come l'esecuzione di $k$ prodotti
+matrice-vettore indipendenti, uno per ciascuna colonna di $X$.
 
-Nello schema~A entrambi i flussi di lettura sono a \textbf{passo unitario}. La
-riga di $A$ è contigua per costruzione e la riga di $X$ lo è perché $X$ è
-row-major con le $k$ colonne adiacenti (\cref{sec:layout}). Nessuno dei due
-accessi ha stride, quindi i prefetcher hardware lavorano nelle condizioni
-migliori e, sulla GPU, gli accessi delle lane di uno stesso warp sono
-coalescibili. Lo schema~B, per ottenere la stessa proprietà sull'accesso a
-$X$, richiederebbe $X$ column-major, cioè un layout diverso da quello che
-serve altrove.
+Lo \emph{schema~A} scambia invece i due cicli interni. Fissati $i$ e $j$,
+l'elemento
 
-\section{Precisione}
-\label{sec:precisione}
+\[
+a=A[i][j]
+\]
 
-Tutto il codice usa un unico tipo \code{scalar\_t}, definito in
-\file{src/common/scalar.h}, che vale \code{double} per default e \code{float}
-compilando con \code{PREC=float} (il Makefile traduce la variabile nella macro
-\code{-DUSE\_FLOAT}). Anche il tipo MPI segue lo scalare, attraverso la macro
-\code{SCALAR\_MPI\_TYPE}, così le collettive non vanno toccate.
+viene utilizzato per aggiornare tutti i $k$ elementi della riga corrente
+di $Y$:
 
-Il confronto FP64/FP32 è quindi un flag di compilazione e non una seconda
-copia dei sorgenti: le due build eseguono esattamente lo stesso codice, che è
-la sola condizione in cui il confronto misura la precisione e non due
-implementazioni diverse.
+\[
+\code{acc}[c]
+\mathrel{+}=
+a\,X[j][c],
+\qquad
+0\le c<k.
+\]
 
-\paragraph{Effetto sul modello roofline.} La scelta della precisione non è
-neutra, e agisce in \textbf{due modi opposti}:
+In questo modo ogni utilizzo di $A[i][j]$ necessario alle $k$ colonne del
+risultato viene concentrato nella stessa iterazione del ciclo su $j$.
 
-\begin{itemize}[nosep,left=0pt]
-  \item dimezzando $s$ la \cref{eq:intensita} \emph{raddoppia} l'intensità
-        aritmetica, da $k/4$ a $k/2$. Da solo, questo avvicinerebbe il nucleo
-        al regime compute-bound;
-  \item ma il punto di crossover del roofline vale $P_{\text{picco}}/B$, e su
-        una GPU Turing il picco FP32 è $32$ volte il picco FP64. Il crossover
-        si sposta quindi a destra di un fattore $32$.
-\end{itemize}
+Dal punto di vista del codice, lo schema~B richiede ogni elemento di $A$
+una volta per ciascuna delle $k$ colonne, mentre nello schema~A ogni
+elemento viene caricato una volta e riutilizzato immediatamente per tutti
+i $k$ accumulatori.
 
-Il secondo effetto è $16$ volte più forte del primo e prevale nettamente: in
-singola precisione il nucleo finisce \textbf{saldamente memory-bound} su tutto
-l'intervallo di $k$ della traccia, mentre in doppia precisione è
-compute-bound già da $k = 6$. I due regimi sono qualitativamente diversi, ed è
-questo il vero argomento con cui il progetto discute la precisione: la doppia
-non costa il fattore $2$ del traffico, costa il fattore $32$ del picco. I
-numeri sono in \cref{sec:roofline-gpu}.
+Questa distinzione riguarda il \emph{numero di accessi} espresso
+dall'algoritmo. Il traffico effettivamente generato verso i diversi livelli
+della gerarchia di memoria può essere anche inferiore, perché le riletture dello
+schema~B possono essere servite dalle cache. Lo schema~A rende tuttavia il
+riuso esplicito nel codice, senza dipendere dalla capacità della cache di
+conservare i dati fra una colonna e la successiva.
 
-\paragraph{Effetto sulla validazione.} \file{scalar.h} deriva dal tipo anche
-\code{SCALAR\_EPS} e la tolleranza del confronto con l'oracolo seriale, che
-non è una costante ma cresce con la lunghezza della riduzione. Il modello e la
-costante misurata sono discussi in \cref{cap:validazione}.
+L'efficienza con cui questo riuso viene realizzato dipende poi dal backend.
+In particolare, mantenere gli accumulatori in registri ed evitare spill in
+memoria diventa un aspetto importante delle implementazioni CPU e CUDA,
+discusso nei rispettivi capitoli.
 
-\section{Generazione riproducibile dei dati}
-\label{sec:generazione}
+\subsection{Intensità rispetto al traffico di $A$}
 
-Le matrici di test sono generate, non lette da file. La traccia lo consente
-esplicitamente, elencando la generazione fra le strategie di collaudo, e in
-cambio chiede che sia \textbf{ripetibile}.
+Per quantificare il vantaggio dello schema~A è utile considerare
+separatamente il traffico associato alla matrice $A$.
 
-\subsection{Il generatore}
+Supponiamo, come modello ideale, che ogni accesso ad $A$ che non viene
+riutilizzato esplicitamente debba essere soddisfatto dal livello di memoria
+considerato. Indicando con $s$ la dimensione in byte di uno scalare, lo
+schema~A richiede $MN\,s$ byte associati ad $A$, mentre lo schema~B ne richiede $kMN\,s.$
 
-Il generatore è \code{splitmix64}, un mixer a 64 bit \textbf{senza stato}. La
-differenza rispetto a un generatore pseudocasuale ordinario è tutta qui: un
-generatore con stato produce una \emph{sequenza}, e per ottenere l'elemento in
-posizione $p$ bisogna averlo fatto avanzare $p$ volte. Un mixer stateless va
-da $(\text{seed}, \text{chiave})$ al valore in un passo solo. La chiave scelta è
-l'\textbf{indice lineare globale} dell'elemento:
+Rapportando i $2MNk$ FLOP del prodotto a questo solo contributo si ottiene:
 
 \begin{equation}
-  A[i][j] \;=\; g\bigl(\text{seed},\ \Sigma_A,\ i \cdot N + j \bigr),
-  \qquad
-  X[j][c] \;=\; g\bigl(\text{seed},\ \Sigma_X,\ j \cdot k + c \bigr),
-  \label{eq:gen}
+\mathcal{I}_{A}^{(A)}
+=
+\frac{2MNk}{MNs}
+=
+\frac{2k}{s},
+\qquad
+\mathcal{I}_{A}^{(B)}
+=
+\frac{2MNk}{kMNs}
+=
+\frac{2}{s}.
+\label{eq:intensita-a}
 \end{equation}
-dove $\Sigma_A$ e $\Sigma_X$ sono due identificatori di \emph{stream} distinti, che
-servono a evitare che $A$ e $X$ abbiano lo stesso pattern di valori. Il seed
-viene mescolato prima con lo stream e poi con la chiave: due passaggi, perché
-uno solo lascerebbe correlati i valori di chiavi vicine. Dei $64$ bit
-prodotti si usano i $53$ alti, che danno un \code{double} esatto in $[0,1)$,
-riscalato poi in $[-1,1)$.
 
-Il valore di un elemento dipende dunque \emph{solo} dalla sua posizione
-globale: mai dal processo che lo calcola, mai dall'ordine in cui viene
-generato, mai dalla forma della griglia.
+Queste quantità \emph{non} rappresentano l'intensità aritmetica completa del
+kernel, perché non includono il traffico associato a $X$ e $Y$ e non
+modellano gli effetti delle cache. Servono invece a isolare il beneficio
+del riuso esplicito della matrice $A$ introdotto dallo schema~A.
 
-\subsection{Le tre conseguenze, tutte usate dal progetto}
+Il fattore $k$ mostra quanto l'ordine dei cicli possa aumentare il riuso
+esplicito della matrice dominante.
 
-\begin{enumerate}[nosep,left=0pt]
-  \item ogni processo può generare \textbf{direttamente} il proprio blocco
-        locale, senza che una copia globale della matrice esista mai in
-        memoria. È ciò che permette di misurare taglie che su un solo nodo non
-        starebbero;
-  \item la stessa matrice globale si ottiene con \emph{qualunque} griglia di
-        processi e con qualunque modalità di inizializzazione. Due
-        configurazioni diverse sono quindi confrontabili elemento per
-        elemento;
-  \item l'esecuzione seriale di \cref{cap:validazione}, usata come oracolo,
-        può ricostruire da sé la
-        porzione che gli serve, senza ricevere dati dagli altri processi.
-\end{enumerate}
+\color{red}
+Per stabilire se questo sia sufficiente
+a spostare il kernel da un regime limitato dalla memoria a uno limitato
+dal calcolo è però necessario includere anche gli altri flussi di memoria
+e confrontare l'intensità complessiva con le caratteristiche
+dell'hardware. Questa analisi è svolta nel \cref{cap:roofline}.
+\color{black}
 
-\subsection{Perché i valori hanno media nulla}
+\subsection{Il limite rispetto al traffico di $A$}
 
-I valori sono distribuiti in $[-1, 1)$ a media nulla, e questa non è una scelta
-estetica. Ogni elemento di $Y$ è una riduzione su $N$ termini, e l'errore di
-arrotondamento di una riduzione dipende da come si compongono i segni: con
-termini a media nulla gli arrotondamenti hanno segno indipendente e l'errore
-cresce come $\varepsilon\sqrt{N}$, non come il pessimistico $\varepsilon N$
-del caso in cui tutti i termini abbiano lo stesso segno. È questa proprietà
-dei dati che rende possibile una tolleranza di validazione stretta invece di
-una soglia fissa e generosa (\cref{cap:validazione}).
+Nel modello appena descritto, lo schema~A raggiunge il minimo traffico
+possibile per la matrice $A$: ciascuno degli $MN$ elementi deve essere reso
+disponibile almeno una volta per poter contribuire al prodotto.
 
-Una nota utile per il confronto fra precisioni: il generatore calcola sempre in
-\code{double} e converte in \code{scalar\_t} solo alla fine. Le build FP64 e
-FP32 lavorano quindi sugli stessi dati a meno del solo arrotondamento della
-conversione, ed è la condizione che rende confrontabili i loro tempi.
+Ulteriori ottimizzazioni non possono quindi ridurre questo limite
+algoritmico sulla matrice $A$, ma possono agire sul modo in cui la matrice $X$ viene acceduta,
+sulla permanenza degli accumulatori nei registri e sull'effettivo
+sfruttamento della gerarchia di memoria.
+
+\subsection{Località degli accessi}
+
+Lo schema~A presenta inoltre una proprietà favorevole nel codice
+sequenziale. Al crescere di $j$, gli elementi
+
+\[
+A[i][0],A[i][1],\ldots
+\]
+
+sono attraversati nell'ordine con cui compaiono nella riga di $A$.
+
+Per ogni $j$, il ciclo interno su $c$ attraversa invece
+
+\[
+X[j][0],X[j][1],\ldots,X[j][k-1],
+\]
+
+anch'essi consecutivi nel layout row-major adottato dal progetto.
+
+Lo schema espone quindi una buona località spaziale per entrambi i buffer
+nel percorso sequenziale. Il modo in cui tale proprietà si traduce
+sull'hardware parallelo dipende però dalla mappatura del lavoro:
+l'ordine dei cicli descrive quali dati vengono visitati consecutivamente
+nell'esecuzione sequenziale, ma non dice ancora quali dati vengono
+elaborati nello stesso momento dai diversi thread. In particolare, sulla CPU conta quali elementi vengono elaborati
+consecutivamente da un core e quali cicli possono essere vettorizzati,
+mentre sulla GPU conta quali indirizzi vengono richiesti simultaneamente
+dalle lane di uno stesso warp.
+
+La \emph{coalescenza degli accessi} non può quindi essere dedotta dal solo
+ordine dei cicli e verrà analizzata separatamente per ciascun kernel CUDA.
+
+
+\section{Interfaccia comune dei backend locali}
+\label{sec:interfaccia-locale}
+
+Dopo aver definito il prodotto locale, la rappresentazione dei dati e
+l'organizzazione di base del calcolo, resta da stabilire come il livello
+distribuito interagisca con le diverse implementazioni del nucleo locale.
+
+Tutti i backend espongono la stessa interfaccia, definita in
+\file{src/kernel/kernel.h}. Il livello MPI può quindi utilizzare il nucleo
+locale senza conoscere i dettagli della sua implementazione, che può essere
+basata sulla CPU, su un kernel CUDA oppure su una libreria esterna come
+cuBLAS.
+
+\subsection{Ciclo di vita del backend}
+
+Le tre operazioni principali dell'interfaccia sono:
+
+\begin{lstlisting}[language=C,caption={Operazioni principali dell'interfaccia definita in \file{src/kernel/kernel.h}.}]
+local_gemm_t *local_gemm_create(int m, int n, int k,
+                                const scalar_t *A_loc,
+                                int lda, int ldx, int ldy);
+
+void local_gemm(local_gemm_t *ctx,
+                const scalar_t *RESTRICT X, int ldx,
+                scalar_t *RESTRICT Y, int ldy);
+
+void local_gemm_destroy(local_gemm_t *ctx);
+\end{lstlisting}
+
+Le tre funzioni corrispondono alle fasi di inizializzazione, esecuzione e
+finalizzazione del backend locale. La separazione non è soltanto
+organizzativa, ma riflette il diverso ciclo di vita dei dati coinvolti nel
+prodotto.
+
+Il blocco locale $A_{\mathrm{loc}}$ rimane invariato durante tutte le
+ripetizioni del nucleo. Può quindi essere associato al contesto una sola
+volta durante \code{local_gemm_create}. I buffer relativi a $X$ e $Y$,
+invece, appartengono alla singola invocazione e vengono forniti a
+\code{local_gemm} ogni volta che il prodotto deve essere eseguito.
+
+La funzione \code{local_gemm_create} inizializza quindi il contesto del
+backend e prepara tutte le risorse che possono essere riutilizzate fra più
+invocazioni. Nei backend CPU ciò comprende principalmente le informazioni
+necessarie a descrivere il problema e il blocco locale di $A$. Nei backend
+CUDA vengono inoltre inizializzate le risorse del device, allocati i buffer
+persistenti e trasferita $A_{\mathrm{loc}}$ nella memoria della GPU.
+
+La funzione \code{local_gemm} rappresenta invece il percorso ripetuto del
+calcolo. Riceve il blocco di $X$ reso disponibile al processo dal livello
+distribuito e produce il corrispondente contributo locale in $Y$. Nei
+backend CUDA vengono riutilizzati i buffer predisposti durante
+l'inizializzazione: $X$ viene trasferita sul device, viene eseguito il
+prodotto locale e il risultato viene infine riportato nella memoria host.
+
+Al termine dell'esecuzione, \code{local_gemm_destroy} rilascia tutte le
+risorse associate al contesto, comprese le eventuali allocazioni e risorse
+CUDA.
+
+Questa organizzazione evita di ripetere a ogni invocazione le operazioni
+associate ai dati persistenti e mantiene separati i costi di preparazione
+da quelli del percorso effettivamente ripetuto durante il benchmark.
+
+\subsection{Contesto opaco del backend}
+
+Lo stato specifico di ciascuna implementazione è racchiuso nel tipo opaco
+\code{local_gemm_t}. Il codice che utilizza l'interfaccia conosce soltanto
+un puntatore a tale tipo, mentre la struttura concreta viene definita
+separatamente da ciascun backend.
+
+Questa scelta permette alle diverse implementazioni di mantenere
+informazioni e risorse differenti senza modificare il codice che le
+utilizza. Un backend CPU può, per esempio, conservare le dimensioni del
+problema e il riferimento al blocco locale di $A$, mentre un backend CUDA
+deve mantenere anche i puntatori ai buffer sul device e le risorse
+necessarie all'esecuzione e alla misurazione.
+
+Il contesto costituisce quindi il confine fra l'interfaccia comune e lo
+stato specifico dell'implementazione. Il livello distribuito non deve
+conoscere come viene realizzato il prodotto locale: fornisce i dati
+attraverso \code{local_gemm} e riceve il risultato tramite la stessa
+interfaccia per tutti i backend.
+
+\subsection{Informazioni sperimentali}
+
+Oltre alle tre operazioni principali, l'interfaccia espone alcune funzioni
+di introspezione utilizzate dal driver di benchmark. Queste permettono di
+recuperare informazioni specifiche del backend, come tempi di
+inizializzazione, tempi di trasferimento, tempo del calcolo locale e
+parametri della configurazione effettivamente utilizzata.
+
+Tali funzioni non partecipano alla definizione matematica del prodotto e
+non modificano il contratto di \code{local_gemm}. Servono esclusivamente a
+rendere osservabili separatamente i costi che compongono l'esecuzione. Il
+significato delle singole metriche e il modo in cui vengono aggregate sono
+descritti nel capitolo dedicato alla metodologia sperimentale.
+
+\subsection{Selezione del backend}
+
+L'implementazione del nucleo locale viene selezionata a tempo di
+compilazione. Tutti i backend rispettano la stessa interfaccia, per cui il
+driver e il livello MPI non devono essere modificati quando cambia
+l'implementazione utilizzata per il prodotto locale.
+
+La configurazione di build controlla anche alcune proprietà comuni, come
+la precisione numerica, e parametri specifici dei singoli backend. Le
+configurazioni utilizzate nelle campagne di misura e la loro
+identificazione nei risultati vengono descritte insieme alla metodologia
+sperimentale.
+
+L'interfaccia realizza quindi la separazione fra i due livelli introdotti
+nel \cref{cap:introduzione}: MPI stabilisce quali dati e quale contributo
+al prodotto appartengono a ciascun processo, mentre il backend locale
+stabilisce come quel contributo viene calcolato.

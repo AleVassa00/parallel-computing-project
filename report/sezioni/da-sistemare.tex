@@ -1,0 +1,109 @@
+
+\section{Precisione}\label{sec:precisione}
+
+Il progetto utilizza un unico tipo scalare, \code{scalar\_t}, definito in
+\file{src/common/scalar.h}. Per default esso corrisponde a \code{double},
+mentre la compilazione con \code{PREC=float} seleziona \code{float} tramite
+la macro \code{USE\_FLOAT}.
+
+Anche il tipo utilizzato nelle comunicazioni MPI viene derivato dalla stessa
+scelta attraverso \code{SCALAR\_MPI\_TYPE}. La struttura dell'algoritmo e
+l'interfaccia dei backend rimangono quindi invariate fra le build FP64 e
+FP32, mentre cambia il tipo numerico sul quale vengono eseguite le
+operazioni.
+
+Passare da FP64 a FP32 dimezza la dimensione di ciascun elemento,
+riducendo il volume di dati associato allo stesso numero di valori.
+A parità di modello di traffico, ciò aumenta quindi l'intensità aritmetica
+espressa in FLOP per byte.
+
+\color{red}
+La precisione modifica però anche la capacità di calcolo disponibile
+sull'hardware, che può essere molto diversa fra FP32 e FP64. Il regime
+prestazionale non può quindi essere dedotto dalla sola riduzione della
+dimensione dei dati: deve essere determinato confrontando intensità
+aritmetica, banda di memoria e throughput di calcolo della piattaforma.
+Questa analisi viene svolta nel \cref{cap:roofline}.
+
+La scelta della precisione influenza anche la validazione numerica.
+Il confronto con il riferimento seriale utilizza tolleranze dipendenti dal
+tipo scalare e dalla lunghezza della riduzione, anziché una soglia unica
+per tutte le configurazioni. La definizione della tolleranza e la misura
+dell'errore sono discusse nel \cref{cap:validazione}.
+\color{black}
+
+\subsection{Generazione deterministica}
+
+I dati vengono costruiti mediante una funzione deterministica basata sul
+mixer a 64 bit di SplitMix64. Nel progetto il mixer non viene utilizzato
+come una sequenza pseudocasuale da avanzare elemento dopo elemento:
+l'input viene invece ricavato direttamente dal seed, da un identificatore
+della matrice e dall'indice globale dell'elemento.
+
+In questo modo ogni valore può essere calcolato indipendentemente dagli
+altri, senza mantenere uno stato condiviso del generatore.
+
+Indicando con $\Sigma_A$ e $\Sigma_X$ due identificatori distinti dei
+dataset, la chiave associata a ciascun elemento dipende dalla sua posizione
+nella matrice globale:
+
+\begin{equation}
+A[i][j]
+=
+g\!\left(\text{seed},\Sigma_A,iN+j\right),
+\qquad
+X[j][c]
+=
+g\!\left(\text{seed},\Sigma_X,jk+c\right).
+\label{eq:gen}
+\end{equation}
+
+Gli identificatori distinti impediscono che $A$ e $X$ utilizzino la stessa
+sequenza di valori pur condividendo lo stesso seed.
+
+Di conseguenza, il valore associato a una posizione globale non dipende
+dal rank MPI che la genera, dalla forma della griglia di processi o
+dall'ordine con cui gli elementi vengono prodotti.
+
+L'uscita a 64 bit del mixer viene convertita in un valore floating point
+nell'intervallo $[0,1)$ e successivamente riscalata in $[-1,1)$.
+La generazione viene effettuata inizialmente in doppia precisione e il
+risultato viene convertito in \code{scalar\_t} soltanto alla fine.
+
+\subsection{Indipendenza dalla decomposizione}
+
+La generazione basata sugli indici globali ha tre conseguenze utili.
+
+\begin{itemize}
+    \item Ogni processo può generare direttamente gli elementi appartenenti
+    al proprio blocco locale, senza dover ricevere necessariamente una copia
+    della matrice globale.
+
+    \item Cambiando il numero di processi o la forma della griglia MPI,
+    ciascuna posizione globale continua ad avere lo stesso valore. Le
+    configurazioni parallele vengono quindi confrontate sullo stesso
+    problema numerico.
+
+    \item Il riferimento seriale può ricostruire autonomamente gli elementi
+    necessari alla validazione a partire dallo stesso seed e dagli stessi
+    indici globali.
+\end{itemize}
+
+I valori vengono riscalati nell'intervallo $[-1,1)$, producendo dati con
+segni sia positivi sia negativi e distribuzione approssimativamente
+centrata intorno allo zero.
+
+Questa scelta evita casi di test costituiti esclusivamente da contributi
+dello stesso segno e produce riduzioni numericamente più rappresentative
+dei diversi ordini di accumulazione introdotti dalle implementazioni
+parallele.
+
+Non viene tuttavia assunta una legge deterministica per la crescita
+dell'errore. La tolleranza utilizzata nella validazione viene definita
+separatamente e verificata sperimentalmente, come discusso nel
+\cref{cap:validazione}.
+
+La generazione avviene inizialmente in \code{double}; nel caso FP32 il
+valore viene successivamente convertito in \code{float}. Le build FP64 e
+FP32 partono quindi dalla stessa sequenza deterministica di valori reali,
+differendo per l'arrotondamento introdotto dalla rappresentazione scelta.
