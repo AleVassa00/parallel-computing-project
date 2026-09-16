@@ -1,0 +1,221 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1040" viewBox="0 0 1600 1040" role="img" aria-labelledby="title desc">
+  <title id="title">Esecuzione del kernel CUDA warp con X column-major</title>
+  <desc id="desc">Un warp calcola una riga di Y. Le lane percorrono j a passo 32, leggono A e ciascuna colonna di X in modo coalescente, accumulano k risultati parziali nei registri, li riducono con shuffle e la lane zero scrive Y.</desc>
+
+  <defs>
+    <linearGradient id="header" x1="0" x2="1">
+      <stop offset="0" stop-color="#102A43"/>
+      <stop offset="1" stop-color="#1F4E78"/>
+    </linearGradient>
+    <linearGradient id="laneBand" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#E8F1FB"/>
+      <stop offset="1" stop-color="#F6FAFE"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#102A43" flood-opacity="0.13"/>
+    </filter>
+    <marker id="arrowBlue" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5.5 L0,11 Z" fill="#1F6FB2"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5.5 L0,11 Z" fill="#16856B"/>
+    </marker>
+    <marker id="arrowOrange" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5.5 L0,11 Z" fill="#D66A1F"/>
+    </marker>
+    <marker id="arrowPurple" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5.5 L0,11 Z" fill="#7048A8"/>
+    </marker>
+    <style>
+      .sans { font-family: Inter, Segoe UI, Arial, sans-serif; }
+      .mono { font-family: "Cascadia Mono", "DejaVu Sans Mono", monospace; }
+      .title { font: 700 34px Inter, Segoe UI, Arial, sans-serif; fill: #fff; }
+      .subtitle { font: 400 17px Inter, Segoe UI, Arial, sans-serif; fill: #D9E8F5; }
+      .panel-title { font: 700 21px Inter, Segoe UI, Arial, sans-serif; fill: #102A43; }
+      .panel-num { font: 700 17px Inter, Segoe UI, Arial, sans-serif; fill: #fff; }
+      .body { font: 400 16px Inter, Segoe UI, Arial, sans-serif; fill: #334E68; }
+      .small { font: 400 14px Inter, Segoe UI, Arial, sans-serif; fill: #486581; }
+      .tiny { font: 400 12px Inter, Segoe UI, Arial, sans-serif; fill: #486581; }
+      .label { font: 650 15px Inter, Segoe UI, Arial, sans-serif; fill: #243B53; }
+      .math { font: 500 16px "Cambria Math", Cambria, serif; fill: #102A43; }
+      .code { font: 500 14px "Cascadia Mono", "DejaVu Sans Mono", monospace; fill: #102A43; }
+      .cell { stroke: #7B93A8; stroke-width: 1; }
+      .dash { stroke-dasharray: 7 6; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1040" fill="#F4F7FA"/>
+  <rect width="1600" height="108" fill="url(#header)"/>
+  <text x="64" y="52" class="title">cuda_warp(xcol): un warp calcola una riga di Y</text>
+  <text x="64" y="82" class="subtitle">Y = A · X  •  A e Y row-major  •  X compatta per colonne  •  esempio di un singolo warp</text>
+  <rect x="1292" y="27" width="244" height="54" rx="27" fill="#FFFFFF" fill-opacity="0.12" stroke="#FFFFFF" stroke-opacity="0.35"/>
+  <text x="1414" y="50" text-anchor="middle" class="subtitle">mapping fondamentale</text>
+  <text x="1414" y="71" text-anchor="middle" class="sans" font-size="16" font-weight="700" fill="#FFFFFF">warp_id = riga i</text>
+
+  <!-- Panel 1 -->
+  <g filter="url(#shadow)">
+    <rect x="44" y="138" width="482" height="332" rx="18" fill="#FFFFFF"/>
+  </g>
+  <circle cx="78" cy="174" r="18" fill="#1F6FB2"/>
+  <text x="78" y="180" text-anchor="middle" class="panel-num">1</text>
+  <text x="108" y="181" class="panel-title">Dal blocco alla riga di Y</text>
+
+  <rect x="74" y="210" width="422" height="66" rx="12" fill="#EAF2F8" stroke="#9FB3C8"/>
+  <text x="92" y="236" class="label">Blocco CUDA predefinito</text>
+  <text x="92" y="260" class="code">256 thread = 8 warp × 32 lane</text>
+
+  <text x="76" y="308" class="small">Ogni warp del blocco riceve una riga diversa:</text>
+  <g>
+    <rect x="76" y="327" width="50" height="43" rx="7" fill="#1F6FB2"/><text x="101" y="354" text-anchor="middle" class="panel-num">W0</text>
+    <rect x="132" y="327" width="50" height="43" rx="7" fill="#3B82B8"/><text x="157" y="354" text-anchor="middle" class="panel-num">W1</text>
+    <rect x="188" y="327" width="50" height="43" rx="7" fill="#5795BE"/><text x="213" y="354" text-anchor="middle" class="panel-num">W2</text>
+    <rect x="244" y="327" width="50" height="43" rx="7" fill="#73A8C4"/><text x="269" y="354" text-anchor="middle" class="panel-num">W3</text>
+    <text x="319" y="354" class="label">…</text>
+    <rect x="349" y="327" width="50" height="43" rx="7" fill="#8BB8CD"/><text x="374" y="354" text-anchor="middle" class="panel-num">W6</text>
+    <rect x="405" y="327" width="50" height="43" rx="7" fill="#A3C8D6"/><text x="430" y="354" text-anchor="middle" class="panel-num">W7</text>
+  </g>
+  <path d="M101 378 L101 406 L430 406 L430 378" fill="none" stroke="#1F6FB2" stroke-width="2"/>
+  <text x="265" y="430" text-anchor="middle" class="math">8 warp → 8 righe Y[i, 0…k−1]</text>
+  <text x="76" y="456" class="tiny">I warp con warp_id ≥ m_loc escono tutti insieme.</text>
+
+  <!-- Panel 2 -->
+  <g filter="url(#shadow)">
+    <rect x="550" y="138" width="1006" height="332" rx="18" fill="#FFFFFF"/>
+  </g>
+  <circle cx="584" cy="174" r="18" fill="#16856B"/>
+  <text x="584" y="180" text-anchor="middle" class="panel-num">2</text>
+  <text x="614" y="181" class="panel-title">Passo r: le lane visitano j = 32r + lane</text>
+  <text x="1498" y="181" text-anchor="end" class="small">qui sono mostrate 8 lane rappresentative su 32</text>
+
+  <!-- A row -->
+  <text x="586" y="225" class="label">A: riga i del warp</text>
+  <text x="586" y="247" class="tiny">lettura contigua e coalescente</text>
+  <g transform="translate(585 263)">
+    <rect x="0" y="0" width="62" height="46" fill="#D9EAF7" class="cell"/><text x="31" y="20" text-anchor="middle" class="tiny">lane 0</text><text x="31" y="37" text-anchor="middle" class="tiny">A[i,j]</text>
+    <rect x="62" y="0" width="62" height="46" fill="#CDE3F3" class="cell"/><text x="93" y="20" text-anchor="middle" class="tiny">lane 1</text><text x="93" y="37" text-anchor="middle" class="tiny">j+1</text>
+    <rect x="124" y="0" width="62" height="46" fill="#C1DCF0" class="cell"/><text x="155" y="20" text-anchor="middle" class="tiny">lane 2</text><text x="155" y="37" text-anchor="middle" class="tiny">j+2</text>
+    <rect x="186" y="0" width="62" height="46" fill="#B5D5EC" class="cell"/><text x="217" y="20" text-anchor="middle" class="tiny">lane 3</text><text x="217" y="37" text-anchor="middle" class="tiny">j+3</text>
+    <rect x="248" y="0" width="62" height="46" fill="#EEF5FA" class="cell"/><text x="279" y="29" text-anchor="middle" class="label">⋯</text>
+    <rect x="310" y="0" width="62" height="46" fill="#A9CEE8" class="cell"/><text x="341" y="20" text-anchor="middle" class="tiny">lane 29</text><text x="341" y="37" text-anchor="middle" class="tiny">j+29</text>
+    <rect x="372" y="0" width="62" height="46" fill="#9DC7E5" class="cell"/><text x="403" y="20" text-anchor="middle" class="tiny">lane 30</text><text x="403" y="37" text-anchor="middle" class="tiny">j+30</text>
+    <rect x="434" y="0" width="62" height="46" fill="#91C0E1" class="cell"/><text x="465" y="20" text-anchor="middle" class="tiny">lane 31</text><text x="465" y="37" text-anchor="middle" class="tiny">j+31</text>
+  </g>
+
+  <path d="M1097 286 C1140 286,1140 286,1172 286" fill="none" stroke="#D66A1F" stroke-width="3" marker-end="url(#arrowOrange)"/>
+  <text x="1134" y="273" text-anchor="middle" class="tiny">per ogni c</text>
+
+  <!-- X columns -->
+  <text x="1188" y="225" class="label">X column-major</text>
+  <text x="1188" y="247" class="tiny">indirizzo: X[c·n_loc + j]</text>
+  <g transform="translate(1188 263)">
+    <g>
+      <rect x="0" y="0" width="58" height="13" fill="#D7F2E9" class="cell"/><rect x="0" y="13" width="58" height="13" fill="#CFEFE4" class="cell"/><rect x="0" y="26" width="58" height="13" fill="#C6EBDE" class="cell"/><rect x="0" y="39" width="58" height="13" fill="#F0F8F5" class="cell"/><rect x="0" y="52" width="58" height="13" fill="#B3E2D2" class="cell"/><rect x="0" y="65" width="58" height="13" fill="#AAE0CB" class="cell"/>
+      <text x="29" y="11" text-anchor="middle" class="tiny">L0</text><text x="29" y="24" text-anchor="middle" class="tiny">L1</text><text x="29" y="37" text-anchor="middle" class="tiny">L2</text><text x="29" y="50" text-anchor="middle" class="tiny">⋮</text><text x="29" y="63" text-anchor="middle" class="tiny">L30</text><text x="29" y="76" text-anchor="middle" class="tiny">L31</text>
+      <text x="29" y="-8" text-anchor="middle" class="tiny">c = 0</text>
+    </g>
+    <g transform="translate(72 0)">
+      <rect x="0" y="0" width="58" height="13" fill="#D7F2E9" class="cell"/><rect x="0" y="13" width="58" height="13" fill="#CFEFE4" class="cell"/><rect x="0" y="26" width="58" height="13" fill="#C6EBDE" class="cell"/><rect x="0" y="39" width="58" height="13" fill="#F0F8F5" class="cell"/><rect x="0" y="52" width="58" height="13" fill="#B3E2D2" class="cell"/><rect x="0" y="65" width="58" height="13" fill="#AAE0CB" class="cell"/>
+      <text x="29" y="-8" text-anchor="middle" class="tiny">c = 1</text>
+    </g>
+    <text x="158" y="42" text-anchor="middle" class="label">⋯</text>
+    <g transform="translate(188 0)">
+      <rect x="0" y="0" width="58" height="13" fill="#D7F2E9" class="cell"/><rect x="0" y="13" width="58" height="13" fill="#CFEFE4" class="cell"/><rect x="0" y="26" width="58" height="13" fill="#C6EBDE" class="cell"/><rect x="0" y="39" width="58" height="13" fill="#F0F8F5" class="cell"/><rect x="0" y="52" width="58" height="13" fill="#B3E2D2" class="cell"/><rect x="0" y="65" width="58" height="13" fill="#AAE0CB" class="cell"/>
+      <text x="29" y="-8" text-anchor="middle" class="tiny">c = k−1</text>
+    </g>
+  </g>
+  <path d="M1451 263 L1451 339" stroke="#16856B" stroke-width="3" marker-end="url(#arrowGreen)"/>
+  <text x="1470" y="282" class="tiny">lane 0</text>
+  <text x="1470" y="338" class="tiny">lane 31</text>
+  <text x="1352" y="371" text-anchor="middle" class="small">a c fissato: 32 indirizzi consecutivi</text>
+
+  <rect x="585" y="398" width="933" height="48" rx="10" fill="#F0F7F4" stroke="#9ACDBE"/>
+  <text x="606" y="428" class="math">Ogni lane riusa a = A[i,j]: acc_lane[c] ← acc_lane[c] + a · X[j,c] per c = 0…k−1</text>
+
+  <!-- Panel 3 -->
+  <g filter="url(#shadow)">
+    <rect x="44" y="494" width="940" height="478" rx="18" fill="#FFFFFF"/>
+  </g>
+  <circle cx="78" cy="530" r="18" fill="#D66A1F"/>
+  <text x="78" y="536" text-anchor="middle" class="panel-num">3</text>
+  <text x="108" y="537" class="panel-title">Accumulazione privata nei registri</text>
+  <text x="78" y="572" class="body">Ogni lane somma il proprio sottoinsieme j = lane, lane+32, lane+64, …</text>
+
+  <g transform="translate(78 603)">
+    <rect x="0" y="0" width="860" height="54" rx="10" fill="url(#laneBand)" stroke="#AEC5D7"/>
+    <rect x="0" y="65" width="860" height="54" rx="10" fill="url(#laneBand)" stroke="#AEC5D7"/>
+    <rect x="0" y="130" width="860" height="54" rx="10" fill="url(#laneBand)" stroke="#AEC5D7"/>
+    <rect x="0" y="231" width="860" height="54" rx="10" fill="url(#laneBand)" stroke="#AEC5D7"/>
+
+    <text x="18" y="33" class="label">lane 0</text>
+    <text x="18" y="98" class="label">lane 1</text>
+    <text x="18" y="163" class="label">lane 2</text>
+    <text x="18" y="264" class="label">lane 31</text>
+    <text x="43" y="217" class="label">⋮</text>
+
+    <g transform="translate(110 10)">
+      <rect x="0" y="0" width="116" height="34" rx="6" fill="#FFE7D2" stroke="#E6A36D"/><text x="58" y="22" text-anchor="middle" class="code">acc[0]</text>
+      <rect x="128" y="0" width="116" height="34" rx="6" fill="#FFE7D2" stroke="#E6A36D"/><text x="186" y="22" text-anchor="middle" class="code">acc[1]</text>
+      <text x="275" y="23" class="label">…</text>
+      <rect x="310" y="0" width="136" height="34" rx="6" fill="#FFE7D2" stroke="#E6A36D"/><text x="378" y="22" text-anchor="middle" class="code">acc[k−1]</text>
+      <text x="478" y="22" class="small">registri della lane</text>
+    </g>
+    <g transform="translate(110 75)">
+      <rect x="0" y="0" width="116" height="34" rx="6" fill="#FFE7D2" stroke="#E6A36D"/><text x="58" y="22" text-anchor="middle" class="code">acc[0]</text>
+      <rect x="128" y="0" width="116" height="34" rx="6" fill="#FFE7D2" stroke="#E6A36D"/><text x="186" y="22" text-anchor="middle" class="code">acc[1]</text>
+      <text x="275" y="23" class="label">…</text>
+      <rect x="310" y="0" width="136" height="34" rx="6" fill="#FFE7D2" stroke="#E6A36D"/><text x="378" y="22" text-anchor="middle" class="code">acc[k−1]</text>
+    </g>
+    <g transform="translate(110 140)">
+      <rect x="0" y="0" width="116" height="34" rx="6" fill="#FFE7D2" stroke="#E6A36D"/><text x="58" y="22" text-anchor="middle" class="code">acc[0]</text>
+      <rect x="128" y="0" width="116" height="34" rx="6" fill="#FFE7D2" stroke="#E6A36D"/><text x="186" y="22" text-anchor="middle" class="code">acc[1]</text>
+      <text x="275" y="23" class="label">…</text>
+      <rect x="310" y="0" width="136" height="34" rx="6" fill="#FFE7D2" stroke="#E6A36D"/><text x="378" y="22" text-anchor="middle" class="code">acc[k−1]</text>
+    </g>
+    <g transform="translate(110 241)">
+      <rect x="0" y="0" width="116" height="34" rx="6" fill="#FFE7D2" stroke="#E6A36D"/><text x="58" y="22" text-anchor="middle" class="code">acc[0]</text>
+      <rect x="128" y="0" width="116" height="34" rx="6" fill="#FFE7D2" stroke="#E6A36D"/><text x="186" y="22" text-anchor="middle" class="code">acc[1]</text>
+      <text x="275" y="23" class="label">…</text>
+      <rect x="310" y="0" width="136" height="34" rx="6" fill="#FFE7D2" stroke="#E6A36D"/><text x="378" y="22" text-anchor="middle" class="code">acc[k−1]</text>
+    </g>
+  </g>
+
+  <rect x="78" y="907" width="860" height="42" rx="9" fill="#FFF7EF" stroke="#F1C69F"/>
+  <text x="96" y="934" class="small">k = 3, 6, 8, 20, 32: array acc[K] specializzato a compile-time; altri k: tile runtime di 4 colonne.</text>
+
+  <!-- Panel 4 -->
+  <g filter="url(#shadow)">
+    <rect x="1008" y="494" width="548" height="478" rx="18" fill="#FFFFFF"/>
+  </g>
+  <circle cx="1042" cy="530" r="18" fill="#7048A8"/>
+  <text x="1042" y="536" text-anchor="middle" class="panel-num">4</text>
+  <text x="1072" y="537" class="panel-title">Riduzione nel warp e scrittura</text>
+  <text x="1042" y="572" class="body">Per ogni c, le 32 somme parziali convergono nella lane 0.</text>
+
+  <g transform="translate(1052 615)">
+    <text x="0" y="17" class="code">offset</text>
+    <g transform="translate(78 0)">
+      <rect x="0" y="0" width="58" height="31" rx="6" fill="#EEE7F7" stroke="#A98CCB"/><text x="29" y="21" text-anchor="middle" class="code">16</text>
+      <path d="M68 15 L103 15" stroke="#7048A8" stroke-width="2.5" marker-end="url(#arrowPurple)"/>
+      <rect x="114" y="0" width="58" height="31" rx="6" fill="#E8DDF4" stroke="#9B79C4"/><text x="143" y="21" text-anchor="middle" class="code">8</text>
+      <path d="M182 15 L217 15" stroke="#7048A8" stroke-width="2.5" marker-end="url(#arrowPurple)"/>
+      <rect x="228" y="0" width="58" height="31" rx="6" fill="#E0D2F0" stroke="#8E67BB"/><text x="257" y="21" text-anchor="middle" class="code">4</text>
+      <path d="M296 15 L331 15" stroke="#7048A8" stroke-width="2.5" marker-end="url(#arrowPurple)"/>
+      <rect x="342" y="0" width="58" height="31" rx="6" fill="#D8C6EB" stroke="#8055B3"/><text x="371" y="21" text-anchor="middle" class="code">2</text>
+    </g>
+    <path d="M449 31 L449 60 L305 60" fill="none" stroke="#7048A8" stroke-width="2.5" marker-end="url(#arrowPurple)"/>
+    <rect x="214" y="45" width="58" height="31" rx="6" fill="#CFBAE6" stroke="#7048A8"/><text x="243" y="66" text-anchor="middle" class="code">1</text>
+    <text x="0" y="110" class="code">acc[c] += __shfl_down_sync(mask, acc[c], offset)</text>
+  </g>
+
+  <rect x="1044" y="761" width="476" height="58" rx="12" fill="#F3EEFA" stroke="#B8A2D3"/>
+  <text x="1282" y="786" text-anchor="middle" class="label">lane 0 contiene l’intera riga risultante</text>
+  <text x="1282" y="807" text-anchor="middle" class="code">acc[c] = Σⱼ A[i,j] · X[j,c]</text>
+
+  <path d="M1282 830 L1282 860" stroke="#16856B" stroke-width="3" marker-end="url(#arrowGreen)"/>
+  <rect x="1068" y="875" width="428" height="48" rx="9" fill="#DDF3EC" stroke="#75B9A6"/>
+  <text x="1282" y="905" text-anchor="middle" class="code">lane 0 → Y[i, 0…k−1]</text>
+  <text x="1282" y="949" text-anchor="middle" class="tiny">Nessuna shared memory, nessuna __syncthreads().</text>
+
+  <!-- Footer -->
+  <text x="800" y="1012" text-anchor="middle" class="small">Invariante visivo: blu = A / mapping warp, verde = X e output, arancio = registri, viola = shuffle.</text>
+</svg>
