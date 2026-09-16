@@ -103,22 +103,22 @@
 \contentsline {subsection}{\numberline {7.1.5}Esito della Fase 1 - Configurazioni consolidate}{60}{subsection.7.1.5}%
 \contentsline {section}{\numberline {7.2}Fase 2 - Caratterizzazione dimensionale}{61}{section.7.2}%
 \contentsline {section}{\numberline {7.3}Fase 3 - Effetto della precisione numerica}{66}{section.7.3}%
-\contentsline {section}{\numberline {7.4}Fase 4 - Esecuzione distribuita MPI + CUDA}{68}{section.7.4}%
-\contentsline {subsection}{\numberline {7.4.1}Metrica rank-local e tempo collettivo}{68}{subsection.7.4.1}%
+\contentsline {section}{\numberline {7.4}Fase 4 - Esecuzione distribuita MPI + CUDA}{69}{section.7.4}%
+\contentsline {subsection}{\numberline {7.4.1}Metrica rank-local e tempo collettivo}{69}{subsection.7.4.1}%
 \contentsline {subsection}{\numberline {7.4.2}Effetto del numero di rank}{69}{subsection.7.4.2}%
 \contentsline {subsection}{\numberline {7.4.3}Effetto della griglia MPI}{70}{subsection.7.4.3}%
 \contentsline {subsection}{\numberline {7.4.4}Confronto fra backend nella composizione MPI + CUDA}{71}{subsection.7.4.4}%
-\contentsline {section}{\numberline {7.5}Risultati complementari sul backend CPU}{71}{section.7.5}%
+\contentsline {section}{\numberline {7.5}Risultati complementari sul backend CPU}{72}{section.7.5}%
 \contentsline {subsection}{\numberline {7.5.1}Il nucleo di CPU a rank singolo}{72}{subsection.7.5.1}%
 \contentsline {subsection}{\numberline {7.5.2}Effetto del numero di rank e della scala}{73}{subsection.7.5.2}%
-\contentsline {section}{\numberline {7.6}Il costo dei dati: trasferimenti e preprocessing}{74}{section.7.6}%
+\contentsline {section}{\numberline {7.6}Il costo dei dati: trasferimenti e preprocessing}{75}{section.7.6}%
 \contentsline {section}{\numberline {7.7}Sintesi}{76}{section.7.7}%
 \contentsline {chapter}{\numberline {8}Conclusioni}{77}{chapter.8}%
 \contentsline {section}{\numberline {8.1}Che cosa \`e stato realizzato}{77}{section.8.1}%
 \contentsline {section}{\numberline {8.2}Che cosa dicono i dati finora}{77}{section.8.2}%
 \contentsline {section}{\numberline {8.3}Lavori futuri}{78}{section.8.3}%
-\contentsline {paragraph}{Blocking del ciclo su $j$ sul nucleo di CPU.}{78}{section*.64}%
-\contentsline {paragraph}{Parallelizzazione OpenMP interna al processo.}{78}{section*.65}%
-\contentsline {paragraph}{MPI CUDA-aware.}{78}{section*.66}%
-\contentsline {paragraph}{MPS per la condivisione della GPU.}{78}{section*.67}%
-\contentsline {paragraph}{Profilazione con \texttt {ncu}.}{78}{section*.68}%
+\contentsline {paragraph}{Blocking del ciclo su $j$ sul nucleo di CPU.}{78}{section*.65}%
+\contentsline {paragraph}{Parallelizzazione OpenMP interna al processo.}{78}{section*.66}%
+\contentsline {paragraph}{MPI CUDA-aware.}{78}{section*.67}%
+\contentsline {paragraph}{MPS per la condivisione della GPU.}{78}{section*.68}%
+\contentsline {paragraph}{Profilazione con \texttt {ncu}.}{78}{section*.69}%

@@ -994,64 +994,112 @@ $k$ & FP64 & FP32 & FP64 & FP32 \\
 
 \subsubsection*{Lettura}
 
-\textbf{La previsione centrale del modello è confermata.} Il roofline prevedeva
-che $S_{32/64}$ dovesse \emph{crescere} con $k$, e che uno speedup piatto
-vicino a 2 lo avrebbe falsificato. Misurato su \kernelname{cuda\_warp}:
-$2{,}00$ a $k = 3$, poi $3{,}30$, $4{,}00$, $4{,}20$ e $5{,}48$ a $k = 32$. Il
-valore a $k = 3$ è particolarmente significativo perché è \emph{esattamente} 2,
-cioè il rapporto fra le dimensioni degli scalari: a $k = 3$ entrambe le
-precisioni sono memory-bound - il crossover FP64 cade a $k \approx 3{,}1$ - e
-il guadagno si riduce al solo traffico risparmiato. Il modello non prevede solo
-l'andamento, prevede il punto di partenza.
+\subsubsection*{Lettura}
 
-\textbf{La shared memory guadagna in FP32, esattamente dove il modello dice che
-può.} \kernelname{cuda\_warp\_smem} batte \kernelname{cuda\_warp} a $k = 20$
-($1727$ contro $1489$ GFLOPS, $+16\%$) dopo esserne stato indistinguibile in
-FP64 su tutto l'intervallo. È il controllo incrociato previsto nella campagna
-1.5: in FP32 il nucleo resta memory-bound su tutta la traccia, quindi ridurre
-il traffico su $X$ ha dove tradursi. Le due campagne, prese insieme, dicono una
-cosa che nessuna delle due direbbe da sola: \kernelname{cuda\_warp\_smem} non è
-un kernel inferiore, è un kernel il cui vantaggio è invisibile nel regime FP64
-di questa scheda.
+\textbf{Lo speedup FP32/FP64 cresce con $k$, in accordo con la previsione
+qualitativa del modello.}
+Per \kernelname{cuda\_warp} il rapporto
 
-\textbf{A $k = 32$ in FP32 qualcosa cambia di nuovo, e va detto invece di
-nascosto.} Lì \kernelname{cuda\_warp\_smem} crolla a $1473$ GFLOPS, sotto
-\kernelname{cuda\_warp}, e la percentuale del tetto scende al $20{,}6\%$. Il
-piano di \cref{tab:ris-fase3-piano} mostra che in FP32 il tile a $k = 32$ tiene
-160 righe con 3 blocchi residenti per SM: rispetto a $k = 20$ il numero di
-accumulatori per lane sale da 20 a 32 e l'occupancy ne risente. La lettura
-completa richiederebbe i dati \code{ptxas} non ancora raccolti, e per questo
-resta un'indicazione e non una conclusione.
+\[
+S_{32/64}
+=
+\frac{\overline{t}_{\mathrm{kernel}}^{\mathrm{FP64}}}
+     {\overline{t}_{\mathrm{kernel}}^{\mathrm{FP32}}}
+\]
 
-\textbf{Nessun kernel avvicina il tetto FP32 ai $k$ grandi.} La
-\cref{tab:ris-fase3-tetto} è il risultato meno comodo del capitolo: in FP32 si
-parte dall'$89{,}9\%$ del tetto a $k = 3$ e si scende al $27{,}1\%$ a $k = 32$.
-Il motivo è in un limite del modello roofline adottato: l'intensità aritmetica
-conta il solo traffico su $A$ verso la DRAM,
-mentre il traffico su $X$, pari a $\mloc\nloc k$ elementi, consuma banda L2 e
-non compare nel modello. In FP64 quel traffico è nascosto dal tetto di calcolo,
-in FP32, dove il tetto di calcolo è 32 volte più alto, diventa il limite vero.
-Il roofline a un solo livello ha quindi previsto correttamente il
-\emph{regime} e sovrastimato il \emph{tetto}, e la campagna individua esattamente
-dove va raffinato.
+vale $2{,}00$ a $k=3$, quindi cresce a $3{,}30$, $4{,}00$, $4{,}20$ e
+$5{,}48$ per $k=32$. Il comportamento non è quindi compatibile con uno
+speedup costante determinato unicamente dal dimezzamento della dimensione
+degli elementi.
 
-\textbf{Il $28\times$ di cuBLAS non è uno speedup di precisione.} È il rapporto
-fra un percorso FP64 patologicamente lento su questo problema e un percorso
-FP32 che invece raggiunge una quota ragionevole, fra il $63\%$ e il $67\%$ del
-tetto, costante su
-tutti i $k$. Notevole è proprio la costanza: in FP32 cuBLAS è l'unico backend
-che mantiene la stessa frazione del tetto al crescere di $k$, ed è il segno che
-il suo tiling gestisce il traffico su $X$ meglio dei kernel custom. Ai $k$
-grandi in singola precisione la libreria torna competitiva e, a $k = 32$,
-vince: $4792$ GFLOPS contro i $1946$ di \kernelname{cuda\_warp}. È il rovescio
-esatto del risultato FP64, e insieme i due dicono che la scelta ``kernel
-custom'' è giustificata dal regime del progetto, non in assoluto.
+Il punto $k=3$ è inoltre coerente con il crossover previsto dal roofline
+FP64, collocato dal modello intorno a $k\simeq3{,}1$. In quel regime il
+passaggio da \code{double} a \code{float} dimezza la quantità di byte associata
+agli stessi elementi e uno speedup vicino a due è quindi quello atteso da un
+limite prevalentemente legato al traffico di memoria. Il singolo valore
+$S_{32/64}=2{,}00$ non costituisce però, da solo, una misura diretta del collo
+di bottiglia. Il risultato significativo è l'andamento complessivo dello
+speedup, che aumenta progressivamente con $k$ invece di rimanere piatto.
 
-I dati disponibili non comprendono il report di allocazione prodotto da
-\code{ptxas}. La pressione sui registri resta quindi l'interpretazione più
-coerente sia per il calo di \kernelname{cuda\_warp\_smem} a $k=32$ in FP32,
-sia per i lanci falliti a \code{BLOCK}$=1024$, ma non viene presentata come una
-misura diretta.
+\textbf{In FP32 lo staging di $X$ in shared memory può produrre un vantaggio
+che non era visibile in FP64.}
+A $k=20$, \kernelname{cuda\_warp\_smem} raggiunge $1726{,}9$ GFLOPS contro
+$1489{,}3$ GFLOPS di \kernelname{cuda\_warp}, con un vantaggio di circa il
+$16\%$. In FP64, sullo stesso valore di $k$, i due kernel erano invece
+praticamente indistinguibili.
+
+Il confronto è coerente con l'ipotesi che, quando il tetto aritmetico FP64
+cessa di essere il limite dominante, diventi più importante il percorso
+attraverso cui $X$ raggiunge le lane. \kernelname{cuda\_warp\_smem} riduce
+infatti le letture globali ridondanti di $X$ fra i warp dello stesso blocco,
+pagando in cambio il caricamento cooperativo del tile e le sincronizzazioni.
+
+Il risultato non implica tuttavia che la shared memory sia sempre preferibile
+in FP32. Il vantaggio dipende da $k$ e dalle risorse richieste dal kernel, come
+mostra il comportamento del punto successivo.
+
+\textbf{A $k=32$ il comportamento di \kernelname{cuda\_warp\_smem} cambia
+nuovamente.}
+Il throughput scende a $1473{,}0$ GFLOPS, contro i $1945{,}9$ GFLOPS di
+\kernelname{cuda\_warp}. Anche il piano scelto a runtime cambia: per
+\kernelname{cuda\_warp\_smem} si passa da 192 righe per tile e 4 blocchi
+residenti per SM a $k=20$ a 160 righe e 3 blocchi residenti per SM a $k=32$.
+
+Il dato mostra quindi che la configurazione a $k=32$ dispone di un minore
+grado di residenza rispetto al caso $k=20$. È plausibile che l'aumento del
+numero di accumulatori e, più in generale, del consumo di risorse per thread
+contribuisca a questa variazione. I risultati raccolti non permettono però di
+attribuire il calo a una risorsa specifica.
+
+Il progetto viene compilato con \code{-Xptxas -v}, ma i report di allocazione
+prodotti da \code{ptxas} non sono stati conservati fra i risultati della
+campagna. La pressione sui registri rimane quindi un'interpretazione
+compatibile con i dati, non una misura diretta.
+
+\textbf{Il roofline FP32 sovrastima progressivamente il throughput dei kernel
+custom ai valori maggiori di $k$.}
+Per \kernelname{cuda\_warp} la quota del tetto utilizzato nel modello passa
+dall'$89{,}9\%$ a $k=3$ all'$87{,}0\%$ a $k=6$, quindi scende al
+$78{,}9\%$, al $33{,}2\%$ e infine al $27{,}1\%$ per $k=32$.
+\kernelname{cuda\_warp\_smem} mostra un andamento analogo.
+
+Questo risultato evidenzia il limite del modello adottato. L'intensità
+aritmetica utilizzata nel roofline descrive il rapporto fra operazioni e
+traffico associato ad $A$, mettendo in evidenza il riuso esplicito della
+matrice. Non rappresenta invece l'intero traffico del kernel. Gli accessi a
+$X$, il comportamento delle cache, la shared memory, la pressione sui
+registri e l'efficienza dell'esecuzione del warp possono quindi diventare
+rilevanti senza essere rappresentati da quel singolo valore di intensità.
+
+In FP64 tali costi rimangono in larga parte nascosti dal basso tetto
+aritmetico della scheda. In FP32 il margine di calcolo disponibile è molto
+maggiore e il modello basato sul solo traffico di $A$ diventa
+progressivamente meno accurato come previsione quantitativa del throughput.
+La campagna conferma quindi l'utilità del roofline nell'individuare il cambio
+di regime, ma mostra anche la necessità di un modello più completo per
+descrivere i valori assoluti in FP32.
+
+\textbf{Il grande speedup di cuBLAS fra FP64 e FP32 riflette due percorsi
+prestazionali molto diversi.}
+Il rapporto $S_{32/64}$ rimane compreso fra circa $28\times$ e $29\times$ su
+tutti i valori di $k$, molto al di sopra di quello osservato per i kernel
+custom. In FP32 cuBLAS raggiunge inoltre una frazione relativamente stabile
+del tetto utilizzato nel modello, fra circa il $63\%$ e il $67\%$, mentre in
+FP64 il suo throughput era molto inferiore.
+
+Il dato non può essere interpretato come un generico ``vantaggio della
+singola precisione'' pari a $28\times$. Mostra piuttosto che le implementazioni
+interne selezionate dalla libreria nelle due precisioni hanno un comportamento
+molto diverso su questo problema. Senza profilazione non è possibile stabilire
+quale kernel interno venga utilizzato, quale strategia di tiling adotti o
+quale componente determini il divario.
+
+Il confronto prestazionale rimane comunque netto: a $k=32$ cuBLAS raggiunge
+$4791{,}9$ GFLOPS, contro $1945{,}9$ GFLOPS di
+\kernelname{cuda\_warp}. Il risultato ribalta quello osservato in FP64 e
+mostra che la convenienza dei kernel specializzati sviluppati nel progetto è
+legata al regime considerato, non costituisce un vantaggio universale rispetto
+alla libreria.
 
 \section{Fase 4 - Esecuzione distribuita MPI + CUDA}
 \label{sec:ris-fase4}

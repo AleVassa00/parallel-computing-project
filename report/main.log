@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.8.27)  16 SEP 2026 20:17
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.8.27)  16 SEP 2026 20:19
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -1322,23 +1322,23 @@ Package cleveref Info: loaded `italian' language definitions on input line 887.
 Package pgfplots info on input line 955: Using 'lua backend=false' for axis: ymode=log unsupported (yet).
 Package cleveref Info: loaded `italian' language definitions on input line 973.
  [66]
-Package cleveref Info: loaded `italian' language definitions on input line 1037.
+Package cleveref Info: loaded `italian' language definitions on input line 1036.
  [67]
-Package cleveref Info: loaded `italian' language definitions on input line 1109.
+Package cleveref Info: loaded `italian' language definitions on input line 1104.
  [68]
-Package cleveref Info: loaded `italian' language definitions on input line 1182.
+Package cleveref Info: loaded `italian' language definitions on input line 1195.
  [69]
-Package cleveref Info: loaded `italian' language definitions on input line 1264.
+Package cleveref Info: loaded `italian' language definitions on input line 1266.
  [70]
 Package cleveref Info: loaded `italian' language definitions on input line 1333.
  [71]
-Package cleveref Info: loaded `italian' language definitions on input line 1406.
+Package cleveref Info: loaded `italian' language definitions on input line 1411.
  [72]
-Package cleveref Info: loaded `italian' language definitions on input line 1477.
+Package cleveref Info: loaded `italian' language definitions on input line 1514.
  [73]
-Package cleveref Info: loaded `italian' language definitions on input line 1568.
+Package cleveref Info: loaded `italian' language definitions on input line 1571.
  [74]
-Package cleveref Info: loaded `italian' language definitions on input line 1636.
+Package cleveref Info: loaded `italian' language definitions on input line 1651.
  [75]) (./sezioni/11-conclusioni.tex
 Package cleveref Info: loaded `italian' language definitions on input line 1.
  [76]
@@ -1372,18 +1372,18 @@ Package rerunfilecheck Info: File `main.out' has not changed.
 (rerunfilecheck)             Checksum: 7B7DFDA58333AC1BC47DBE492B602BEF;24495.
  ) 
 Here is how much of TeX's memory you used:
- 48620 strings out of 467525
- 1121468 string characters out of 5418982
+ 48621 strings out of 467525
+ 1121475 string characters out of 5418982
  1846094 words of memory out of 5000000
  76013 multiletter control sequences out of 15000+600000
- 782224 words of font info for 355 fonts, out of 8000000 for 9000
+ 782177 words of font info for 355 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  103i,19n,111p,1082b,2285s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmcsc10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmex10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi6.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr6.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy6.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtk10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtt10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtt9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtti10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on main.pdf (82 pages, 1715387 bytes).
+Output written on main.pdf (82 pages, 1717324 bytes).
 PDF statistics:
  1736 PDF objects out of 2073 (max. 8388607)
  1270 compressed objects within 13 object streams
- 372 named destinations out of 1000 (max. 500000)
+ 373 named destinations out of 1000 (max. 500000)
  89478 words of extra memory for PDF output out of 106986 (max. 10000000)
 
