@@ -1,689 +1,1275 @@
 \chapter{Risultati}
 \label{cap:risultati}
 
+Il capitolo segue l'ordine delle fasi introdotte in \cref{sec:disegno-fasi}.
+Ogni sezione riporta prima i numeri misurati e poi, separatamente, la loro
+lettura: che cosa il singolo esperimento permette di concludere, e che cosa
+diventa invece leggibile solo mettendolo accanto agli esperimenti correlati.
+La separazione è voluta: le tabelle restano valide anche se una lettura viene
+in seguito rivista.
+
 \section{Stato della raccolta dati}
+\label{sec:stato-dati}
 
 \begin{table}[H]
 \centering
 \footnotesize
 \caption{Stato delle campagne al momento di questa versione della relazione.}
 \label{tab:stato-campagne}
-\begin{tabular}{@{}llll@{}}
+\begin{tabular}{@{}cllcl@{}}
 \toprule
-\textbf{Campagna} & \textbf{Stato} & \textbf{Dati disponibili} & \textbf{Sezione} \\
+\textbf{Fase} & \textbf{Campagna} & \textbf{Config.} & \textbf{Stato} & \textbf{Sezione} \\
 \midrule
-C3 (baseline CPU) & parziale & build specializzata, $P=1$, $10000^2$ & \cref{sec:c3} \\
-C3 (build generica) & \textcolor{todorosso}{da eseguire} & --- & \cref{sec:c3-generic} \\
-C2 ($k$-sweep, 6 backend) & \textcolor{todorosso}{da eseguire} & --- & \cref{sec:ris-c2} \\
-C1 (taglia $\times$ rapporto) & \textcolor{todorosso}{da eseguire} & --- & \cref{sec:ris-c1} \\
-C6 (forma della griglia) & \textcolor{todorosso}{da eseguire} & --- & \cref{sec:ris-c6} \\
-C4 (strong scaling) & \textcolor{todorosso}{da eseguire} & --- & \cref{sec:ris-c4} \\
-C5 (weak scaling) & \textcolor{todorosso}{da eseguire} & --- & \cref{sec:ris-c5} \\
-C7.1 (precisione $\times$ $k$) & \textcolor{todorosso}{da eseguire} & --- & \cref{sec:ris-c7} \\
-C7.2 (risorse per precisione) & \textcolor{todorosso}{da eseguire} & --- & \cref{sec:ris-c7-2} \\
+1 & 1.1 dimensione del blocco        & 105 & eseguita & \cref{sec:ris-block} \\
+1 & 1.2 layout di $X$                & 5   & eseguita & \cref{sec:ris-layout} \\
+1 & 1.3 padding della shared memory  & 10  & eseguita & \cref{sec:ris-pad} \\
+1 & 1.4 granularità del tile         & 140 & eseguita (132 riuscite) & \cref{sec:ris-granularita} \\
+1 & 1.5 confronto fra i kernel       & 20  & eseguita & \cref{sec:ris-confronto-kernel} \\
+\midrule
+2 & scala e forma di $A$             & 180 & eseguita & \cref{sec:ris-fase2} \\
+\midrule
+3 & FP32 contro FP64                 & 20  & eseguita & \cref{sec:ris-fase3} \\
+3 & risorse dichiarate da \code{ptxas} & --- & \textcolor{todorosso}{da eseguire} & \cref{sec:ris-fase3} \\
+\midrule
+4 & strong scaling MPI su CPU        & 60  & eseguita & \cref{sec:ris-fase4} \\
+\midrule
+5 & MPI + CUDA                       & --- & \textcolor{todorosso}{non eseguita} & \cref{sec:fase5-mpi-cuda} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\begin{daverificare}
-Tempo macchina stimato per completare la raccolta: circa un'ora, escluse le
-compilazioni, nell'ordine C3 (build generica) $\to$ C2 $\to$ C1 $\to$ C6 $\to$
-C4 $\to$ C5 $\to$ C7. Le sezioni che seguono sono gi\`a strutturate con le
-tabelle e le figure definitive: resta da sostituire i segnaposto con i numeri.
+Tutte le campagne eseguite condividono il protocollo di
+\cref{sec:stabilita-misure}: 20 repetition misurate dopo 5 warm-up, seme
+\num{20252026}, generazione locale di $A$ e $X$. I coefficienti di variazione
+osservati restano quasi ovunque sotto l'$1\%$ e sono riportati, campagna per
+campagna, insieme ai valori medi; dove superano tale soglia la circostanza
+viene dichiarata esplicitamente, perché è ciò che stabilisce quali differenze
+possano essere discusse e quali no.
 
-Va inoltre popolata \cref{sec:ris-trasferimenti}: i tempi esclusi dalla metrica
-ufficiale non richiedono nessuna esecuzione aggiuntiva, perch\'e ogni campagna
-li scrive gi\`a in coda al proprio CSV.
-\end{daverificare}
+\section{Fase 1 --- Tuning dei backend CUDA}
+\label{sec:ris-fase1}
 
-\section{C3 --- baseline di CPU}
-\label{sec:c3}
+Tutte le misure di questa sezione sono prese a $M = N = \num{16384}$, doppia
+precisione, $P = 1$.
 
-Configurazione: \kernelname{scheme\_a}, doppia precisione, $M = N = \num{10000}$,
-$P = 1$ (griglia $1 \times 1$), \code{--reps 20 --warmup 5}, seed
-\num{20252026}, generazione locale di $A$ e $X$. Senza comunicazione e senza GPU:
-\`e il nucleo di calcolo puro, ed \`e il denominatore di ogni speedup della
-relazione.
+\subsection{Campagna 1.1 --- Dimensione del blocco}
+\label{sec:ris-block}
+
+La \cref{tab:ris-block-perdite} riporta, per ciascun kernel e ciascun valore di
+\code{BLOCK}, le due statistiche di perdita definite nella
+\cref{eq:perdita-max}: quanto quella dimensione di blocco perde, in media e nel
+caso peggiore, rispetto al miglior blocco \emph{per lo stesso} $k$.
 
 \begin{table}[H]
 \centering
 \footnotesize
-\caption{Campagna C3, build specializzata. $t$ \`e il tempo ufficiale medio su 20
-repetition; le ultime due colonne sono derivate, non misurate, e sono definite
-nel testo.}
-\label{tab:c3-misure}
-\begin{tabular}{@{}rrrrrr@{}}
+\caption{Campagna 1.1: perdita rispetto al miglior \code{BLOCK} per lo stesso
+$k$, in percentuale. In grassetto il valore selezionato per ciascun kernel.}
+\label{tab:ris-block-perdite}
+\begin{tabular}{@{}rrrrrrr@{}}
 \toprule
-$k$ & $t$ [\si{\second}] & CV [\%] & GFLOPS & $B_A$ [\si{\giga\byte\per\second}] & $B_X$ [\si{\giga\byte\per\second}] \\
+& \multicolumn{2}{c}{\kernelname{cuda\_naive}}
+& \multicolumn{2}{c}{\kernelname{cuda\_warp}}
+& \multicolumn{2}{c}{\kernelname{cuda\_warp\_smem}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+\code{BLOCK} & media & max & media & max & media & max \\
 \midrule
-3  & 0,1336 & 1,38 & 4,49  & 5,99 & 18,0 \\
-6  & 0,1424 & 1,17 & 8,43  & 5,62 & 33,7 \\
-8  & 0,1473 & 1,10 & 10,87 & 5,43 & 43,5 \\
-20 & 0,7680 & 0,37 & 5,21  & 1,04 & 20,8 \\
-32 & 1,3073 & 0,43 & 4,90  & 0,61 & 19,6 \\
-\midrule
-\multicolumn{6}{@{}l}{\footnotesize\itshape fallback generico (due passaggi su $A$, cfr.\ \cref{eq:passaggi})}\\
-40 & 1,7591 & 0,46 & 4,55  & 0,45 & 18,2 \\
-64 & 3,0332 & 0,37 & 4,22  & 0,26 & 16,9 \\
+64   & 1,13  & 3,85  & 0,41 & 1,32 & 13,79 & 38,78 \\
+128  & \textbf{0,92} & \textbf{1,69} & \textbf{0,42} & \textbf{0,74} & 1,31 & 3,68 \\
+192  & 3,55  & 8,21  & 0,98 & 1,99 & 4,64 & 18,35 \\
+256  & 1,09  & 4,56  & 1,19 & 3,95 & \textbf{0,56} & \textbf{1,46} \\
+384  & 3,84  & 9,71  & 1,27 & 1,78 & 8,27 & 19,38 \\
+512  & 5,64  & 10,23 & 3,17 & 5,89 & 7,08 & 9,33 \\
+1024 & 10,86 & 23,29 & \multicolumn{4}{c}{\footnotesize\itshape lancio fallito per $k = 20$ e $k = 32$} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Il coefficiente di variazione resta fra $0{,}37\%$ e $1{,}38\%$: tutte le
-differenze discusse qui sotto sono di ordini di grandezza superiori alla
-dispersione delle misure. Il preprocessing del backend
-($t_{\text{setup}} \approx \SI{1.4}{\micro\second}$) \`e trascurabile, come atteso
-per un backend che si limita a registrare un puntatore.
+I valori selezionati sono quindi $\code{BLOCK} = 128$ per
+\kernelname{cuda\_naive} e \kernelname{cuda\_warp}, $\code{BLOCK} = 256$ per
+\kernelname{cuda\_warp\_smem}. Le prestazioni assolute corrispondenti sono
+riportate in \cref{tab:ris-block-assolute}.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Campagna 1.1: \code{gflops\_kernel} al \code{BLOCK} selezionato.}
+\label{tab:ris-block-assolute}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+\textbf{Backend} & $k=3$ & $k=6$ & $k=8$ & $k=20$ & $k=32$ \\
+\midrule
+\kernelname{cuda\_naive} (\code{BLOCK}=128)      & 149,3 & 308,7 & 337,3 & 345,6 & 350,3 \\
+\kernelname{cuda\_warp} (\code{BLOCK}=128)       & 300,3 & 351,4 & 350,3 & 351,4 & 352,5 \\
+\kernelname{cuda\_warp\_smem} (\code{BLOCK}=256) & 289,3 & 337,2 & 346,9 & 346,3 & 338,4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_warp_xcolumn.png}
+  \caption{\kernelname{cuda\_warp}, $X$ column-major.}
+\end{subfigure}
+\\[6pt]
+\begin{subfigure}{\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_warp_smem.png}
+  \caption{\kernelname{cuda\_warp\_smem}.}
+\end{subfigure}
+\caption{Campagna 1.1: prestazione normalizzata per $(\code{BLOCK}, k)$ a
+sinistra, perdita media e massima sui cinque $k$ a destra. Le celle
+\code{FAIL} sono i lanci non riusciti a \code{BLOCK}$=1024$.}
+\label{fig:ris-block}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_naive.png}
+\caption{Campagna 1.1: stessa lettura per \kernelname{cuda\_naive}, l'unico
+kernel che completa anche a \code{BLOCK}$=1024$.}
+\label{fig:ris-block-naive}
+\end{figure}
+
+\subsubsection*{Lettura}
+
+\textbf{Il blocco conta poco, ma non conta zero, e conta in modo diverso per i
+tre kernel.} Per \kernelname{cuda\_warp} l'intervallo fra il migliore e il
+peggiore dei sette valori è di appena $3{,}6$ punti percentuali in media: è il
+kernel meno sensibile, e la ragione è strutturale. Un warp per riga di $Y$
+significa che il lavoro è già partizionato alla granularità del warp, e quanti
+warp stiano in un blocco cambia solo come vengono raggruppati, non che cosa
+ciascuno fa. \kernelname{cuda\_warp\_smem} è invece il più sensibile
+($13{,}8\%$ di perdita media a \code{BLOCK}$=64$, con punte del $38{,}8\%$),
+ed è coerente con la sua struttura: il tile in shared memory è condiviso fra i
+warp del blocco, quindi il numero di warp per blocco è il fattore di riuso del
+tile. Con due soli warp per blocco il tile viene riletto da pochi consumatori e
+il vantaggio della shared memory si assottiglia.
+
+\textbf{L'argomento sull'occupancy regge, ma solo in parte.} La previsione era
+che 192 e 384, non essendo divisori di 1024, fossero penalizzati. Lo sono: per
+\kernelname{cuda\_naive} la perdita media passa da $1{,}09\%$ a
+\code{BLOCK}$=256$ a $3{,}55\%$ a 192 e $3{,}84\%$ a 384, e per
+\kernelname{cuda\_warp\_smem} da $0{,}56\%$ a $4{,}64\%$ e $8{,}27\%$. Ma
+\code{BLOCK}$=512$, che è un divisore di 1024, è peggiore di entrambi per
+\kernelname{cuda\_warp}: il criterio dei divisori è quindi una condizione utile
+e non sufficiente, e il residuo va cercato altrove --- in particolare nella
+pressione sui registri, che cresce con i thread per blocco.
+
+\textbf{I lanci falliti a \code{BLOCK}$=1024$ sono essi stessi un dato.} Con
+1024 thread per blocco, \kernelname{cuda\_warp} e
+\kernelname{cuda\_warp\_smem} non eseguono per $k = 20$ e $k = 32$, mentre
+\kernelname{cuda\_naive} completa. La differenza fra i kernel è esattamente il
+numero di accumulatori tenuti in registro: \kernelname{cuda\_naive} ne tiene
+uno per thread, gli altri due ne tengono $k$, che in doppia precisione valgono
+$2k$ registri a \SI{32}{\bit}.
+
+\begin{ipotesi}{a \code{BLOCK}$=1024$ il fabbisogno di registri supera il file
+di registri dello SM}
+Un blocco da 1024 thread può disporre al più di 64 registri per thread, perché
+il file di registri di uno SM Turing ne contiene \num{65536}. Con $k = 20$
+accumulatori \code{double} servono già 40 registri solo per gli accumulatori,
+ai quali si aggiungono indici, puntatori e registri temporanei; a $k = 32$ i
+soli accumulatori ne richiedono 64. Il superamento della soglia produce un
+errore di lancio a runtime, che è esattamente l'esito osservato
+(\code{exit\_code} 1, nessuna misura prodotta).
+
+\textbf{Come falsificarla.} È il controllo già previsto dalla
+caratterizzazione \code{ptxas} di \cref{sec:ris-fase3}: compilare i due kernel
+con \code{-Xptxas -v} a \code{BLOCK}$=1024$ e verificare che il numero di
+registri per thread dichiarato superi 64 per $k \ge 20$ e resti sotto per
+\kernelname{cuda\_naive}. Se non lo superasse, la causa del fallimento sarebbe
+un'altra e andrebbe cercata nel budget di shared memory.
+\end{ipotesi}
+
+\textbf{In funzione delle campagne successive.} Il risultato che conta per il
+seguito non è quale blocco vinca, ma che la scelta sia \emph{quasi
+indifferente} nell'intorno del valore selezionato: con una perdita massima
+inferiore al $2\%$ per tutti e tre i kernel, le differenze misurate nelle fasi
+2, 3 e 4 --- che sono di ordini di grandezza --- non possono essere attribuite a
+un blocco mal scelto. È precisamente ciò che la fase di tuning doveva
+garantire.
+
+\subsection{Campagna 1.2 --- Layout in memoria di $X$}
+\label{sec:ris-layout}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Campagna 1.2: \kernelname{cuda\_warp} con $X$ row-major e
+column-major, \code{BLOCK}$=128$. L'ultima colonna è il costo della conversione
+di $X$, che è preprocessing e non entra in $T$.}
+\label{tab:ris-layout}
+\begin{tabular}{@{}rrrrrr@{}}
+\toprule
+$k$ & row-major & column-major & speedup & $t_{\text{kernel}}$ row & $t_{\text{convert}}$ \\
+    & [GFLOPS] & [GFLOPS] & col/row & [\si{\milli\second}] & [\si{\milli\second}] \\
+\midrule
+3  & 297,3 & 300,3 & 1,01 & 5,4   & 0,26 \\
+6  & 352,0 & 351,4 & 1,00 & 9,2   & 0,57 \\
+8  & 182,6 & 350,3 & 1,92 & 23,5  & 0,88 \\
+20 & 174,1 & 351,4 & 2,02 & 61,7  & 2,43 \\
+32 & 92,2  & 352,5 & 3,82 & 186,4 & 3,32 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{img/fase1/campagna_VAS_2_row_major/campagna_VAS_2_layout_comparison}
+\caption{Campagna 1.2: prestazioni assolute (sinistra) e vantaggio del layout
+column-major (destra). CV massimo: $0{,}63\%$ row-major, $0{,}67\%$
+column-major.}
+\label{fig:ris-layout}
+\end{figure}
+
+\subsubsection*{Lettura}
+
+\textbf{La soglia è netta e cade fra $k = 6$ e $k = 8$.} Fino a $k = 6$ i due
+layout sono indistinguibili entro la dispersione delle misure ($1{,}01\times$ e
+$1{,}00\times$, con CV sotto lo $0{,}7\%$): la differenza non è misurabile e non
+va discussa. Da $k = 8$ in poi il column-major vince, e il vantaggio cresce
+monotonamente fino a $3{,}82\times$ a $k = 32$.
+
+\textbf{La forma della curva identifica il meccanismo.} Con $X$ row-major le
+32 lane di un warp, al passo $j$, leggono gli elementi $X[j][0..k-1]$ a
+distanza $k$ l'una dall'altra: la richiesta di memoria non è coalescibile in
+una singola transazione e il controller deve emetterne fino a una per lane. Con
+$X$ column-major gli stessi elementi diventano contigui e la richiesta collassa
+in poche transazioni. Il costo del layout sbagliato è quindi proporzionale al
+numero di transazioni sprecate, che cresce con $k$ --- ed è esattamente ciò che
+il fattore $1{,}00 \to 1{,}92 \to 2{,}02 \to 3{,}82$ mostra. Un guadagno
+costante su tutti i $k$ avrebbe indicato un'altra causa.
+
+\textbf{La conversione non cambia il bilancio, e il dato lo dimostra.} Portare
+$X$ in column-major costa fra $0{,}26$ e $3{,}32$ \si{\milli\second}, contro un
+risparmio sul kernel che a $k = 32$ vale $186{,}4 - 48{,}7 \approx
+\SI{138}{\milli\second}$ per singola invocazione. La conversione si ripaga
+quindi entro la prima invocazione anche se la si contasse dentro la metrica, e
+la scelta di tenerla fuori (è preprocessing, \cref{sec:costi-esclusi}) non è ciò
+che rende il column-major conveniente.
+
+\textbf{In funzione delle campagne correlate.} Questo risultato spiega perché
+\kernelname{cuda\_warp\_smem} non abbia bisogno della conversione e lavori
+invece con $X$ row-major: staging il tile in shared memory, la lettura da
+memoria globale viene fatta cooperativamente dai thread del blocco in forma già
+coalescente, e il layout di partenza smette di contare. I due kernel risolvono
+lo stesso problema --- l'accesso non coalescente a $X$ --- per due strade
+diverse, e il confronto della campagna 1.5 misura quale delle due costi meno.
+
+\subsection{Campagna 1.3 --- Padding del tile in shared memory}
+\label{sec:ris-pad}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Campagna 1.3: effetto di \code{SMEM\_PAD} su
+\kernelname{cuda\_warp\_smem}, \code{BLOCK}$=256$. \code{x\_rows\_per\_tile} è
+il numero di righe di $X$ che il pianificatore fa entrare nel tile.}
+\label{tab:ris-pad}
+\begin{tabular}{@{}rrrrrr@{}}
+\toprule
+$k$ & \code{PAD}=0 & \code{PAD}=1 & guadagno & \code{x\_rows} & \code{x\_rows} \\
+    & [GFLOPS] & [GFLOPS] & & \code{PAD}=0 & \code{PAD}=1 \\
+\midrule
+3  & 296,4 & 296,7 & $+0{,}1\%$  & 672 & 512 \\
+6  & 315,4 & 352,4 & $+11{,}7\%$ & 320 & 288 \\
+8  & 328,9 & 352,6 & $+7{,}2\%$  & 256 & 224 \\
+20 & 355,3 & 352,3 & $-0{,}9\%$  & 128 & 128 \\
+32 & 177,8 & 343,7 & $+93{,}3\%$ & 128 & 96 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection*{Lettura}
+
+\textbf{La previsione di \cref{sec:bank-conflict} è confermata nel suo punto
+più specifico.} L'analisi prevedeva un guadagno massimo a $k = 32$ e nullo a
+$k = 3$. Misurato: $+93{,}3\%$ a $k = 32$ e $+0{,}1\%$ a $k = 3$, cioè zero
+entro la dispersione. La conferma è forte perché la previsione era puntuale:
+non ``il padding aiuta'', ma ``il padding aiuta esattamente dove lo stride di
+riga è un multiplo di 32 banchi''. Con \code{SMEM\_PAD}$=0$ e $k = 32$ in
+doppia precisione lo stride vale $2 \cdot 32 = 64 \equiv 0 \pmod{32}$: tutte e
+32 le lane insistono sullo stesso banco e la richiesta si serializza in 32
+accessi. Il fattore misurato, poco meno di $2\times$, è inferiore al 32 teorico
+perché il conflitto riguarda solo le letture da shared memory e non l'intero
+kernel, ma il punto in cui compare è quello previsto.
+
+\textbf{I valori intermedi confermano la regola invece di contraddirla.} A
+$k = 6$ lo stride vale 12 banchi e a $k = 8$ vale 16: entrambi dividono 32 in
+modo parziale e producono conflitti a 2 e 4 vie, ai quali corrispondono
+guadagni intermedi ($+11{,}7\%$ e $+7{,}2\%$). A $k = 20$ lo stride vale 40,
+che è coprimo con 32 in modo sufficiente da distribuire le lane, e infatti il
+padding non serve --- anzi costa lo $0{,}9\%$, cioè poco più della dispersione.
+
+\textbf{Il padding non è gratis, e la tabella dice quanto costa.} Allungando la
+riga del tile di uno scalare, a parità di budget di shared memory entrano meno
+righe di $X$: da 672 a 512 a $k = 3$, da 128 a 96 a $k = 32$. È un fattore di
+riuso più basso, ed è la ragione per cui a $k = 20$ il padding risulta
+leggermente in perdita. La scelta \code{SMEM\_PAD}$=1$ è quindi un compromesso
+esplicito: si accetta un tile più piccolo su tutti i $k$ per eliminare il
+crollo su uno solo di essi, coerentemente con il criterio di robustezza di
+\cref{sec:criterio-robustezza}.
+
+\textbf{In funzione delle campagne correlate.} Il fenomeno è lo stesso già
+incontrato sulla CPU con il padding di \code{LDA} contro i conflict miss di L1:
+stessa causa (un indirizzo periodico che collide con la periodicità della
+gerarchia), stessa cura (rompere la periodicità con una colonna in più), altra
+gerarchia. La campagna 1.4 mostrerà che la perdita di riuso qui quantificata è
+anche ciò che rende la granularità del tile un parametro non trascurabile.
+
+\subsection{Campagna 1.4 --- Granularità del tile}
+\label{sec:ris-granularita}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Campagna 1.4: prestazione normalizzata di \kernelname{cuda\_warp\_smem}
+per ogni coppia $(\code{BLOCK}, g)$, in percentuale dell'ottimo per lo stesso
+$k$. Media sui cinque $k$ e caso peggiore. In grassetto la coppia selezionata.}
+\label{tab:ris-granularita}
+\begin{tabular}{@{}rrrrrrrrr@{}}
+\toprule
+& \multicolumn{2}{c}{$g = 1$} & \multicolumn{2}{c}{$g = 8$}
+& \multicolumn{2}{c}{$g = 16$} & \multicolumn{2}{c}{$g = 32$} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}
+\code{BLOCK} & media & peggiore & media & peggiore & media & peggiore & media & peggiore \\
+\midrule
+64  & 83,6 & 54,7 & 82,7 & 53,8 & 77,4 & 46,2 & 86,8 & 61,0 \\
+128 & 88,0 & 51,3 & 84,3 & 50,5 & 82,2 & 50,4 & 98,7 & 97,1 \\
+192 & 79,0 & 67,4 & 76,5 & 66,4 & 87,7 & 71,9 & 94,9 & 81,1 \\
+256 & 85,0 & 65,5 & 98,1 & 94,4 & 96,7 & 87,8 & \textbf{99,0} & \textbf{98,5} \\
+384 & 89,1 & 80,0 & 89,9 & 78,6 & 89,5 & 76,0 & 90,5 & 80,2 \\
+512 & 91,9 & 82,8 & 92,3 & 90,7 & 90,6 & 86,0 & 92,2 & 89,7 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_joint_tuning_summary}
+\caption{Campagna 1.4: tuning congiunto di \code{BLOCK} e granularità. A
+sinistra la prestazione normalizzata media sui cinque $k$, a destra il caso
+peggiore.}
+\label{fig:ris-granularita}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_block256_detail}
+\caption{Campagna 1.4: dettaglio a \code{BLOCK}$=256$. A destra il piano di
+tiling effettivamente scelto a runtime, che dipende da $k$ e non da $g$ se non
+attraverso l'arrotondamento.}
+\label{fig:ris-granularita-dettaglio}
+\end{figure}
+
+\subsubsection*{Lettura}
+
+\textbf{Il tuning congiunto era necessario, e la tabella lo dimostra.} Se
+\code{BLOCK} e $g$ fossero indipendenti, la riga migliore sarebbe la stessa per
+ogni colonna. Non lo è: a $g = 1$ il valore migliore di \code{BLOCK} è 512
+($91{,}9\%$), a $g = 8$ e $g = 32$ è 256, a $g = 16$ è ancora 256 ma con un
+margine molto più stretto su 192. Fissare \code{BLOCK} al valore trovato nella
+campagna 1.1 e cercare $g$ separatamente avrebbe quindi prodotto una
+configurazione subottima.
+
+\textbf{La granularità grossa vince perché allinea il tile ai warp.} $g = 32$
+domina su cinque delle sei dimensioni di blocco, e il valore 32 non è casuale:
+è la dimensione del warp. Arrotondare il numero di righe del tile a un multiplo
+di 32 fa sì che il caricamento cooperativo del tile si distribuisca in modo
+uniforme fra i warp del blocco, senza un warp di coda che lavora a metà
+carico. Con $g = 1$ il tile ha una dimensione arbitraria e l'ultima porzione
+viene caricata da un sottoinsieme irregolare di lane: nel caso peggiore la
+prestazione scende al $51{,}3\%$ dell'ottimo.
+
+\textbf{Il pannello destro di \cref{fig:ris-granularita-dettaglio} spiega
+perché il parametro non domina.} Il numero di righe per tile effettivamente
+scelto a runtime è quasi identico per tutte e quattro le granularità (512, 288,
+224, 128, 96 righe per $k = 3, 6, 8, 20, 32$): $g$ non decide la dimensione del
+tile, che discende dal budget di shared memory, ma solo come essa viene
+arrotondata. È il motivo per cui l'effetto è grande nei casi patologici e
+trascurabile altrove, e il motivo per cui va scelto con il criterio del caso
+peggiore e non della media.
+
+\textbf{In funzione delle campagne correlate.} Le campagne 1.3 e 1.4 agiscono
+sulla stessa risorsa --- le righe di $X$ che stanno nel tile --- in direzioni
+opposte: il padding ne toglie, la granularità corretta evita di sprecarle. La
+configurazione finale $(\code{BLOCK}, \code{SMEM\_PAD}, g) = (256, 1, 32)$
+perde l'$1{,}5\%$ nel caso peggiore, contro il $38{,}8\%$ della peggiore
+combinazione misurata: il tuning di questo kernel vale, da solo, più di quanto
+valga la differenza fra i kernel che la campagna 1.5 sta per misurare.
+
+\subsection{Campagna 1.5 --- Confronto fra i kernel}
+\label{sec:ris-confronto-kernel}
+
+Configurazioni: \kernelname{cuda\_naive} con \code{BLOCK}$=128$;
+\kernelname{cuda\_warp} con \code{BLOCK}$=128$ e $X$ column-major;
+\kernelname{cuda\_warp\_smem} con \code{BLOCK}$=256$, \code{SMEM\_PAD}$=1$,
+$g = 32$; \kernelname{cublas} come riferimento esterno.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Campagna 1.5: \code{gflops\_kernel} e tempo di kernel, $M = N =
+\num{16384}$, FP64, $P = 1$. L'ultima riga è la percentuale del tetto FP64
+nominale di \cref{tab:picchi-gpu} raggiunta dal miglior kernel.}
+\label{tab:ris-confronto-kernel}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+\textbf{Backend} & $k=3$ & $k=6$ & $k=8$ & $k=20$ & $k=32$ \\
+\midrule
+\multicolumn{6}{@{}l}{\itshape GFLOPS (kernel-only)} \\
+\kernelname{cuda\_naive}      & 150,3 & 309,3 & 347,0 & 349,2 & 353,7 \\
+\kernelname{cuda\_warp}       & \textbf{302,1} & \textbf{357,5} & \textbf{356,2} & \textbf{357,7} & \textbf{358,3} \\
+\kernelname{cuda\_warp\_smem} & 296,9 & 352,6 & 352,3 & 352,3 & 343,7 \\
+\kernelname{cublas}           & 15,4  & 30,9  & 41,1  & 102,8 & 164,3 \\
+\midrule
+\multicolumn{6}{@{}l}{\itshape $t_{\text{kernel}}$ [\si{\milli\second}]} \\
+\kernelname{cuda\_naive}      & 10,71  & 10,42  & 12,38  & 30,74  & 48,58 \\
+\kernelname{cuda\_warp}       & 5,33   & 9,01   & 12,06  & 30,02  & 47,95 \\
+\kernelname{cuda\_warp\_smem} & 5,43   & 9,13   & 12,19  & 30,48  & 49,99 \\
+\kernelname{cublas}           & 104,46 & 104,22 & 104,50 & 104,46 & 104,59 \\
+\midrule
+\% del tetto FP64 (\kernelname{cuda\_warp}) & 86,3 & 102,1 & 101,8 & 102,2 & 102,4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Il coefficiente di variazione resta sotto lo $0{,}35\%$ per
+\kernelname{cublas}, \kernelname{cuda\_warp} e \kernelname{cuda\_warp\_smem}, e
+sotto l'$1{,}3\%$ per \kernelname{cuda\_naive}: tutte le differenze discusse
+qui sotto, tranne quella fra \kernelname{cuda\_warp} e
+\kernelname{cuda\_warp\_smem}, sono di ordini di grandezza superiori alla
+dispersione.
 
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}
 \begin{axis}[scpa,
-  xlabel={$k$}, ylabel={GFLOPS},
-  xmin=0, xmax=68, ymin=0, ymax=12,
-  legend pos=north east, width=0.8\linewidth, height=6cm]
-\addplot[blue!70!black, mark=*] coordinates {(3,4.491) (6,8.425) (8,10.866) (20,5.208) (32,4.896)};
-\addlegendentry{specializzato}
-\addplot[red!60!black, mark=square*, dashed] coordinates {(40,4.548) (64,4.220)};
-\addlegendentry{fallback generico}
+  xlabel={$k$}, ylabel={GFLOPS (kernel-only)},
+  xmin=0, xmax=35, ymin=0, ymax=420,
+  xtick={3,6,8,20,32},
+  legend pos=south east, width=0.82\linewidth, height=6.4cm]
+\addplot[black, dashed, thick, forget plot, samples=2, domain=0:35]{350};
+\node[font=\scriptsize,anchor=north east,fill=white,inner sep=1pt] at (axis cs:34.5,345) {tetto FP64 nominale};
+\addplot[blue!70!black, mark=*] coordinates {(3,302.1) (6,357.5) (8,356.2) (20,357.7) (32,358.3)};
+\addlegendentry{\kernelname{cuda\_warp}}
+\addplot[teal!70!black, mark=triangle*] coordinates {(3,296.9) (6,352.6) (8,352.3) (20,352.3) (32,343.7)};
+\addlegendentry{\kernelname{cuda\_warp\_smem}}
+\addplot[orange!80!black, mark=square*] coordinates {(3,150.3) (6,309.3) (8,347.0) (20,349.2) (32,353.7)};
+\addlegendentry{\kernelname{cuda\_naive}}
+\addplot[red!70!black, mark=diamond*] coordinates {(3,15.4) (6,30.9) (8,41.1) (20,102.8) (32,164.3)};
+\addlegendentry{\kernelname{cublas}}
 \end{axis}
 \end{tikzpicture}
-\caption{C3: prestazioni del nucleo di CPU al variare di $k$. Il massimo cade a
-$k = 8$; oltre, il throughput crolla.}
-\label{fig:c3-gflops}
+\caption{Campagna 1.5: confronto fra backend in doppia precisione. La
+distanza dal tetto, non il valore assoluto, è il risultato.}
+\label{fig:ris-confronto-kernel}
 \end{figure}
 
-\subsection{Lettura: due regimi separati da una soglia di cache}
+\subsubsection*{Lettura}
 
-La curva di \cref{fig:c3-gflops} ha una forma che non si spiega con il solo
-conteggio delle operazioni: fra $k = 8$ e $k = 20$ il lavoro cresce di
-$2{,}5\times$ ma il tempo cresce di $5{,}2\times$. Il modo pi\`u diretto di
-guardare il fenomeno \`e normalizzare rispetto al numero di elementi di $A$
-elaborati, che \`e costante:
-\begin{equation}
-  \tau(k) = \frac{t(k)}{MN}
-  \qquad\text{[tempo per elemento di } A\text{]}.
-\end{equation}
+\textbf{Il roofline è confermato, e in modo quasi imbarazzante.} Il modello di
+\cref{sec:roofline-gpu} prevedeva che in FP64 il nucleo fosse memory-bound solo
+a $k = 3$ e compute-bound per ogni $k \ge 6$, con un tetto costante a
+\SI{350}{\giga\flop\per\second}. Misurato: \kernelname{cuda\_warp} sta
+all'$86{,}3\%$ del tetto a $k = 3$ e fra il $101{,}8\%$ e il $102{,}4\%$ per
+tutti i $k \ge 6$. La curva si appiattisce esattamente dove il modello diceva e
+al valore che il modello diceva. Il superamento del $100\%$ non è un errore di
+misura: il tetto di \cref{tab:picchi-gpu} è calcolato sul clock boost nominale,
+e uno scarto del $2\%$ è nell'ordine dello scostamento fra clock nominale e
+clock sostenuto.
+
+\textbf{Il guadagno di \kernelname{cuda\_warp} su \kernelname{cuda\_naive}
+scompare al crescere di $k$, ed è la cosa giusta da aspettarsi.} Lo speedup
+vale $2{,}01\times$ a $k = 3$, $1{,}16\times$ a $k = 6$ e poi $1{,}01$--$1{,}03$
+per $k \ge 8$. A prima vista è deludente; letto attraverso il roofline è
+inevitabile. Il riuso di $A$ in registro alza l'intensità aritmetica, e alzare
+l'intensità aritmetica serve \emph{soltanto} finché si è a sinistra del
+ginocchio. Da $k = 6$ in poi entrambi i kernel sono compute-bound e nessuno dei
+due può superare lo stesso tetto: quello che \kernelname{cuda\_warp} guadagna
+non ha più dove andare. Il vero risultato è che \kernelname{cuda\_naive} non
+arriva al tetto a $k = 3$ ($43{,}0\%$) mentre \kernelname{cuda\_warp} ci si
+avvicina, cioè che la differenza si manifesta tutta e sola nel regime dove il
+modello dice che può manifestarsi.
+
+\textbf{La shared memory non guadagna nulla in doppia precisione, come
+previsto.} \kernelname{cuda\_warp\_smem} resta fra il $96\%$ e il $99\%$ di
+\kernelname{cuda\_warp} su tutto l'intervallo, con l'unico scarto apprezzabile
+a $k = 32$ ($-4{,}1\%$). È una previsione negativa confermata, e vale come
+risultato: il traffico su $X$ che il tile riduce non è il collo di bottiglia
+quando il collo di bottiglia è il calcolo. Il kernel non è però inutile --- è
+scritto per un regime che in FP64 non si presenta mai, e la
+\cref{sec:ris-fase3} lo misura nel regime in cui quel regime esiste.
+
+\textbf{cuBLAS è il risultato più istruttivo della campagna.} Non tanto perché
+perda --- da $19{,}6\times$ a $k = 3$ a $2{,}2\times$ a $k = 32$ --- quanto per
+\emph{come} perde: il suo tempo di kernel è costante,
+\SIrange{104.2}{104.6}{\milli\second}, su tutti e cinque i valori di $k$. Un
+tempo che non dipende da $k$ significa che il costo non è determinato dal
+lavoro richiesto ($2MNk$ operazioni) ma dal percorso attraversato, cioè dallo
+streaming di $A$ con una geometria di tile dimensionata per matrici quadrate
+grandi. Con $k \le 32$ il multivettore riempie una frazione minima della
+mattonella, e il resto del lavoro pianificato viene speso su padding. Ne segue
+anche la previsione, verificabile, che i GFLOPS di cuBLAS crescano
+\emph{linearmente} con $k$ finché $k$ resta sotto la dimensione della
+mattonella: e infatti $15{,}4 \to 30{,}9 \to 41{,}1 \to 102{,}8 \to 164{,}3$
+sta su una retta entro l'$1\%$. È la risposta quantitativa alla domanda
+``perché non avete chiamato una libreria''.
+
+\textbf{Configurazioni consolidate.} La \cref{tab:ris-fase1-sintesi} raccoglie
+quanto la fase 1 lascia in eredità alle fasi successive.
 
 \begin{table}[H]
 \centering
 \footnotesize
-\caption{Costo per elemento di $A$ e dimensione di $X_{\text{loc}}$.}
-\label{tab:c3-tau}
-\begin{tabular}{@{}rrrr@{}}
+\caption{Configurazione selezionata per ciascun backend CUDA, usata invariata
+nelle fasi 2 e 3.}
+\label{tab:ris-fase1-sintesi}
+\begin{tabular}{@{}llll@{}}
 \toprule
-$k$ & $\tau$ [\si{\nano\second}] & $\tau/\tau_{k=3}$ & $|X_{\text{loc}}|$ \\
+\textbf{Backend} & \textbf{\code{BLOCK}} & \textbf{Layout di $X$} & \textbf{Altro} \\
 \midrule
-3  & 1,34 & 1,00 & \SI{0.24}{\mega\byte} \\
-6  & 1,42 & 1,07 & \SI{0.48}{\mega\byte} \\
-8  & 1,47 & 1,10 & \SI{0.64}{\mega\byte} \\
-20 & 7,68 & 5,75 & \SI{1.60}{\mega\byte} \\
-32 & 13,07 & 9,78 & \SI{2.56}{\mega\byte} \\
-40 & 17,59 & 13,17 & \SI{3.20}{\mega\byte} \\
-64 & 30,33 & 22,70 & \SI{5.12}{\mega\byte} \\
+\kernelname{cuda\_naive}      & 128 & row & --- \\
+\kernelname{cuda\_warp}       & 128 & column & --- \\
+\kernelname{cuda\_warp\_smem} & 256 & row & \code{SMEM\_PAD}=1, $g$=32 \\
+\kernelname{cublas}           & --- & row & riferimento esterno \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Per $k \in \{3, 6, 8\}$ il costo per elemento di $A$ \`e \textbf{quasi
-costante}: triplicare il numero di FMA per elemento aumenta il tempo del
-$10\%$. \`E la firma di un regime in cui il collo di bottiglia non \`e il calcolo
-ma lo streaming di $A$: la banda effettiva su $A$,
-$B_A = MN s / t$, vale \SIrange{5.4}{6.0}{\giga\byte\per\second}, un valore
-plausibile per un singolo core, e le FMA aggiuntive si nascondono dietro le
-latenze di memoria.
+\section{Fase 2 --- Scala del problema e forma di $A$}
+\label{sec:ris-fase2}
 
-Da $k = 20$ in poi il comportamento cambia natura. Se il limite fosse la banda su
-$A$, $\tau$ resterebbe piatto; se fosse il picco di calcolo, $\tau$ crescerebbe
-\emph{proporzionalmente} a $k$. Non fa n\'e l'una n\'e l'altra cosa: da $k=8$ a
-$k=20$ cresce di $5{,}2\times$ per $2{,}5\times$ di lavoro. Il candidato che
-spiega il fattore \`e il traffico su $X$ della \cref{eq:traffico-x}. Definendo
-\begin{equation}
-  B_X = \frac{MNk\,s}{t}
-  \qquad\text{[banda effettiva sulla rilettura di } X\text{]},
-\end{equation}
-la colonna corrispondente di \cref{tab:c3-misure} mostra un valore
-sostanzialmente \textbf{costante} intorno a
-\SIrange{17}{21}{\giga\byte\per\second} per tutti i $k \ge 20$ --- inclusi
-$k = 40$ e $k = 64$, che passano dal fallback e leggono $A$ due volte. Un
-plateau di banda su cinque punti che coprono un fattore $3{,}2$ in $k$ \`e una
-firma difficile da attribuire al caso.
-
-\begin{ipotesi}{oltre $k \approx 8$ la rilettura di $X$ esce dalla cache privata}
-Nello schema~A ogni riga di $A$ percorre tutta $X_{\text{loc}}$. Finch\'e
-$X_{\text{loc}}$ sta nella cache privata del core, quelle riletture costano
-poco e il nucleo \`e limitato dallo streaming di $A$ ($k \le 8$: $B_A$ costante,
-$\tau$ piatto). Quando $X_{\text{loc}}$ supera quella capacit\`a --- fra
-\SI{0.64}{\mega\byte} a $k=8$ e \SI{1.6}{\mega\byte} a $k=20$ --- ogni riga di
-$A$ ricomincia a leggere $X$ dal livello successivo della gerarchia, e il tempo
-diventa proporzionale a $MNks$ diviso la banda di quel livello: da qui il
-plateau di $B_X$.
-
-Il valore del plateau, \SIrange{17}{21}{\giga\byte\per\second}, \`e
-coerente con una banda di cache condivisa su singolo core, e nettamente
-superiore alla banda DRAM per core che si legge nel regime $k \le 8$
-($\sim \SI{6}{\giga\byte\per\second}$): non si tratta quindi di traffico verso
-la memoria centrale.
-
-\textbf{Come falsificarla.} (i) Leggere la capacit\`a della cache privata con
-\code{lscpu -C} e verificare che cada fra \SI{0.64}{} e \SI{1.6}{\mega\byte};
-(ii) contare i miss del livello sospetto con \code{perf stat -e} sui $k$ ai due
-lati della soglia; (iii) ripetere C3 a $N$ dimezzato: se l'ipotesi \`e giusta, la
-soglia in $k$ deve raddoppiare, perch\'e $|X_{\text{loc}}| = Nks$.
-\end{ipotesi}
-
-L'ipotesi alternativa --- spill degli accumulatori oltre il numero di registri
-vettoriali disponibili --- \`e compatibile con il salto fra $k=8$ e $k=20$, ma non
-spiega perch\'e $B_X$ resti costante fino a $k = 64$ n\'e perch\'e il fallback a
-$\code{KB} = 32$, che tiene al massimo 32 accumulatori indipendentemente da $k$,
-mostri lo stesso plateau. Le due cause non si escludono, e il terzo controllo
-elencato sopra le separa in modo netto. \`E la verifica da eseguire prima della
-consegna.
-
-\subsection{Conseguenza pratica}
-
-Se l'ipotesi regge, il rimedio \`e noto e non richiede di cambiare schema: basta
-bloccare il ciclo su $j$ in fette di $X$ che stiano in cache, riusando ogni
-fetta su tutte le righe di $A$ prima di passare alla successiva --- lo stesso
-principio che \kernelname{cuda\_warp\_smem} applica sulla GPU con la shared
-memory (\cref{sec:smem}). \`E il primo dei lavori futuri
-(\cref{sec:lavori-futuri}), ed \`e anche il motivo per cui vale la pena
-identificare la causa e non limitarsi a osservare che ``oltre $k=8$ va peggio''.
-
-\subsection{Specializzazione contro fallback}
-\label{sec:c3-generic}
-
-\begin{daverificare}
-Eseguire \file{experiments/c3\_cpu\_baseline/generic.conf} (build
-\code{FORCE\_GENERIC\_K=1}) e completare \cref{tab:c3-generic}. Controllo di
-consistenza obbligatorio: le righe $k = 40$ e $k = 64$ devono coincidere entro il
-rumore nelle due build, perch\'e in entrambe passano dal fallback. Se non
-coincidono, la differenza sugli altri $k$ \`e rumore e non specializzazione.
-\end{daverificare}
+I nove punti del disegno fattoriale sono quelli di \cref{tab:fase2-punti}: tre
+scale nominali e, per ciascuna, tre forme a prodotto $MN$ costante entro
+l'$1{,}2\%$. Tutte le misure sono in doppia precisione, con $P = 1$ e con le
+configurazioni consolidate in \cref{tab:ris-fase1-sintesi}.
 
 \begin{table}[H]
 \centering
 \footnotesize
-\caption{Effetto della specializzazione su $k$, stesso problema e stessa
-sessione.}
-\label{tab:c3-generic}
-\begin{tabular}{@{}rrrr@{}}
+\caption{Fase 2: \code{gflops\_kernel} di \kernelname{cuda\_warp} su tutti i
+nove punti.}
+\label{tab:ris-fase2-warp}
+\begin{tabular}{@{}llrrrrr@{}}
 \toprule
-$k$ & GFLOPS specializzato & GFLOPS generico & speedup \\
+\textbf{Scala} & \textbf{Forma} & $k=3$ & $k=6$ & $k=8$ & $k=20$ & $k=32$ \\
 \midrule
-3  & 4,49  & \dato & \dato \\
-6  & 8,43  & \dato & \dato \\
-8  & 10,87 & \dato & \dato \\
-20 & 5,21  & \dato & \dato \\
-32 & 4,90  & \dato & \dato \\
+\multirow{3}{*}{$S = 4096$}
+ & $M = N$  & 269,6 & 275,7 & 277,4 & 279,8 & 281,5 \\
+ & $N = 2M$ & 280,8 & 308,9 & 310,4 & 289,0 & 292,0 \\
+ & $M = 3N$ & 285,7 & 330,0 & 330,5 & 278,0 & 281,4 \\
 \midrule
-40 & 4,55  & \dato & \dato\ \footnotesize(atteso $\approx 1$) \\
-64 & 4,22  & \dato & \dato\ \footnotesize(atteso $\approx 1$) \\
+\multirow{3}{*}{$S = 8192$}
+ & $M = N$  & 297,5 & 348,4 & 347,8 & 347,5 & 354,1 \\
+ & $N = 2M$ & 296,6 & 353,5 & 351,5 & 354,7 & 357,5 \\
+ & $M = 3N$ & 297,8 & 343,1 & 342,7 & 345,9 & 347,6 \\
+\midrule
+\multirow{3}{*}{$S = 16384$}
+ & $M = N$  & 302,0 & 354,3 & 353,2 & 354,6 & 354,9 \\
+ & $N = 2M$ & 300,0 & 356,0 & 355,8 & 357,4 & 356,7 \\
+ & $M = 3N$ & 301,7 & 349,6 & 349,8 & 351,9 & 352,4 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\section{C2 --- confronto fra backend al variare di $k$}
-\label{sec:ris-c2}
-
-\begin{daverificare}
-Suite \file{experiments/c2\_k\_sweep.txt}, $P = 1$, $M = N = \num{10000}$.
-Colonna da leggere: \code{gflops\_kernel} sui backend GPU, \code{gflops} su
-\kernelname{scheme\_a}. Compilare \cref{tab:c2} e generare
-\cref{fig:c2}. Da riportare in tabella anche $t_{\text{setup}}$ e
-$t_{\text{local}} - t_{\text{kernel}}$ dei backend GPU: la separazione fra
-kernel e trasferimenti \`e una scelta di metodo che vale la pena documentare con
-i numeri.
-\end{daverificare}
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Fase 2: effetto della sola scala, caso quadrato, tutti i backend.}
+\label{tab:ris-fase2-scala}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+& \multicolumn{3}{c}{$k = 3$} & \multicolumn{3}{c}{$k = 32$} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+\textbf{Backend} & 4096 & 8192 & 16384 & 4096 & 8192 & 16384 \\
+\midrule
+\kernelname{cuda\_naive}      & 162,3 & 187,3 & 151,5 & 287,7 & 354,5 & 349,7 \\
+\kernelname{cuda\_warp}       & 269,6 & 297,5 & 302,0 & 281,5 & 354,1 & 354,9 \\
+\kernelname{cuda\_warp\_smem} & 253,5 & 291,5 & 296,8 & 274,5 & 330,7 & 341,0 \\
+\kernelname{cublas}           & 16,5  & 15,4  & 15,3  & 184,3 & 164,0 & 163,2 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \begin{table}[H]
 \centering
 \footnotesize
-\caption{C2: GFLOPS per backend e per $k$ (doppia precisione, $P=1$).}
-\label{tab:c2}
-\begin{tabular}{@{}lrrrrr|rrrrr@{}}
+\caption{Fase 2: effetto della sola forma a $k = 32$, a lavoro costante entro
+l'$1{,}2\%$.}
+\label{tab:ris-fase2-forma}
+\begin{tabular}{@{}lrrrrrr@{}}
 \toprule
-& \multicolumn{5}{c|}{\textbf{$k$ specializzati}} & \multicolumn{5}{c}{\textbf{$k$ dal fallback}} \\
-\textbf{Backend} & 3 & 6 & 8 & 20 & 32 & 1 & 7 & 17 & 40 & 64 \\
+& \multicolumn{3}{c}{$S = 4096$} & \multicolumn{3}{c}{$S = 16384$} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+\textbf{Backend} & $M{=}N$ & $N{=}2M$ & $M{=}3N$ & $M{=}N$ & $N{=}2M$ & $M{=}3N$ \\
 \midrule
-\kernelname{scheme\_a} & 4,49 & 8,43 & 10,87 & 5,21 & 4,90 & \dato & \dato & \dato & 4,55 & 4,22 \\
-\kernelname{cuda\_naive} & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato \\
-\kernelname{cuda\_warp} & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato \\
-\kernelname{cuda\_warp\_smem} & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato \\
-\kernelname{cuda\_warp\_tiled} & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato \\
-\kernelname{cublas} & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato \\
+\kernelname{cuda\_naive}      & 287,7 & 300,7 & 295,8 & 349,7 & 347,6 & 346,1 \\
+\kernelname{cuda\_warp}       & 281,5 & 292,0 & 281,4 & 354,9 & 356,7 & 352,4 \\
+\kernelname{cuda\_warp\_smem} & 274,5 & 262,0 & 263,0 & 341,0 & 341,6 & 338,8 \\
+\kernelname{cublas}           & 184,3 & 173,4 & 170,8 & 163,2 & 170,9 & 168,5 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{figure}[H]
 \centering
-\figuradafare[0.8\linewidth]{GFLOPS in funzione di $k$, una curva per backend,
-scala logaritmica sull'asse $y$. Sovrapporre come linea orizzontale il tetto
-FP64 di \cref{tab:picchi-gpu} (\SI{350}{\giga\flop\per\second}): la distanza
-da quel tetto \`e il risultato, non il numero assoluto.}
-\caption{C2: confronto fra backend al variare di $k$.}
-\label{fig:c2}
+\begin{tikzpicture}
+\begin{axis}[scpa,
+  xlabel={$k$}, ylabel={GFLOPS (kernel-only)},
+  xmin=0, xmax=35, ymin=240, ymax=410,
+  xtick={3,6,8,20,32},
+  legend pos=north west, width=0.8\linewidth, height=6cm]
+\addplot[black, dashed, thick, forget plot, samples=2, domain=0:35]{350};
+\addplot[blue!70!black, mark=*] coordinates {(3,302.0) (6,354.3) (8,353.2) (20,354.6) (32,354.9)};
+\addlegendentry{$S = 16384$}
+\addplot[teal!70!black, mark=triangle*] coordinates {(3,297.5) (6,348.4) (8,347.8) (20,347.5) (32,354.1)};
+\addlegendentry{$S = 8192$}
+\addplot[orange!80!black, mark=square*] coordinates {(3,269.6) (6,275.7) (8,277.4) (20,279.8) (32,281.5)};
+\addlegendentry{$S = 4096$}
+\end{axis}
+\end{tikzpicture}
+\caption{Fase 2: \kernelname{cuda\_warp} sul caso quadrato alle tre scale. La
+linea tratteggiata è il tetto FP64 nominale. A $S = 4096$ la curva non arriva
+al tetto per nessun $k$.}
+\label{fig:ris-fase2-scala}
 \end{figure}
 
-Le tre domande a cui questa campagna deve rispondere, e che vanno affrontate
-esplicitamente nel commento ai dati:
+\subsubsection*{Lettura}
 
-\begin{enumerate}[nosep,left=0pt]
-  \item \textbf{Quanto vale il passaggio da \kernelname{cuda\_naive} a
-        \kernelname{cuda\_warp}?} \`E la misura del recupero del riuso di $A$ in
-        registro e della coalescenza, cio\`e del salto di intensit\`a aritmetica
-        della \cref{eq:intensita}. Ci si attende un guadagno crescente con
-        $k$, perch\'e \`e $k$ il fattore di riuso perduto dalla baseline.
-  \item \textbf{La shared memory guadagna qualcosa?} Il roofline di
-        \cref{sec:roofline-gpu} prevede di no, per $k \ge 6$ in FP64: se la
-        misura lo conferma, la conferma \emph{\`e} il risultato. Il controllo
-        incrociato \`e ripetere il confronto in FP32, dove il modello prevede un
-        regime memory-bound e quindi un guadagno.
-  \item \textbf{Dove sta il crossover fra \kernelname{cuda\_warp\_smem} e
-        \kernelname{cuda\_warp\_tiled}?} Il primo tiene $k$ accumulatori per
-        lane, il secondo ne tiene \code{WARP\_COL\_TILE} al prezzo di rileggere
-        $A$: il rapporto fra i due tempi in funzione di $k$ individua il punto in
-        cui la pressione sui registri costa pi\`u della rilettura.
-\end{enumerate}
+\textbf{La scala conta, la forma quasi no, e il rapporto fra i due effetti è di
+un ordine di grandezza.} Passando da $S = 4096$ a $S = 16384$ a forma fissata,
+\kernelname{cuda\_warp} guadagna il $26\%$ a $k = 32$ ($281{,}5 \to 354{,}9$);
+cambiando forma a scala fissata, lo scarto massimo fra le tre forme è del
+$3{,}7\%$ a $S = 4096$ e dell'$1{,}2\%$ a $S = 16384$. Poiché il disegno tiene
+$MN$ costante entro l'$1{,}2\%$, quest'ultimo numero è al limite di ciò che la
+campagna può risolvere: la conclusione onesta è che \textbf{alla scala massima
+la forma non ha un effetto misurabile}, non che ne abbia uno piccolo.
 
-\subsection{Sweep sul padding della shared memory}
+\textbf{Il deficit a $S = 4096$ è un problema di parallelismo, non di forma.} A
+$S = 4096$ la curva di \cref{fig:ris-fase2-scala} è piatta ben sotto il tetto e
+non lo raggiunge per nessun $k$: il kernel è compute-bound secondo il roofline,
+ma non ha abbastanza warp residenti per saturare i 48 SM. Con un warp per riga
+di $Y$, il caso quadrato a $S = 4096$ offre 4096 warp contro i 16384 del caso
+massimo. La previsione di \cref{sec:roofline-gpu} --- che il tetto di calcolo
+presuppone parallelismo sufficiente --- è quindi confermata dal lato in cui
+viene a mancare.
 
-\begin{daverificare}
-Confronto \kernelname{cuda\_warp\_smem} con \code{SMEM\_PAD=1} contro
-\code{SMEM\_PAD=0} a $k = 32$, dove l'analisi di \cref{sec:bank-conflict}
-prevede il conflitto a 32 vie. \`E una previsione puntuale e falsificabile: il
-padding deve mostrare un guadagno a $k = 32$ e nessun effetto apprezzabile a
-$k = 3$.
-\end{daverificare}
+\textbf{La forma agisce, quando agisce, nella direzione prevista.} L'unico
+punto in cui le tre forme si separano in modo leggibile è $S = 4096$ ai $k$
+piccoli, dove \kernelname{cuda\_warp} passa da $269{,}6$ ($M = N$) a $285{,}7$
+($M = 3N$) a $k = 3$: la matrice alta e stretta triplica le righe di $Y$ e
+quindi i warp disponibili, che è esattamente la risorsa scarsa in quel punto.
+Appena il parallelismo abbonda, il vantaggio svanisce. Va però detto che a
+$S = 4096$ il CV massimo osservato sale al $5{,}8\%$ (\kernelname{cublas}) e al
+$3{,}8\%$ (\kernelname{cuda\_naive}), contro lo $0{,}6\%$ a $S = 16384$: le
+differenze fra forme a piccola scala vanno prese come indicazioni, non come
+misure.
 
-\begin{table}[H]
-\centering
-\footnotesize
-\begin{tabular}{@{}rrrr@{}}
-\toprule
-$k$ & \code{SMEM\_PAD=0} & \code{SMEM\_PAD=1} & guadagno \\
-\midrule
-3  & \dato & \dato & \dato \\
-8  & \dato & \dato & \dato \\
-32 & \dato & \dato & \dato\ \footnotesize(atteso: il pi\`u alto) \\
-\bottomrule
-\end{tabular}
-\caption{Effetto del padding sul conflitto di banchi. \TODO{eseguire}}
-\end{table}
+\textbf{Il comportamento di cuBLAS chiude il cerchio aperto dalla campagna
+1.5.} Il suo tempo di kernel resta costante in $k$ a \emph{tutte} le scale
+(\SIrange{6.1}{6.3}{\milli\second} a $S = 4096$,
+\SIrange{24.5}{26.2}{\milli\second} a $S = 8192$,
+\SIrange{99.3}{105.3}{\milli\second} a $S = 16384$), e i tre valori stanno fra
+loro come $1 : 4 : 16$, cioè come $MN$. È la prova diretta che il costo di
+cuBLAS su questo problema è determinato dallo streaming di $A$ e non dal lavoro
+$2MNk$: l'ipotesi formulata nella campagna 1.5 su un singolo punto è qui
+verificata su nove punti indipendenti. Ne segue anche il solo caso in cui
+cuBLAS migliora scendendo di scala ($184{,}3$ a $S = 4096$ contro $163{,}2$ a
+$S = 16384$ per $k = 32$): a matrice più piccola la mattonella sprecata è meno
+sproporzionata.
 
-\subsection{Sweep sulla dimensione del blocco}
+\textbf{In funzione delle fasi successive.} La fase conferma che le
+configurazioni scelte nella fase 1 su un solo punto restano valide su due
+ordini di grandezza di $MN$ e su tre forme: la gerarchia fra i kernel non si
+inverte mai. È la licenza a condurre le fasi 3 e 4 su un solo problema senza
+dover ogni volta ripetere lo sweep dimensionale.
 
-\begin{daverificare}
-\code{BLOCK} $\in \{64, 128, 192, 256, 384, 512, 1024\}$ su
-\kernelname{cuda\_warp}, a $k$ fisso. Serve a documentare che il default $256$
-non \`e stato scelto solo per argomento teorico (divisore di 1024, quattro blocchi
-per SM) ma anche misurato. I valori $192$ e $384$ sono i controlli: se
-l'argomento sull'occupancy \`e corretto, devono essere peggiori dei divisori di
-1024.
-\end{daverificare}
+\section{Fase 3 --- FP32 contro FP64}
+\label{sec:ris-fase3}
+\label{sec:c7}
 
-\section{C1 --- taglia e rapporto $M{:}N$}
-\label{sec:ris-c1}
-
-\begin{daverificare}
-Suite \file{c1\_size\_ratio\_cpu.txt} e \file{c1\_size\_ratio\_gpu.txt}, i dodici
-punti di \cref{tab:c1-punti}. \`E la campagna esplicitamente richiesta dalla
-traccia e non pu\`o mancare nella consegna.
-\end{daverificare}
+Il riferimento FP64 è il punto $S = 16384$, $M = N$ della Fase 2; le misure
+FP32 sono nuove, sulle stesse configurazioni e con lo stesso protocollo.
 
 \begin{table}[H]
 \centering
 \footnotesize
-\caption{C1: GFLOPS per passo e rapporto. Una tabella per backend.}
-\label{tab:c1}
-\begin{tabular}{@{}lrrr|rrr@{}}
-\toprule
-& \multicolumn{3}{c|}{\textbf{CPU (\kernelname{scheme\_a})}} & \multicolumn{3}{c}{\textbf{GPU}} \\
-\textbf{Passo} & $1{:}1$ & $3{:}1$ & $1{:}2$ & $1{:}1$ & $3{:}1$ & $1{:}2$ \\
-\midrule
-s1 & \dato & \dato & \dato & \dato & \dato & \dato \\
-s2 & \dato & \dato & \dato & \dato & \dato & \dato \\
-s3 & \dato & \dato & \dato & \dato & \dato & \dato \\
-s4 & \dato & \dato & \dato & \dato & \dato & \dato \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{figure}[H]
-\centering
-\figuradafare[0.8\linewidth]{GFLOPS in funzione di $MN$ (asse $x$ logaritmico),
-tre curve per i tre rapporti, un pannello per CPU e uno per GPU. Poich\'e il
-lavoro \`e uguale a parit\`a di passo, ogni scostamento verticale fra le tre curve
-\`e effetto della \emph{forma}.}
-\caption{C1: effetto della taglia e del rapporto $M{:}N$.}
-\label{fig:c1}
-\end{figure}
-
-Da discutere nel commento: la crescita con la taglia (l'ammortamento dei costi
-fissi, e su GPU il raggiungimento di parallelismo sufficiente a saturare gli SM)
-e, separatamente, la distanza fra le tre curve, che \`e l'effetto della forma
-previsto in \cref{sec:modello-comunicazione} e in
-\cref{sec:roofline-gpu} --- con l'attesa che il rapporto $3{:}1$
-($M$ grande, molti warp) sia favorevole su GPU e che $1{:}2$ lo sia meno.
-
-\section{C6 --- perch\'e la griglia \`e bidimensionale}
-\label{sec:ris-c6}
-
-\begin{daverificare}
-Suite \file{c6\_grid\_shape.txt}, tutte le fattorizzazioni di $P = 8, 16, 20$.
-\`E la campagna che giustifica sperimentalmente il requisito centrale della
-traccia; le forme $1 \times P$ e $P \times 1$ sono le due decomposizioni
-monodimensionali e vanno sullo stesso grafico.
-\end{daverificare}
-
-\begin{table}[H]
-\centering
-\footnotesize
-\caption{C6: $P = 20$, tutte le forme ordinate.}
-\label{tab:c6}
-\begin{tabular}{@{}lrrrr@{}}
-\toprule
-Forma $\Prow \times \Pcol$ & $t_{\text{bcast}}$ & $t_{\text{reduce}}$ & $t_{\text{total}}$ & GFLOPS \\
-\midrule
-$1 \times 20$ \footnotesize(1D) & \dato & \dato & \dato & \dato \\
-$2 \times 10$ & \dato & \dato & \dato & \dato \\
-$4 \times 5$  & \dato & \dato & \dato & \dato \\
-$5 \times 4$  & \dato & \dato & \dato & \dato \\
-$10 \times 2$ & \dato & \dato & \dato & \dato \\
-$20 \times 1$ \footnotesize(1D) & \dato & \dato & \dato & \dato \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{figure}[H]
-\centering
-\figuradafare[0.8\linewidth]{Due assi $y$ sovrapposti: $t_{\text{bcast}}$ e
-$t_{\text{reduce}}$ lungo la sequenza di forme. La \cref{eq:volume} prevede
-che si muovano in direzioni \emph{opposte} e che il minimo del totale cada in
-mezzo, non agli estremi.}
-\caption{C6: broadcast e reduce in funzione della forma della griglia.}
-\label{fig:c6}
-\end{figure}
-
-Questa \`e la verifica pi\`u diretta del modello di costo: la
-\cref{eq:ottimo} predice, per $M = N$ e $P = 20$, un ottimo vicino a
-$4 \times 5$ o $5 \times 4$, e un peggioramento marcato agli estremi. Se i dati
-lo confermano, la scelta di \code{grid\_default\_shape} risulta giustificata da
-una misura e non da un'intuizione; se non lo confermano, il modello va corretto,
-ed \`e comunque un risultato da riportare.
-
-\section{C4 --- strong scaling}
-\label{sec:ris-c4}
-
-\begin{daverificare}
-Suite \file{c4\_strong\_scaling.txt}: $\num{20000} \times \num{20000}$,
-$P \in \{1,2,4,8,16,20\}$, $k \in \{3, 32\}$.
-\end{daverificare}
-
-\begin{table}[H]
-\centering
-\footnotesize
-\caption{C4: speedup ed efficienza a problema fisso.}
-\label{tab:c4}
-\begin{tabular}{@{}rrrrr|rrrr@{}}
-\toprule
-& \multicolumn{4}{c|}{$k = 3$} & \multicolumn{4}{c}{$k = 32$} \\
-$P$ & $t$ & speedup & eff.\ & \% comm. & $t$ & speedup & eff.\ & \% comm. \\
-\midrule
-1  & \dato & 1,00 & 1,00 & \dato & \dato & 1,00 & 1,00 & \dato \\
-2  & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato \\
-4  & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato \\
-8  & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato \\
-16 & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato \\
-20 & \dato & \dato & \dato & \dato & \dato & \dato & \dato & \dato \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{figure}[H]
-\centering
-\figuradafare[0.8\linewidth]{A sinistra: speedup contro $P$, con la retta ideale
-come riferimento, due curve ($k=3$ e $k=32$). A destra: scomposizione di
-$t_{\text{total}}$ in $t_{\text{bcast}}$, $t_{\text{local}}$,
-$t_{\text{reduce}}$ come frazioni impilate.}
-\caption{C4: strong scaling e composizione del tempo.}
-\label{fig:c4}
-\end{figure}
-
-L'attesa, dalla \cref{eq:costo-comm}: con $k = 3$ la comunicazione \`e una
-frazione piccola e la scalabilit\`a resta vicina all'ideale; con $k = 32$ il
-volume comunicato \`e dieci volte tanto ed \`e l\`i che l'efficienza si degrada. Il
-pannello di destra deve rendere visibile \emph{quale} delle due collettive
-domina, e il confronto con la legge di Amdahl applicata alla frazione non
-parallelizzabile misurata chiude l'analisi.
-
-\section{C5 --- weak scaling}
-\label{sec:ris-c5}
-
-\begin{daverificare}
-Suite \file{c5\_weak\_scaling.txt}: blocco locale costante $5000 \times 5000$,
-$M = 5000\Prow$, $N = 5000\Pcol$.
-\end{daverificare}
-
-\begin{table}[H]
-\centering
-\footnotesize
-\caption{C5: tempo a lavoro per processo costante.}
-\label{tab:c5}
-\begin{tabular}{@{}rlrrrr@{}}
-\toprule
-$P$ & Griglia & $M \times N$ & $t_{\text{total}}$ & $t_{\text{comm}}$ & efficienza \\
-\midrule
-1  & $1\times1$ & $5000 \times 5000$ & \dato & \dato & 1,00 \\
-2  & \dato & \dato & \dato & \dato & \dato \\
-4  & \dato & \dato & \dato & \dato & \dato \\
-8  & \dato & \dato & \dato & \dato & \dato \\
-16 & \dato & \dato & \dato & \dato & \dato \\
-20 & \dato & \dato & \dato & \dato & \dato \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Poich\'e il lavoro per rank \`e costante, il tempo ideale \`e piatto e tutto ci\`o che
-sale \`e comunicazione pura: \`e la misura pi\`u pulita del costo delle collettive,
-e il confronto con la previsione della \cref{eq:costo-comm} permette di
-stimare $\alpha$ e $\beta$ per interpolazione. Va ricordato nel commento che su
-una griglia 2D il weak scaling cambia anche il rapporto $M{:}N$
-(\cref{sec:modello-comunicazione}), quindi l'effetto misurato qui non \`e
-puramente quello di $P$.
-
-\section{C7.1 --- quanto rende la singola precisione}
-\label{sec:ris-c7}
-
-\begin{daverificare}
-Suite \file{experiments/c7\_1\_precision\_k.txt}: cinque backend GPU in coppie
-\code{double}/\code{float}, $M = N = \num{10000}$, $P = 1$, \code{BLOCK=256},
-\code{WARP\_COL\_TILE=8}. Colonna da leggere: \code{t\_kernel\_mean\_s}, e da
-essa lo speedup della \cref{eq:speedup-precisione}.
-\end{daverificare}
-
-\begin{table}[H]
-\centering
-\footnotesize
-\caption{C7.1: rapporto $S_{32/64} = t_{\text{kernel}}^{\text{fp64}} /
-t_{\text{kernel}}^{\text{fp32}}$ per backend e per $k$.}
-\label{tab:c7-speedup}
+\caption{Fase 3: \code{gflops\_kernel} nelle due precisioni e speedup
+$S_{32/64}$ della \cref{eq:speedup-precisione}, $M = N = \num{16384}$, $P = 1$.}
+\label{tab:ris-fase3}
 \begin{tabular}{@{}lrrrrr@{}}
 \toprule
 \textbf{Backend} & $k=3$ & $k=6$ & $k=8$ & $k=20$ & $k=32$ \\
 \midrule
-\kernelname{cuda\_naive} & \dato & \dato & \dato & \dato & \dato \\
-\kernelname{cuda\_warp} & \dato & \dato & \dato & \dato & \dato \\
-\kernelname{cuda\_warp\_smem} & \dato & \dato & \dato & \dato & \dato \\
-\kernelname{cuda\_warp\_tiled} & \dato & \dato & \dato & \dato & \dato \\
-\kernelname{cublas} & \dato & \dato & \dato & \dato & \dato \\
+\multicolumn{6}{@{}l}{\itshape GFLOPS in FP32} \\
+\kernelname{cuda\_naive}      & 198,3 & 386,8  & 522,0  & 791,6  & 1107,4 \\
+\kernelname{cuda\_warp}       & 604,4 & 1169,8 & 1414,3 & 1489,3 & \textbf{1945,9} \\
+\kernelname{cuda\_warp\_smem} & 601,2 & 1164,7 & 1457,2 & \textbf{1726,9} & 1473,0 \\
+\kernelname{cublas}           & 426,7 & 861,1  & 1141,0 & 2962,3 & 4791,9 \\
 \midrule
-\emph{previsione roofline} & $\approx 2$ & \multicolumn{4}{c}{\emph{crescente con $k$, fino a $\sim 20\times$ a $k=32$}} \\
+\multicolumn{6}{@{}l}{\itshape GFLOPS in FP64 (riferimento, Fase 2)} \\
+\kernelname{cuda\_naive}      & 151,5 & 307,1 & 342,0 & 345,5 & 349,7 \\
+\kernelname{cuda\_warp}       & 302,0 & 354,3 & 353,2 & 354,6 & 354,9 \\
+\kernelname{cuda\_warp\_smem} & 296,8 & 349,8 & 349,6 & 349,5 & 341,0 \\
+\kernelname{cublas}           & 15,3  & 30,7  & 40,8  & 102,0 & 163,2 \\
+\midrule
+\multicolumn{6}{@{}l}{\itshape $S_{32/64} = t_{\text{kernel}}^{\text{FP64}} / t_{\text{kernel}}^{\text{FP32}}$} \\
+\kernelname{cuda\_naive}      & 1,31  & 1,26  & 1,53  & 2,29  & 3,17 \\
+\kernelname{cuda\_warp}       & 2,00  & 3,30  & 4,00  & 4,20  & 5,48 \\
+\kernelname{cuda\_warp\_smem} & 2,03  & 3,33  & 4,17  & 4,94  & 4,32 \\
+\kernelname{cublas}           & 27,89 & 28,08 & 27,97 & 29,04 & 29,37 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\`E la verifica pi\`u diretta del modello di \cref{cap:roofline}, ed \`e
-falsificabile in modo netto. Il modello prevede che in FP64 il tetto sia il
-calcolo e non dipenda da $k$, mentre in FP32 sia la banda e cresca linearmente
-con $k$: il rapporto fra i due deve quindi \textbf{crescere con $k$}. Uno
-speedup piatto e vicino a $2$ --- il rapporto fra le dimensioni degli scalari,
-cio\`e ci\`o che si otterrebbe se entrambe le precisioni fossero memory-bound ---
-falsificherebbe la previsione, e andrebbe riportato come tale.
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Fase 3: percentuale del tetto pertinente. In FP64 il tetto è
+\SI{350}{\giga\flop\per\second} e non dipende da $k$; in FP32 è
+$B \cdot k/2 = 224k$ \si{\giga\flop\per\second} e cresce con $k$
+(\cref{tab:picchi-gpu}).}
+\label{tab:ris-fase3-tetto}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+\textbf{Backend} & $k=3$ & $k=6$ & $k=8$ & $k=20$ & $k=32$ \\
+\midrule
+tetto FP32 [GFLOPS] & 672 & 1344 & 1792 & 4480 & 7168 \\
+\midrule
+\kernelname{cuda\_naive}      & 29,5 & 28,8 & 29,1 & 17,7 & 15,4 \\
+\kernelname{cuda\_warp}       & 89,9 & 87,0 & 78,9 & 33,2 & 27,1 \\
+\kernelname{cuda\_warp\_smem} & 89,5 & 86,7 & 81,3 & 38,5 & 20,6 \\
+\kernelname{cublas}           & 63,5 & 64,1 & 63,7 & 66,1 & 66,9 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \begin{figure}[H]
 \centering
-\figuradafare[0.8\linewidth]{$S_{32/64}$ in funzione di $k$, una curva per
-backend, con due linee orizzontali di riferimento: $S = 2$ (entrambe
-memory-bound) e la previsione del roofline. \`E il grafico che decide se il
-modello di \cref{cap:roofline} regge.}
-\caption{C7.1: guadagno della singola precisione al variare di $k$.}
-\label{fig:c7-speedup}
+\begin{tikzpicture}
+\begin{axis}[scpa,
+  ymode=log,
+  xlabel={$k$}, ylabel={$S_{32/64}$},
+  xmin=0, xmax=35, ymin=1, ymax=40,
+  xtick={3,6,8,20,32}, ytick={1,2,5,10,20,30},
+  yticklabels={1,2,5,10,20,30},
+  legend pos=south east, width=0.8\linewidth, height=6cm]
+\addplot[black, dashed, thick, forget plot, samples=2, domain=0:35]{2};
+\node[font=\scriptsize,anchor=north west,fill=white,inner sep=1pt] at (axis cs:0.6,1.95) {$S = 2$: entrambe memory-bound};
+\addplot[blue!70!black, mark=*] coordinates {(3,2.00) (6,3.30) (8,4.00) (20,4.20) (32,5.48)};
+\addlegendentry{\kernelname{cuda\_warp}}
+\addplot[teal!70!black, mark=triangle*] coordinates {(3,2.03) (6,3.33) (8,4.17) (20,4.94) (32,4.32)};
+\addlegendentry{\kernelname{cuda\_warp\_smem}}
+\addplot[orange!80!black, mark=square*] coordinates {(3,1.31) (6,1.26) (8,1.53) (20,2.29) (32,3.17)};
+\addlegendentry{\kernelname{cuda\_naive}}
+\addplot[red!70!black, mark=diamond*] coordinates {(3,27.89) (6,28.08) (8,27.97) (20,29.04) (32,29.37)};
+\addlegendentry{\kernelname{cublas}}
+\end{axis}
+\end{tikzpicture}
+\caption{Fase 3: guadagno della singola precisione al variare di $k$. La
+crescita con $k$ dei kernel custom è la previsione del roofline; la piattezza di
+\kernelname{cublas} intorno a 28 misura invece la lentezza del suo percorso FP64.}
+\label{fig:ris-fase3}
 \end{figure}
 
-Per \kernelname{cuda\_warp\_smem} vanno riportate anche le due colonne del
-piano, perch\'e cambiano con la precisione e sono met\`a della spiegazione:
-
 \begin{table}[H]
 \centering
 \footnotesize
-\begin{tabular}{@{}lrrrr@{}}
+\caption{Fase 3: piano di tiling scelto a runtime da
+\kernelname{cuda\_warp\_smem} nelle due precisioni.}
+\label{tab:ris-fase3-piano}
+\begin{tabular}{@{}rrrrr@{}}
 \toprule
 & \multicolumn{2}{c}{\code{x\_rows\_per\_tile}} & \multicolumn{2}{c}{\code{blocks\_per\_sm}} \\
-$k$ & double & float & double & float \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+$k$ & FP64 & FP32 & FP64 & FP32 \\
 \midrule
-3  & \dato & \dato & \dato & \dato \\
-8  & \dato & \dato & \dato & \dato \\
-20 & \dato & \dato & \dato & \dato \\
-32 & \dato & \dato & \dato & \dato \\
+3  & 512 & 1344 & 4 & 3 \\
+6  & 288 & 576  & 4 & 4 \\
+8  & 224 & 448  & 4 & 4 \\
+20 & 128 & 192  & 3 & 4 \\
+32 & 96  & 160  & 2 & 3 \\
 \bottomrule
 \end{tabular}
-\caption{C7.1: piano di tiling scelto a runtime nelle due precisioni.
-\TODO{compilare}}
-\label{tab:c7-piano}
 \end{table}
 
-\section{C7.2 --- perch\'e: registri, spill e shared memory}
-\label{sec:ris-c7-2}
+\subsubsection*{Lettura}
+
+\textbf{La previsione centrale del modello è confermata.} Il roofline prevedeva
+che $S_{32/64}$ dovesse \emph{crescere} con $k$, e che uno speedup piatto
+vicino a 2 lo avrebbe falsificato. Misurato su \kernelname{cuda\_warp}:
+$2{,}00$ a $k = 3$, poi $3{,}30$, $4{,}00$, $4{,}20$ e $5{,}48$ a $k = 32$. Il
+valore a $k = 3$ è particolarmente significativo perché è \emph{esattamente} 2,
+cioè il rapporto fra le dimensioni degli scalari: a $k = 3$ entrambe le
+precisioni sono memory-bound --- il crossover FP64 cade a $k \approx 3{,}1$ --- e
+il guadagno si riduce al solo traffico risparmiato. Il modello non prevede solo
+l'andamento, prevede il punto di partenza.
+
+\textbf{La shared memory guadagna in FP32, esattamente dove il modello dice che
+può.} \kernelname{cuda\_warp\_smem} batte \kernelname{cuda\_warp} a $k = 20$
+($1727$ contro $1489$ GFLOPS, $+16\%$) dopo esserne stato indistinguibile in
+FP64 su tutto l'intervallo. È il controllo incrociato previsto nella campagna
+1.5: in FP32 il nucleo resta memory-bound su tutta la traccia, quindi ridurre
+il traffico su $X$ ha dove tradursi. Le due campagne, prese insieme, dicono una
+cosa che nessuna delle due direbbe da sola: \kernelname{cuda\_warp\_smem} non è
+un kernel inferiore, è un kernel il cui vantaggio è invisibile nel regime FP64
+di questa scheda.
+
+\textbf{A $k = 32$ in FP32 qualcosa cambia di nuovo, e va detto invece di
+nascosto.} Lì \kernelname{cuda\_warp\_smem} crolla a $1473$ GFLOPS, sotto
+\kernelname{cuda\_warp}, e la percentuale del tetto scende al $20{,}6\%$. Il
+piano di \cref{tab:ris-fase3-piano} mostra che in FP32 il tile a $k = 32$ tiene
+160 righe con 3 blocchi residenti per SM: rispetto a $k = 20$ il numero di
+accumulatori per lane sale da 20 a 32 e l'occupancy ne risente. La lettura
+completa richiederebbe i dati \code{ptxas} non ancora raccolti, e per questo
+resta un'indicazione e non una conclusione.
+
+\textbf{Nessun kernel avvicina il tetto FP32 ai $k$ grandi.} La
+\cref{tab:ris-fase3-tetto} è il risultato meno comodo del capitolo: in FP32 si
+parte dall'$89{,}9\%$ del tetto a $k = 3$ e si scende al $27{,}1\%$ a $k = 32$.
+Il motivo è nel limite che \cref{sec:roofline-gpu} dichiarava per il proprio
+modello: l'intensità aritmetica conta il solo traffico su $A$ verso la DRAM,
+mentre il traffico su $X$, pari a $\mloc\nloc k$ elementi, consuma banda L2 e
+non compare nel modello. In FP64 quel traffico è nascosto dal tetto di calcolo;
+in FP32, dove il tetto di calcolo è 32 volte più alto, diventa il limite vero.
+Il roofline a un solo livello ha quindi previsto correttamente il
+\emph{regime} e sovrastimato il \emph{tetto}, e la campagna individua esattamente
+dove va raffinato.
+
+\textbf{Il $28\times$ di cuBLAS non è uno speedup di precisione.} È il rapporto
+fra un percorso FP64 patologicamente lento su questo problema e un percorso
+FP32 che invece raggiunge un ragionevole $63$--$67\%$ del tetto, costante su
+tutti i $k$. Notevole è proprio la costanza: in FP32 cuBLAS è l'unico backend
+che mantiene la stessa frazione del tetto al crescere di $k$, ed è il segno che
+il suo tiling gestisce il traffico su $X$ meglio dei kernel custom. Ai $k$
+grandi in singola precisione la libreria torna competitiva e, a $k = 32$,
+vince: $4792$ GFLOPS contro i $1946$ di \kernelname{cuda\_warp}. È il rovescio
+esatto del risultato FP64, e insieme i due dicono che la scelta ``kernel
+custom'' è giustificata dal regime del progetto, non in assoluto.
 
 \begin{daverificare}
-Suite \file{experiments/c7\_2\_precision\_resources.txt}: sei compilazioni con
-\code{-Xptxas -v}, nessun benchmark. Estrarre dal log completo
-\file{*\_ptxas\_*.txt} i casi $k \in \{3, 8, 20, 32\}$.
+La caratterizzazione delle risorse con \code{ptxas} non è stata eseguita
+(\cref{sec:fase3-precisione}). Senza di essa restano non decise due questioni
+aperte sopra: se il calo di \kernelname{cuda\_warp\_smem} a $k = 32$ in FP32
+sia dovuto a spill degli accumulatori, e se il fallimento dei lanci a
+\code{BLOCK}$=1024$ della campagna 1.1 sia effettivamente un superamento del
+file di registri.
 \end{daverificare}
+
+\section{Fase 4 --- Strong scaling MPI sui backend di CPU}
+\label{sec:ris-fase4}
+\label{sec:c3}
+
+Problema globale fisso a $M = N = \num{16384}$, doppia precisione, griglia
+$P \times 1$. Il caso $P = 1$ è la baseline interna di ciascun backend.
+
+\subsection{Il nucleo di CPU a rank singolo}
+\label{sec:ris-cpu-baseline}
 
 \begin{table}[H]
 \centering
 \footnotesize
-\caption{C7.2: risorse per thread dichiarate da \code{ptxas} (registri a
-\SI{32}{\bit} in entrambe le precisioni).}
-\label{tab:c7-risorse}
-\begin{tabular}{@{}llrrrrr@{}}
+\caption{Fase 4, $P = 1$: tempo ufficiale, throughput e le due bande effettive
+derivate. $\tau = T/(MN)$ è il costo per elemento di $A$; $B_A = MNs/T$ e
+$B_X = MNks/T$ sono grandezze \emph{derivate}, non misurate, definite come in
+\cref{sec:rilettura-x}.}
+\label{tab:ris-cpu-baseline}
+\begin{tabular}{@{}lrrrrrr@{}}
 \toprule
-\textbf{Backend} & \textbf{Prec.} & $k$ & \textbf{reg./thread} & \textbf{stack} & \textbf{spill st./ld.} & \textbf{shared statica} \\
+\textbf{Backend} & $k$ & $T$ [\si{\second}] & GFLOPS & $\tau$ [\si{\nano\second}] & $B_A$ [\si{\giga\byte\per\second}] & $B_X$ [\si{\giga\byte\per\second}] \\
 \midrule
-\kernelname{cuda\_warp} & double & 32 & \dato & \dato & \dato & \dato \\
-\kernelname{cuda\_warp} & float & 32 & \dato & \dato & \dato & \dato \\
-\kernelname{cuda\_warp\_smem} & double & 32 & \dato & \dato & \dato & \dato \\
-\kernelname{cuda\_warp\_smem} & float & 32 & \dato & \dato & \dato & \dato \\
-\kernelname{cuda\_warp\_tiled} & double & 32 & \dato & \dato & \dato & \dato \\
-\kernelname{cuda\_warp\_tiled} & float & 32 & \dato & \dato & \dato & \dato \\
-\multicolumn{7}{@{}l}{\footnotesize\itshape ripetere per $k = 3, 8, 20$} \\
+\multirow{5}{*}{\kernelname{scheme\_a}}
+ & 3  & 0,3675 & 4,38  & 1,37  & 5,84 & 17,5 \\
+ & 6  & 0,3937 & 8,18  & 1,47  & 5,46 & 32,7 \\
+ & 8  & 0,5847 & 7,35  & 2,18  & 3,67 & 29,4 \\
+ & 20 & 2,1775 & 4,93  & 8,11  & 0,99 & 19,7 \\
+ & 32 & 3,3584 & 5,12  & 12,51 & 0,64 & 20,5 \\
+\midrule
+\multirow{5}{*}{\kernelname{scheme\_a\_jblock}}
+ & 3  & 0,3823 & 4,21  & 1,42 & 5,62 & 16,9 \\
+ & 6  & 0,3906 & 8,25  & 1,46 & 5,50 & 33,0 \\
+ & 8  & 0,3772 & 11,39 & 1,41 & 5,69 & 45,5 \\
+ & 20 & 0,5989 & 17,93 & 2,23 & 3,59 & 71,7 \\
+ & 32 & 1,0679 & 16,09 & 3,98 & 2,01 & 64,4 \\
+\midrule
+\multirow{5}{*}{\kernelname{scheme\_a\_jblock\_rb}}
+ & 3  & 0,3313 & 4,86 & 1,23  & 6,48 & 19,4 \\
+ & 6  & 0,6909 & 4,66 & 2,57  & 3,11 & 18,6 \\
+ & 8  & 1,0980 & 3,91 & 4,09  & 1,96 & 15,6 \\
+ & 20 & 2,7827 & 3,86 & 10,37 & 0,77 & 15,4 \\
+ & 32 & 4,7773 & 3,60 & 17,80 & 0,45 & 14,4 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-L'attesa \`e leggibile in anticipo, ed \`e ci\`o che rende la tabella un
-esperimento e non un inventario: a $k = 32$ un accumulatore \code{double} occupa
-due registri a \SI{32}{\bit} e uno \code{float} uno solo, quindi il passaggio a
-FP32 dovrebbe dimezzare la pressione sui registri e, se a $k = 32$ in doppia
-precisione compare dello spill, farlo sparire. Se lo spill c'\`e, spiega
-\emph{da solo} una parte dello speedup di \cref{tab:c7-speedup} che il
-roofline non prevedeva --- ed \`e il motivo per cui le due met\`a della campagna
-vanno lette insieme.
+La dimensione del blocco locale di $X$ cresce linearmente con $k$:
+\SI{0.39}{\mega\byte} a $k = 3$, \SI{1.05}{\mega\byte} a $k = 8$,
+\SI{2.62}{\mega\byte} a $k = 20$ e \SI{4.19}{\mega\byte} a $k = 32$. I
+coefficienti di variazione restano sotto l'$1{,}5\%$ ovunque a $P = 1$.
 
-Due limiti da rispettare nella lettura, che la campagna stessa dichiara:
-\code{ptxas} riporta la shared memory \emph{statica} e non quella dinamica,
-quindi per \kernelname{cuda\_warp\_smem} il dato va ricostruito dal piano
-runtime di \cref{tab:c7-piano} come
-$\code{x\_rows\_per\_tile} \cdot (k+1) \cdot s$ byte; e
-\code{blocks\_per\_sm} \`e una capacit\`a teorica dichiarata dall'API
-dell'occupancy, non l'occupancy raggiunta, che richiederebbe un profilo con
-\code{ncu}.
+\subsubsection*{Lettura}
+
+\textbf{L'ipotesi sulla soglia di cache formulata per lo schema~A è
+confermata, e lo è nel modo più diretto possibile: rimuovendo la causa.}
+\kernelname{scheme\_a} mostra la discontinuità attesa --- $\tau$ passa da
+\SI{1.47}{\nano\second} a $k = 6$ a \SI{8.11}{\nano\second} a $k = 20$, mentre
+il lavoro cresce solo di $3{,}3\times$ --- e la firma è un $B_X$ che si stabilizza
+intorno a \SIrange{17}{20}{\giga\byte\per\second} ai due estremi
+dell'intervallo. \kernelname{scheme\_a\_jblock} cambia una sola cosa, l'ordine
+di visita di $X$, e la discontinuità sparisce: $\tau$ passa da $1{,}46$ a
+$2{,}23$ \si{\nano\second} fra $k = 6$ e $k = 20$, e il throughput invece di
+crollare cresce da $8{,}25$ a $17{,}93$ GFLOPS. Se il collo di bottiglia fosse
+stato il numero di accumulatori o la pressione sui registri, mattonellare $X$
+non avrebbe avuto alcun effetto.
+
+\textbf{Il guadagno del j-blocking è dove la teoria lo colloca e non altrove.}
+Lo speedup di \kernelname{scheme\_a\_jblock} su \kernelname{scheme\_a} vale
+$0{,}96\times$ a $k = 3$, $1{,}01\times$ a $k = 6$, poi $1{,}55\times$,
+$3{,}64\times$ e $3{,}14\times$. Ai $k$ piccoli $X_{\text{loc}}$ sta già nella
+cache privata e mattonellarla non serve --- anzi costa un $4\%$, che è il prezzo
+di rileggere $Y$ a ogni tile. Il pareggio cade fra $k = 6$ e $k = 8$, cioè fra
+\SI{0.79}{\mega\byte} e \SI{1.05}{\mega\byte} di $X_{\text{loc}}$: è una stima
+sperimentale della soglia, e restringe l'intervallo che l'analisi precedente
+lasciava aperto.
+
+\textbf{Il register blocking è una regressione, e va riportato come tale.}
+\kernelname{scheme\_a\_jblock\_rb} è più veloce di \kernelname{scheme\_a} solo
+a $k = 3$ ($+11\%$) e perde ovunque altrove, fino a $-30\%$ a $k = 32$; rispetto
+a \kernelname{scheme\_a\_jblock} perde un fattore $4{,}5\times$ a $k = 32$. La
+direzione è coerente con l'intento --- a $k = 3$ le catene di FMA indipendenti
+sono poche ed è lì che lavorare su più righe di $A$ per volta può servire --- ma
+l'entità della perdita agli altri $k$ dice che il blocco di righe interferisce
+con il tile di $X$: lavorando su \code{RB\_ROWS} righe contemporaneamente, il
+working set per tile si moltiplica per \code{RB\_ROWS} e annulla il beneficio
+del j-blocking. La campagna non contiene l'esperimento che lo dimostrerebbe ---
+uno sweep congiunto su \code{JBLOCK\_BYTES} e \code{RB\_ROWS}, che questa
+campagna ha lasciato ai valori predefiniti --- ed è il primo esperimento da
+aggiungere.
+
+\subsection{Scaling a problema fisso}
+\label{sec:ris-scaling}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Fase 4: throughput ufficiale (\code{gflops}) al variare di $P$.}
+\label{tab:ris-fase4-gflops}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+\textbf{Backend} & $P$ & $k=3$ & $k=6$ & $k=8$ & $k=20$ & $k=32$ \\
+\midrule
+\multirow{4}{*}{\kernelname{scheme\_a}}
+ & 1 & 4,38  & 8,18  & 7,35  & 4,93  & 5,12 \\
+ & 2 & 8,75  & 15,15 & 13,67 & 9,53  & 9,88 \\
+ & 4 & 15,86 & 27,13 & 24,81 & 18,46 & 17,17 \\
+ & 8 & 25,85 & 48,32 & 41,42 & 23,13 & 15,18 \\
+\midrule
+\multirow{4}{*}{\kernelname{scheme\_a\_jblock}}
+ & 1 & 4,21  & 8,25  & 11,39 & 17,93  & 16,09 \\
+ & 2 & 8,23  & 15,87 & 20,94 & 34,59  & 30,37 \\
+ & 4 & 15,83 & 30,75 & 40,09 & 62,03  & 55,62 \\
+ & 8 & 24,19 & 45,01 & 58,37 & \textbf{105,46} & \textbf{101,80} \\
+\midrule
+\multirow{4}{*}{\kernelname{scheme\_a\_jblock\_rb}}
+ & 1 & 4,86  & 4,66  & 3,91  & 3,86  & 3,60 \\
+ & 2 & 8,89  & 8,84  & 7,42  & 7,50  & 6,93 \\
+ & 4 & 16,55 & 17,03 & 14,36 & 14,34 & 12,64 \\
+ & 8 & 22,49 & 31,16 & 27,29 & 27,86 & 24,07 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Fase 4: efficienza parallela $E(P) = S(P)/P$ della
+\cref{eq:speedup-efficienza}, rispetto alla baseline $P = 1$ dello stesso
+backend.}
+\label{tab:ris-fase4-efficienza}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+\textbf{Backend} & $P$ & $k=3$ & $k=6$ & $k=8$ & $k=20$ & $k=32$ \\
+\midrule
+\multirow{3}{*}{\kernelname{scheme\_a}}
+ & 2 & 1,00 & 0,93 & 0,93 & 0,97 & 0,97 \\
+ & 4 & 0,90 & 0,83 & 0,84 & 0,94 & 0,84 \\
+ & 8 & 0,74 & 0,74 & 0,70 & 0,59 & \textbf{0,37} \\
+\midrule
+\multirow{3}{*}{\kernelname{scheme\_a\_jblock}}
+ & 2 & 0,98 & 0,96 & 0,92 & 0,96 & 0,94 \\
+ & 4 & 0,94 & 0,93 & 0,88 & 0,86 & 0,86 \\
+ & 8 & 0,72 & 0,68 & 0,64 & 0,74 & 0,79 \\
+\midrule
+\multirow{3}{*}{\kernelname{scheme\_a\_jblock\_rb}}
+ & 2 & 0,91 & 0,95 & 0,95 & 0,97 & 0,96 \\
+ & 4 & 0,85 & 0,91 & 0,92 & 0,93 & 0,88 \\
+ & 8 & 0,58 & 0,84 & 0,87 & 0,90 & 0,84 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Fase 4: scomposizione del tempo a $k = 32$, in \si{\milli\second}. La
+reduce è degenere perché la griglia è $P \times 1$.}
+\label{tab:ris-fase4-composizione}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+\textbf{Backend} & $P$ & $t_{\text{bcast}}$ & $t_{\text{local}}$ & $t_{\text{reduce}}$ & $t_{\text{total}}$ \\
+\midrule
+\multirow{4}{*}{\kernelname{scheme\_a}}
+ & 1 & 0,001 & 3357,4 & 1,035 & 3358,4 \\
+ & 2 & 0,461 & 1738,6 & 0,582 & 1739,6 \\
+ & 4 & 2,323 & 999,2  & 0,379 & 1000,6 \\
+ & 8 & 2,103 & 1129,9 & 0,278 & 1132,1 \\
+\midrule
+\multirow{4}{*}{\kernelname{scheme\_a\_jblock}}
+ & 1 & 0,000 & 1067,1 & 0,719 & 1067,9 \\
+ & 2 & 0,883 & 564,3  & 0,480 & 565,7 \\
+ & 4 & 2,637 & 306,2  & 0,233 & 308,9 \\
+ & 8 & 1,374 & 167,3  & 0,111 & 168,8 \\
+\midrule
+\multirow{4}{*}{\kernelname{scheme\_a\_jblock\_rb}}
+ & 1 & 0,001 & 4776,4 & 0,914 & 4777,3 \\
+ & 2 & 0,916 & 2478,6 & 0,505 & 2480,0 \\
+ & 4 & 2,820 & 1357,7 & 0,263 & 1359,2 \\
+ & 8 & 2,254 & 711,3  & 0,135 & 713,6 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[scpa,
+  xlabel={$P$}, ylabel={speedup $S(P)$},
+  xmin=0.5, xmax=8.5, ymin=0, ymax=8.5,
+  xtick={1,2,4,8},
+  legend pos=north west, width=0.78\linewidth, height=6cm]
+\addplot[black, dotted, thick, forget plot] coordinates {(1,1) (8,8)};
+\node[font=\scriptsize,anchor=south east,rotate=38] at (axis cs:7.6,7.6) {ideale};
+\addplot[blue!70!black, mark=*] coordinates {(1,1) (2,1.89) (4,3.46) (8,6.33)};
+\addlegendentry{\kernelname{scheme\_a\_jblock}}
+\addplot[teal!70!black, mark=triangle*] coordinates {(1,1) (2,1.93) (4,3.51) (8,6.69)};
+\addlegendentry{\kernelname{scheme\_a\_jblock\_rb}}
+\addplot[orange!80!black, mark=square*] coordinates {(1,1) (2,1.93) (4,3.36) (8,2.97)};
+\addlegendentry{\kernelname{scheme\_a}}
+\end{axis}
+\end{tikzpicture}
+\caption{Fase 4: strong scaling a $k = 32$. Lo speedup è calcolato sulla
+baseline $P = 1$ dello stesso backend, quindi le tre curve non sono
+confrontabili in valore assoluto: \kernelname{scheme\_a\_jblock\_rb} scala bene
+perché parte da un tempo tre volte più alto.}
+\label{fig:ris-fase4-speedup}
+\end{figure}
+
+\subsubsection*{Lettura}
+
+\textbf{La comunicazione non è mai il limite, e la campagna lo quantifica.}
+Broadcast e reduce insieme non superano l'$1{,}03\%$ del tempo ufficiale in
+nessuna delle 60 configurazioni. È una conseguenza della griglia $P \times 1$:
+il comunicatore di riga contiene un solo processo, la reduce degenera in una
+copia locale, e il solo costo reale è il broadcast di $X_{\text{loc}}$, che vale
+al più \SI{4}{\mega\byte}. Con $M = N = \num{16384}$ e $P \le 8$ il rapporto
+calcolo/comunicazione è troppo favorevole perché le collettive contino:
+qualunque degrado dell'efficienza osservato sotto va quindi attribuito al
+calcolo locale, non a MPI.
+
+\textbf{Il crollo di \kernelname{scheme\_a} a $P = 8$ e $k = 32$ è il risultato
+più informativo della fase.} L'efficienza scende a $0{,}37$ e il tempo
+\emph{aumenta} passando da $P = 4$ a $P = 8$ ($1000{,}6 \to
+\SI{1132.1}{\milli\second}$): aggiungere processi peggiora le cose. La
+scomposizione esclude la comunicazione, che vale \SI{2.4}{\milli\second} su
+\num{1132}. Con la griglia $P \times 1$ ogni rank riceve l'intera
+$X_{\text{loc}}$, quindi otto rank streammano otto copie da
+\SI{4}{\mega\byte} della stessa $X$ attraverso la cache condivisa: la banda che
+lo schema~A consuma rileggendo $X$ viene moltiplicata per $P$ mentre la cache
+condivisa resta una. È la stessa causa della discontinuità a rank singolo,
+vista da un'altra direzione --- e \kernelname{scheme\_a\_jblock}, che quella
+causa la rimuove, a $P = 8$ e $k = 32$ mantiene $E = 0{,}79$ e un throughput
+$6{,}7\times$ superiore.
+
+\textbf{Lo speedup, da solo, mente.} \cref{fig:ris-fase4-speedup} mostra
+\kernelname{scheme\_a\_jblock\_rb} come il backend che scala meglio
+($6{,}69\times$ a $P = 8$). È vero e irrilevante: scala bene perché parte da un
+tempo a rank singolo $4{,}5\times$ peggiore, e a $P = 8$ resta il più lento dei
+tre in valore assoluto ($24{,}07$ contro $101{,}80$ GFLOPS). È il motivo per cui
+la \cref{tab:ris-fase4-gflops} riporta il throughput e non solo l'efficienza:
+il confronto fra backend si legge orizzontalmente in quella tabella, mentre
+$S(P)$ ed $E(P)$ dicono soltanto quanto bene ciascun backend parallelizza sé
+stesso.
+
+\textbf{Il calo generale di efficienza a $P = 8$ ha una causa unica.} Tutti e
+tre i backend perdono efficienza fra $P = 4$ e $P = 8$ ($0{,}64$--$0{,}90$), e
+poiché la comunicazione è trascurabile e il lavoro per rank è esattamente
+$1/P$, resta la banda di memoria condivisa fra i core. Il nucleo è
+memory-bound anche nella sua versione mattonellata: $B_A$ a rank singolo vale
+\SIrange{2}{5.7}{\giga\byte\per\second} per \kernelname{scheme\_a\_jblock}, e
+otto core che vi accedono contemporaneamente saturano il canale prima di
+esaurire il calcolo. Sarebbe verificabile con una misura STREAM a uno e a otto
+core, che è fra i dati mancanti di \cref{tab:picchi-cpu}.
+
+\textbf{In funzione delle fasi GPU.} Il confronto fra le due piattaforme, a
+parità di problema, precisione e metrica, si legge accostando la
+\cref{tab:ris-fase4-gflops} alla \cref{tab:ris-confronto-kernel}: a
+$k = 32$, $\num{16384}\times\num{16384}$ in doppia precisione,
+\kernelname{cuda\_warp} fa $358{,}3$ GFLOPS contro i $16{,}09$ del miglior
+backend CPU a rank singolo ($22{,}3\times$) e i $101{,}80$ a $P = 8$
+($3{,}5\times$). Il rapporto si riduce al crescere di $P$ ma non si chiude, e
+va letto ricordando che il tempo GPU esclude i trasferimenti per costruzione
+(\cref{sec:costi-esclusi}): quanto pesino davvero è l'oggetto della sezione
+seguente.
 
 \section{Il costo dei dati: trasferimenti e preprocessing}
 \label{sec:ris-trasferimenti}
 
-\begin{daverificare}
-Nessuna esecuzione aggiuntiva: le colonne di \cref{tab:tempi-esclusi} sono
-gi\`a in coda al CSV di ogni campagna. Compilare le due tabelle seguenti
-estraendole dalle righe GPU di C2 (per la dipendenza da $k$) e di C1 (per la
-dipendenza dalla taglia).
-\end{daverificare}
-
-Questa sezione risponde a una domanda che la traccia permette di non mettere in
-$T$ ma non di ignorare: con $k \le 32$, quanto costa portare i dati sulla scheda
-rispetto a calcolarci sopra?
+Le voci di questa sezione non richiedono esecuzioni aggiuntive: ogni campagna
+le scrive in coda al proprio CSV. I valori riportati sono quelli di
+\kernelname{cuda\_warp} nella campagna 1.5 ($M = N = \num{16384}$, FP64,
+$P = 1$), dove $A$ occupa \SI{2}{\gibi\byte} e il blocco di $X$ trasferito a
+ogni invocazione va da \SI{0.38}{\mebi\byte} a $k = 3$ a \SI{4}{\mebi\byte} a
+$k = 32$.
 
 \begin{table}[H]
 \centering
 \footnotesize
-\caption{Scomposizione della fase locale su GPU, secondo la
-\cref{eq:scomposizione-locale}. Percentuali di $t_{\text{local}}$.}
+\caption{Scomposizione della fase locale su GPU secondo la
+\cref{eq:scomposizione-locale}, in percentuale di $t_{\text{local}}$.}
 \label{tab:ris-scomposizione}
 \begin{tabular}{@{}rrrrrr@{}}
 \toprule
-$k$ & $t_{\text{H2D }X}$ & $t_{\text{kernel}}$ & $t_{\text{D2H }Y}$ & $t_{\text{launch}}$ & $t_{\text{local}}$ [\si{\second}] \\
+$k$ & $t_{\text{H2D }X}$ & $t_{\text{kernel}}$ & $t_{\text{D2H }Y}$ & $t_{\text{launch}}$ & $t_{\text{local}}$ [\si{\milli\second}] \\
 \midrule
-3  & \dato & \dato & \dato & \dato & \dato \\
-8  & \dato & \dato & \dato & \dato & \dato \\
-32 & \dato & \dato & \dato & \dato & \dato \\
+3  & $2{,}17\%$ & $96{,}05\%$ & $1{,}62\%$ & $0{,}168\%$ & 5,55 \\
+6  & $2{,}45\%$ & $95{,}66\%$ & $1{,}79\%$ & $0{,}101\%$ & 9,42 \\
+8  & $2{,}48\%$ & $95{,}68\%$ & $1{,}76\%$ & $0{,}080\%$ & 12,60 \\
+20 & $1{,}99\%$ & $96{,}41\%$ & $1{,}57\%$ & $0{,}035\%$ & 31,14 \\
+32 & $2{,}07\%$ & $96{,}33\%$ & $1{,}58\%$ & $0{,}023\%$ & 49,78 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Da discutere: i due trasferimenti per invocazione scalano con $\nloc k$ e
-$\mloc k$, mentre l'overhead del runtime non scala affatto --- quindi il loro
-peso relativo deve muoversi in direzioni opposte al crescere della taglia, ed \`e
-esattamente ci\`o che la scomposizione permette di verificare invece di
-asserire. Se a $k = 3$ i trasferimenti pesano quanto il kernel o pi\`u, quello
-\`e il risultato: dice che a $k$ piccolo il problema non \`e il calcolo, ed \`e
-l'argomento pi\`u forte per un MPI CUDA-aware (\cref{sec:lavori-futuri}).
-
 \begin{table}[H]
 \centering
 \footnotesize
-\caption{Preprocessing e banda dei trasferimenti, per una configurazione
-rappresentativa.}
+\caption{Preprocessing e banda dei trasferimenti, \kernelname{cuda\_warp},
+$M = N = \num{16384}$, FP64. Le voci di setup sono pagate una volta sola.}
 \label{tab:ris-prep}
 \begin{tabular}{@{}lrl@{}}
 \toprule
 \textbf{Voce} & \textbf{Valore} & \textbf{Nota} \\
 \midrule
-$t_{\text{setup}}^{\text{init}}$ & \dato & costo fisso, indipendente dalla taglia \\
-$t_{\text{setup}}^{\text{alloc}}$ & \dato & cresce con la taglia \\
-$t_{\text{setup}}^{\text{H2D }A}$ & \dato & il trasferimento tolto dal cammino misurato \\
-\code{bw\_h2d\_A\_gbs} & \dato & da confrontare con il picco del bus \\
-\code{bw\_h2d\_X\_gbs} / \code{bw\_d2h\_Y\_gbs} & \dato & messaggi piccoli: attesa banda molto inferiore \\
-$t_{\text{prep}}^{\text{gen }A}$ & \dato & generazione, esclusa da $T$ \\
-$t_{\text{prep}}^{\text{distrib }A}$ & \dato & $0$ con \code{--a-mode local} \\
-$t_{\text{prep}}^{\text{convert }X}$ & \dato & $0$ con \code{X\_LAYOUT=row} \\
+$t_{\text{setup}}$ totale            & \SI{0.617}{\second} & \code{local\_gemm\_create} \\
+\quad creazione del contesto CUDA    & \SI{0.139}{\second} & costo fisso, indipendente dalla taglia \\
+\quad \code{cudaMalloc} in VRAM      & \SI{0.26}{\milli\second} & trascurabile \\
+\quad H2D di $A$                     & \SI{0.475}{\second} & il trasferimento tolto dal cammino misurato \\
+\code{bw\_h2d\_A\_gbs}               & \SI{4.53}{\giga\byte\per\second} & \SI{2}{\gibi\byte} in un'unica copia \\
+\code{bw\_h2d\_X\_gbs}               & \SIrange{3.27}{4.23}{\giga\byte\per\second} & messaggi da \SIrange{0.38}{4}{\mebi\byte} \\
+\code{bw\_d2h\_Y\_gbs}               & \SIrange{4.38}{5.36}{\giga\byte\per\second} & idem, in uscita \\
+$t_{\text{prep}}$ generazione di $A$ & \SI{0.68}{\second} & esclusa da $T$ \\
+$t_{\text{prep}}$ distribuzione di $A$ & \SI{0}{\second} & con \code{--a-mode local} \\
+$t_{\text{prep}}$ conversione di $X$ & \SIrange{0.26}{3.32}{\milli\second} & solo con $X$ column-major \\
+$t_{\text{prep}}$ totale             & \SI{1.30}{\second} & somma locale, poi massimo fra i rank \\
+$t_{\text{io}}$ scrittura del CSV    & \SI{0.19}{\milli\second} & unico I/O del driver \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Il confronto fra \code{bw\_h2d\_A\_gbs} e le due bande per invocazione \`e
-istruttivo di per s\'e: $A$ \`e un unico trasferimento da gigabyte e dovrebbe
-avvicinarsi al picco del bus, mentre $X$ e $Y$ sono messaggi da qualche decina
-o centinaio di kilobyte, dominati dalla latenza. \`E la stessa distinzione fra
-$\alpha$ e $\beta$ della \cref{eq:costo-comm}, su un altro collegamento.
+\subsubsection*{Lettura}
+
+\textbf{I trasferimenti per invocazione pesano circa il $4\%$, e il peso non
+dipende da $k$.} H2D di $X$ e D2H di $Y$ sommano fra il $3{,}6\%$ e il
+$4{,}2\%$ di $t_{\text{local}}$ su tutto l'intervallo. Il risultato non era
+scontato: i due trasferimenti scalano con $\nloc k$ e $\mloc k$, cioè
+linearmente in $k$, ma anche il kernel scala linearmente in $k$ nel regime
+compute-bound, e il rapporto resta costante. È la conferma che a
+$\num{16384}\times\num{16384}$ il problema è abbastanza grande da rendere il
+PCIe un contorno.
+
+\textbf{L'overhead di lancio si ammortizza, come deve.} $t_{\text{launch}}$
+vale \SIrange{9}{12}{\micro\second} in assoluto, cioè un valore che non
+dipende da $k$; in percentuale scende quindi dallo $0{,}168\%$ a $k = 3$ allo
+$0{,}023\%$ a $k = 32$. Le due voci si muovono in direzioni opposte proprio
+perché una scala con il lavoro e l'altra no, ed è ciò che la scomposizione
+permette di verificare invece di asserire.
+
+\textbf{La banda misurata è un quarto del bus, e questo è un risultato
+azionabile.} La copia di $A$ raggiunge \SI{4.53}{\giga\byte\per\second} su un
+PCIe~3.0 $\times$16 il cui picco teorico è circa
+\SI{15.75}{\giga\byte\per\second}. Il valore è coerente con l'uso di memoria
+host \emph{pageable}: il driver deve passare per un buffer di staging pinnato
+interno, dimezzando o peggio la banda utile. Allocare i buffer host con
+\code{cudaHostAlloc} è quindi l'intervento che ridurrebbe i
+\SI{0.475}{\second} di setup, e non richiede di toccare né i kernel né
+\code{mpi\_matmul}.
+
+\textbf{Il ciclo di vita a tre fasi si ripaga in una decina di invocazioni.}
+Il trasferimento iniziale di $A$ costa \SI{0.475}{\second}, contro i
+\SI{48}{\milli\second} di un kernel a $k = 32$: copiare $A$ a ogni invocazione
+--- che è ciò che un'interfaccia senza \code{create}/\code{destroy} imporrebbe ---
+moltiplicherebbe per undici il tempo di ogni prodotto. La scelta di
+\cref{sec:tre-fasi} non è quindi una comodità di progetto ma la condizione
+perché la misura riguardi la GPU e non il bus.
+
+\textbf{In funzione dei lavori futuri.} I due trasferimenti per invocazione
+sommano, a $k = 32$, \SI{1.82}{\milli\second} su una fase locale di
+\SI{49.78}{\milli\second}. È il tetto esatto del guadagno ottenibile da un MPI
+CUDA-aware, che eliminerebbe H2D di $X$ e D2H di $Y$ passando puntatori device
+direttamente alle collettive: meno del $4\%$ sulla fase locale a rank singolo.
+Il beneficio vero di quell'intervento va quindi cercato nella Fase 5, dove i
+trasferimenti di $P$ rank competono sullo stesso bus, e non qui.
 
 \section{Sintesi}
+\label{sec:ris-sintesi}
 
-\begin{daverificare}
-Completare a raccolta ultimata con: la tabella riassuntiva
-(backend $\times$ $k$, migliore configurazione, GFLOPS, \% del tetto roofline
-pertinente); il confronto fra la previsione di \cref{sec:roofline-gpu} e la
-misura, con lo scarto; l'esito dei tre punti elencati in \cref{sec:ris-c2}.
-\end{daverificare}
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Migliore configurazione misurata per ciascun regime, a
+$M = N = \num{16384}$.}
+\label{tab:ris-sintesi}
+\begin{tabular}{@{}llrrl@{}}
+\toprule
+\textbf{Regime} & \textbf{Backend migliore} & \textbf{GFLOPS} & \textbf{\% tetto} & \textbf{Riferimento} \\
+\midrule
+GPU FP64, $k = 3$   & \kernelname{cuda\_warp} & 302,1 & 86,3 & \cref{tab:ris-confronto-kernel} \\
+GPU FP64, $k \ge 6$ & \kernelname{cuda\_warp} & \numrange{356}{358} & $\approx 102$ & \cref{tab:ris-confronto-kernel} \\
+GPU FP32, $k \le 8$ & \kernelname{cuda\_warp} & \numrange{604}{1414} & \numrange{79}{90} & \cref{tab:ris-fase3-tetto} \\
+GPU FP32, $k = 20$  & \kernelname{cuda\_warp\_smem} & 1726,9 & 38,5 & \cref{tab:ris-fase3-tetto} \\
+GPU FP32, $k = 32$  & \kernelname{cublas} & 4791,9 & 66,9 & \cref{tab:ris-fase3-tetto} \\
+CPU FP64, $P = 1$   & \kernelname{scheme\_a\_jblock} & 17,93 ($k=20$) & --- & \cref{tab:ris-fase4-gflops} \\
+CPU FP64, $P = 8$   & \kernelname{scheme\_a\_jblock} & 105,46 ($k=20$) & --- & \cref{tab:ris-fase4-gflops} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Le tre conclusioni che il capitolo sostiene, ciascuna appoggiata su più di una
+campagna:
+
+\begin{enumerate}[nosep,left=0pt]
+  \item \textbf{Il modello roofline ha previsto correttamente il regime in
+        entrambe le precisioni.} In FP64 il plateau al tetto per $k \ge 6$
+        (campagna 1.5), la sua indipendenza da taglia e forma alle scale
+        sufficienti (Fase 2) e la crescita di $S_{32/64}$ con $k$ (Fase 3) sono
+        tre verifiche indipendenti della stessa previsione. Il modello
+        sovrastima però il tetto FP32 ai $k$ grandi, e la Fase 3 individua la
+        ragione nel traffico su $X$ che il roofline a un livello non contempla.
+  \item \textbf{Il collo di bottiglia del nucleo di CPU è la rilettura di $X$,
+        e il j-blocking lo rimuove.} L'ipotesi formulata sulla base della sola
+        discontinuità in $k$ è confermata dall'esperimento che ne rimuove la
+        causa (Fase 4, $P = 1$) e di nuovo, indirettamente, dal crollo di
+        \kernelname{scheme\_a} a $P = 8$, dove la stessa banda è contesa da
+        otto core.
+  \item \textbf{Il tuning vale quanto la scelta del kernel.} La differenza fra
+        la peggiore e la migliore configurazione di
+        \kernelname{cuda\_warp\_smem} ($38{,}8\%$ di perdita contro $1{,}5\%$)
+        è dello stesso ordine della differenza fra i kernel custom, e molto
+        maggiore della differenza fra \kernelname{cuda\_warp} e
+        \kernelname{cuda\_warp\_smem}. È la giustificazione a posteriori
+        dell'ordine delle fasi.
+\end{enumerate}
