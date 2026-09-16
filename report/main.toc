@@ -12,13 +12,13 @@
 \contentsline {subsection}{\numberline {2.3.2}Intensità rispetto al traffico di $A$}{6}{subsection.2.3.2}%
 \contentsline {subsection}{\numberline {2.3.3}Il limite rispetto al traffico di $A$}{7}{subsection.2.3.3}%
 \contentsline {subsection}{\numberline {2.3.4}Località degli accessi}{7}{subsection.2.3.4}%
-\contentsline {section}{\numberline {2.4}Interfaccia comune dei backend locali}{8}{section.2.4}%
+\contentsline {section}{\numberline {2.4}Interfaccia comune dei backend locali}{7}{section.2.4}%
 \contentsline {subsection}{\numberline {2.4.1}Ciclo di vita del backend}{8}{subsection.2.4.1}%
-\contentsline {subsection}{\numberline {2.4.2}Contesto opaco del backend}{9}{subsection.2.4.2}%
+\contentsline {subsection}{\numberline {2.4.2}Contesto opaco del backend}{8}{subsection.2.4.2}%
 \contentsline {subsection}{\numberline {2.4.3}Informazioni sperimentali}{9}{subsection.2.4.3}%
 \contentsline {subsection}{\numberline {2.4.4}Selezione del backend}{9}{subsection.2.4.4}%
 \contentsline {subsection}{\numberline {2.4.5}Precisione}{9}{subsection.2.4.5}%
-\contentsline {subsection}{\numberline {2.4.6}Generazione deterministica}{10}{subsection.2.4.6}%
+\contentsline {subsection}{\numberline {2.4.6}Generazione deterministica}{9}{subsection.2.4.6}%
 \contentsline {subsection}{\numberline {2.4.7}Indipendenza dalla decomposizione}{10}{subsection.2.4.7}%
 \contentsline {chapter}{\numberline {3}Parallelizzazione MPI}{11}{chapter.3}%
 \contentsline {section}{\numberline {3.1}Che cosa significa parallelizzare in MPI}{11}{section.3.1}%
@@ -124,6 +124,7 @@
 \contentsline {section}{\numberline {6.5}Il costo dei dati: trasferimenti e preprocessing}{75}{section.6.5}%
 \contentsline {chapter}{\numberline {A}L'oracolo seriale}{77}{appendix.Alph1}%
 \contentsline {section}{\numberline {A.1}L'implementazione}{77}{section.Alph1.1}%
-\contentsline {section}{\numberline {A.2}Il confronto}{77}{section.Alph1.2}%
+\contentsline {section}{\numberline {A.2}Il confronto di validazione}{77}{section.Alph1.2}%
 \contentsline {section}{\numberline {A.3}La tolleranza}{78}{section.Alph1.3}%
 \contentsline {section}{\numberline {A.4}Perché resta fuori dalle misure}{78}{section.Alph1.4}%
+\contentsline {chapter}{\numberline {B}Ripartizione del lavoro}{79}{appendix.Alph2}%

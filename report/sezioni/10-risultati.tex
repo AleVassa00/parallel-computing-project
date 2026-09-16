@@ -253,7 +253,7 @@ $k$. Media sui cinque $k$ e caso peggiore. In grassetto la coppia selezionata.}
 \begin{figure}[H]
 \centering
 \includegraphics[width=\linewidth]{img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_joint_tuning_summary}
-\caption{Campagna 1.4: tuning congiunto di \code{BLOCK} e granularità. A
+\caption{Campagna 1.3: tuning congiunto di \code{BLOCK} e granularità. A
 sinistra la prestazione normalizzata media sui cinque $k$, a destra il caso
 peggiore.}
 \label{fig:ris-granularita}
@@ -262,7 +262,7 @@ peggiore.}
 \begin{figure}[H]
 \centering
 \includegraphics[width=\linewidth]{img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_block256_detail}
-\caption{Campagna 1.4: dettaglio a \code{BLOCK}$=256$. A destra il piano di
+\caption{Campagna 1.3: dettaglio a \code{BLOCK}$=256$. A destra il piano di
 tiling effettivamente scelto a runtime, che dipende da $k$ e non da $g$ se non
 attraverso l'arrotondamento.}
 \label{fig:ris-granularita-dettaglio}
@@ -385,7 +385,7 @@ $k$ & \code{PAD}=0 & \code{PAD}=1 & guadagno & \code{x\_rows} & \code{x\_rows} \
 \addlegendentry{\code{SMEM\_PAD}=1}
 \end{axis}
 \end{tikzpicture}
-\caption{Campagna 1.3: confronto fra tile senza padding e con una colonna di
+\caption{Campagna 1.4: confronto fra tile senza padding e con una colonna di
 padding. Il caso $k=32$ rende visibile la patologia che negli altri punti è
 parzialmente nascosta dal resto del lavoro del kernel.}
 \label{fig:ris-pad}
