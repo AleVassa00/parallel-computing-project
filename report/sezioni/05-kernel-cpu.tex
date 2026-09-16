@@ -172,13 +172,6 @@ compilatore si pone prima di vettorizzare un ciclo.
         sono contigue in memoria.
 \end{itemize}
 
-\begin{daverificare}
-Verificare sul server l'effettiva vettorizzazione del percorso caldo, per
-esempio con \code{gcc -fopt-info-vec} oppure ispezionando l'assembly di
-\code{kernel\_k8} e \code{kernel\_k32}. Il punto da documentare è se e a quale
-$k$ compaiano spill degli accumulatori.
-\end{daverificare}
-
 \section{Il primo limite: la rilettura di $X$}
 \label{sec:rilettura-x}
 

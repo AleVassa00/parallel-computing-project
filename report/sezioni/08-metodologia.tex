@@ -278,7 +278,7 @@ di processi utilizzati per eseguirlo.
 
 \subsection{Prestazione della sola fase computazionale}
 
-\color{red}
+
 Accanto alla metrica complessiva viene mantenuta una misura che esclude le
 comunicazioni MPI e considera soltanto la fase computazionale del backend.
 
@@ -335,7 +335,7 @@ interne al kernel senza includere le collettive MPI degeneri.
 
 Quando l'oggetto dell'esperimento è invece l'esecuzione distribuita, la
 metrica di riferimento rimane \code{gflops}.
-\color{black}
+
 
 \section{Ripetizioni e raccolta dei campioni}
 \label{sec:stabilita-misure}
@@ -496,11 +496,8 @@ in doppia precisione, con $5$ invocazioni di warm-up e $20$ repetition
 misurate.
 
 La dimensione $\num{16384}\times\num{16384}$ fornisce un problema
-sufficientemente grande da esporre
-\color{red}
-un elevato grado di parallelismo
-\color{black}
-e da
+sufficientemente grande da esporre 
+un elevato grado di parallelismo e da
 ridurre il peso relativo dei costi fissi, mantenendo al tempo stesso un
 ampio margine nella memoria della GPU per i buffer ausiliari e per le
 diverse configurazioni dei backend.
@@ -936,12 +933,6 @@ Passando da FP64 a FP32 si dimezza la dimensione di ciascun elemento in
 memoria e cambia il throughput aritmetico disponibile sulla GPU. Possono
 inoltre cambiare l'utilizzo dei registri e, per i kernel che utilizzano
 shared memory, la quantità di memoria richiesta dal tile.
-
-\color{red}
-La campagna permette quindi di osservare come questi effetti complessivi
-si riflettano sul tempo di esecuzione e se il comportamento misurato sia
-coerente con il modello roofline discusso nel \cref{cap:roofline}.
-\color{black}
 
 L'interpretazione delle differenze viene rimandata alla sezione dei
 risultati.

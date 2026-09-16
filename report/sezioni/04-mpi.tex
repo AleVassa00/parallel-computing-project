@@ -8,8 +8,7 @@ non condividono niente, e le scelte che ne derivano condizionano tutto il
 resto della relazione: la forma dei blocchi, che cosa viene cronometrato, e
 perfino quali configurazioni ha senso misurare.
 
-\section{Che cosa significa parallelizzare in MPI}
-\label{sec:mpi-intro}
+\section{Che cosa significa parallelizzare in MPI}\label{sec:mpi-intro}
 
 MPI (\emph{Message Passing Interface}) è uno standard per programmare macchine
 a \textbf{memoria distribuita}. Il modello di esecuzione è il seguente: lo
@@ -404,8 +403,7 @@ peso:
   \item \textbf{costringerebbe a replicare $A$.} Per calcolare un qualunque
         sottoinsieme di colonne di $Y$ serve comunque \emph{tutta} $A$: i
         processi di una stessa partizione lungo $k$ vorrebbero perciò lo stesso
-        identico blocco di $A$. Si duplicherebbe il dato dominante
-        (\cref{sec:traffico}), che è l'opposto di ciò per cui la decomposizione
+        identico blocco di $A$. Si duplicherebbe il dato dominante, che è l'opposto di ciò per cui la decomposizione
         esiste;
   \item \textbf{ridurrebbe il riuso di $A$ in registro.} Nello schema~A il
         fattore di riuso è pari al numero di colonne che il processo possiede
@@ -415,17 +413,6 @@ peso:
         definizione del problema, e frammentarlo ulteriormente darebbe
         comunicazioni dominate dalla latenza invece che dalla banda.
 \end{itemize}
-
-\begin{tcolorbox}[colback=black!3,colframe=black!30,title=\textbf{Invariante critico}]
-Il numero di righe locali di $X$ deve venire dalla \emph{stessa} partizione con
-cui si tagliano le colonne di $A$, e il numero di righe locali di $Y$ dalla
-stessa con cui se ne tagliano le righe. Non è un controllo da eseguire, è una
-proprietà garantita \emph{per costruzione}: esistono soltanto $\mloc$ e
-$\nloc$, calcolati una volta sola in \code{layout\_init}, e non due coppie di
-valori da tenere allineate. La struttura \code{layout\_t} è il punto unico di
-verità sulla forma dei blocchi, e finché resta tale l'invariante non può essere
-violato senza modificarla.
-\end{tcolorbox}
 
 \section{Distribuzione iniziale dei dati}
 \label{sec:distribuzione-a}
@@ -567,9 +554,9 @@ Le due collettive non sono però messaggi singoli. Il costo logaritmico che
 segue è quello del \emph{recursive doubling}, l'algoritmo di broadcast visto a
 lezione, che al posto dei $p-1$ invii sequenziali della versione ingenua
 costa $T(p) = \lceil \log_2 p \rceil$ tempi di messaggio. Il logaritmo si
-ottiene grazie a un'ipotesi precisa sulla rete --- che essa sostenga più
+ottiene grazie a un'ipotesi precisa sulla rete - che essa sostenga più
 messaggi contemporaneamente, purché le coppie di nodi coinvolte non si
-sovrappongano --- ed è quell'ipotesi, più che la struttura ad albero, a
+sovrappongano - ed è quell'ipotesi, più che la struttura ad albero, a
 rendere possibile il guadagno.
 
 Detti $s$ i byte per scalare, il costo di comunicazione per invocazione è
