@@ -3,29 +3,80 @@
 
 \section{Obiettivo}
 
-Il progetto realizza un nucleo di calcolo per il prodotto fra una matrice densa
-e un multivettore,
+Il progetto realizza un nucleo di calcolo parallelo per il prodotto tra una
+matrice densa e un multivettore:
+
 \begin{equation}
-  Y \leftarrow A X ,
-  \qquad
-  A \in \mathbb{R}^{M \times N},\quad
-  X \in \mathbb{R}^{N \times k},\quad
-  Y \in \mathbb{R}^{M \times k},
-  \label{eq:problema}
+    Y \leftarrow AX,
+    \qquad
+    A \in \mathbb{R}^{M\times N},
+    \quad
+    X \in \mathbb{R}^{N\times k},
+    \quad
+    Y \in \mathbb{R}^{M\times k}.
+    \label{eq:problema}
 \end{equation}
-con $k$ \emph{piccolo}: il multivettore è una matrice densa alta e strettissima.
-Il codice funziona per $k$ generico ed è collaudato sui cinque valori richiesti
-dalla traccia, $k \in \{3, 6, 8, 20, 32\}$.
 
-\medskip
+Il multivettore $X$ può essere visto come una matrice densa con un numero
+$k$ di colonne molto più piccolo rispetto alle dimensioni della matrice
+$A$. Il codice supporta valori generici di $k$ ed è stato collaudato sui
+cinque valori richiesti dalla traccia,
 
-La parallelizzazione è ibrida a due livelli:
+\[
+k \in \{3,6,8,20,32\}.
+\]
 
-\begin{itemize}
-  \item \textbf{MPI (Message Passing Interface)} costituisce il livello esterno, responsabile della distribuzione dei dati su una griglia di processi bidimensionale e della comunicazione fra processi
-  \item la parallelizzazione interna al singolo processo è affidata a \textbf{CUDA (Compute Unified Device Architecture)},
-  che costituisce il backend di accelerazione su GPU NVIDIA.
-\end{itemize}
-I due livelli non sono alternativi ma sovrapposti: ogni processo
-MPI possiede un blocco di $A$ e delega il calcolo del proprio contributo
-parziale a un \emph{backend} locale, che può essere un kernel CUDA oppure un nucleo di CPU.
+Le dimensioni globali $M$ e $N$ non sono fissate in fase di compilazione,
+ma vengono scelte a runtime. Il nucleo deve quindi adattarsi sia alla forma
+della matrice sia alla dimensione del multivettore.
+
+La parallelizzazione è organizzata su due livelli. Il livello esterno è
+basato su MPI e distribuisce il problema fra più processi. La matrice $A$
+viene suddivisa su una griglia bidimensionale di processi, e le
+comunicazioni MPI rendono disponibili i dati necessari al calcolo dei
+contributi locali e alla successiva costruzione del risultato globale.
+
+All'interno di ciascun processo, il prodotto sul blocco locale è demandato
+a un backend di calcolo attraverso un'interfaccia comune. Il progetto
+comprende implementazioni direttamente su CPU e diversi backend CUDA, questi ultimi utilizzati
+per sfruttare il parallelismo della GPU NVIDIA.
+
+I due livelli operano quindi in modo gerarchico: MPI determina quali dati
+e quale parte del prodotto competono a ciascun processo, mentre il backend
+locale determina come quel prodotto viene eseguito all'interno del singolo
+processo.
+
+Oltre alla correttezza numerica, il progetto ha come obiettivo il confronto
+prestazionale delle diverse strategie implementate. Le successive
+ottimizzazioni vengono perciò introdotte e misurate separatamente, così da
+poter collegare le differenze di prestazione alle specifiche scelte di
+distribuzione, accesso alla memoria e parallelizzazione.
+
+Il lavoro non si limita alla realizzazione funzionale del prodotto.
+Le diverse implementazioni vengono confrontate sia dal punto di vista
+della correttezza numerica sia da quello delle prestazioni. La correttezza
+viene verificata rispetto a un riferimento seriale, mentre le prestazioni
+vengono studiate al variare delle dimensioni della matrice, del numero di
+colonne del multivettore e della configurazione parallela.
+
+La separazione tra livello MPI e backend locale permette di mantenere
+invariata la decomposizione distribuita del problema e di sostituire
+indipendentemente il nucleo di calcolo eseguito da ciascun processo.
+In questo modo le diverse implementazioni locali possono essere confrontate
+all'interno della stessa pipeline MPI.
+
+La presenza di un $k$ piccolo rispetto a $M$ e $N$ distingue inoltre il
+problema da una GEMM generale: ciascun elemento di $A$ viene utilizzato
+per contribuire a più colonne del multivettore, rendendo il riuso dei dati
+e il modo in cui questi vengono disposti in memoria aspetti centrali
+dell'ottimizzazione.
+
+\section{Struttura della relazione}
+
+La relazione introduce dapprima la decomposizione del prodotto e
+l'organizzazione dei dati, quindi descrive il livello distribuito MPI.
+I capitoli successivi analizzano separatamente i backend locali su CPU e
+GPU, mettendo in relazione le scelte implementative con il comportamento
+della gerarchia di memoria e con il parallelismo disponibile.
+Infine vengono presentate la metodologia sperimentale e l'analisi delle
+prestazioni ottenute.
