@@ -89,36 +89,36 @@
 \contentsline {section}{\numberline {6.6}Fase 1 - Configurazione dei backend CUDA}{45}{section.6.6}%
 \contentsline {subsection}{\numberline {6.6.1}Campagna 1.1 - Dimensione del blocco e confronto dei backend}{45}{subsection.6.6.1}%
 \contentsline {subsection}{\numberline {6.6.2}Campagna 1.2 - Layout in memoria di $X$}{46}{subsection.6.6.2}%
-\contentsline {subsection}{\numberline {6.6.3}Campagna 1.3 - Padding del tile in shared memory}{47}{subsection.6.6.3}%
-\contentsline {subsection}{\numberline {6.6.4}Campagna 1.4 - Granularità del tile}{48}{subsection.6.6.4}%
+\contentsline {subsection}{\numberline {6.6.3}Campagna 1.3 - Granularità del tile}{47}{subsection.6.6.3}%
+\contentsline {subsection}{\numberline {6.6.4}Campagna 1.4 - Padding del tile in shared memory}{48}{subsection.6.6.4}%
 \contentsline {section}{\numberline {6.7}Fase 2 - Caratterizzazione dimensionale}{48}{section.6.7}%
 \contentsline {section}{\numberline {6.8}Fase 3 - Effetto della precisione numerica}{49}{section.6.8}%
 \contentsline {section}{\numberline {6.9}Fase 4 - Esecuzione distribuita MPI + CUDA}{50}{section.6.9}%
 \contentsline {chapter}{\numberline {7}Risultati}{53}{chapter.7}%
 \contentsline {section}{\numberline {7.1}Fase 1 - Configurazione dei backend CUDA}{53}{section.7.1}%
 \contentsline {subsection}{\numberline {7.1.1}Campagna 1.1 - Dimensione del blocco}{53}{subsection.7.1.1}%
-\contentsline {subsection}{\numberline {7.1.2}Campagna 1.2 - Layout in memoria di $X$}{56}{subsection.7.1.2}%
-\contentsline {subsection}{\numberline {7.1.3}Campagna 1.3 - Padding del tile in shared memory}{57}{subsection.7.1.3}%
-\contentsline {subsection}{\numberline {7.1.4}Campagna 1.4 - Granularità del tile}{59}{subsection.7.1.4}%
-\contentsline {subsection}{\numberline {7.1.5}Esito della Fase 1 - Confronto fra i backend configurati}{60}{subsection.7.1.5}%
-\contentsline {section}{\numberline {7.2}Fase 2 - Caratterizzazione dimensionale}{62}{section.7.2}%
-\contentsline {section}{\numberline {7.3}Fase 3 - Effetto della precisione numerica}{64}{section.7.3}%
-\contentsline {section}{\numberline {7.4}Fase 4 - Esecuzione distribuita MPI + CUDA}{66}{section.7.4}%
-\contentsline {subsection}{\numberline {7.4.1}Metrica rank-local e tempo collettivo}{66}{subsection.7.4.1}%
-\contentsline {subsection}{\numberline {7.4.2}Effetto del numero di rank}{67}{subsection.7.4.2}%
-\contentsline {subsection}{\numberline {7.4.3}Effetto della griglia MPI}{68}{subsection.7.4.3}%
-\contentsline {subsection}{\numberline {7.4.4}Confronto fra backend nella composizione MPI + CUDA}{68}{subsection.7.4.4}%
-\contentsline {section}{\numberline {7.5}Risultati complementari sul backend CPU}{69}{section.7.5}%
-\contentsline {subsection}{\numberline {7.5.1}Il nucleo di CPU a rank singolo}{69}{subsection.7.5.1}%
-\contentsline {subsection}{\numberline {7.5.2}Effetto del numero di rank e della scala}{70}{subsection.7.5.2}%
-\contentsline {section}{\numberline {7.6}Il costo dei dati: trasferimenti e preprocessing}{72}{section.7.6}%
-\contentsline {section}{\numberline {7.7}Sintesi}{73}{section.7.7}%
-\contentsline {chapter}{\numberline {8}Conclusioni}{74}{chapter.8}%
-\contentsline {section}{\numberline {8.1}Che cosa \`e stato realizzato}{74}{section.8.1}%
-\contentsline {section}{\numberline {8.2}Che cosa dicono i dati finora}{74}{section.8.2}%
-\contentsline {section}{\numberline {8.3}Lavori futuri}{75}{section.8.3}%
-\contentsline {paragraph}{Blocking del ciclo su $j$ sul nucleo di CPU.}{75}{section*.64}%
-\contentsline {paragraph}{Parallelizzazione OpenMP interna al processo.}{75}{section*.65}%
-\contentsline {paragraph}{MPI CUDA-aware.}{75}{section*.66}%
-\contentsline {paragraph}{MPS per la condivisione della GPU.}{75}{section*.67}%
-\contentsline {paragraph}{Profilazione con \texttt {ncu}.}{75}{section*.68}%
+\contentsline {subsection}{\numberline {7.1.2}Campagna 1.2 - Layout in memoria di $X$}{55}{subsection.7.1.2}%
+\contentsline {subsection}{\numberline {7.1.3}Campagna 1.3 - Granularità del tile}{57}{subsection.7.1.3}%
+\contentsline {subsection}{\numberline {7.1.4}Campagna 1.4 - Padding del tile in shared memory}{59}{subsection.7.1.4}%
+\contentsline {subsection}{\numberline {7.1.5}Esito della Fase 1 - Configurazioni consolidate}{60}{subsection.7.1.5}%
+\contentsline {section}{\numberline {7.2}Fase 2 - Caratterizzazione dimensionale}{61}{section.7.2}%
+\contentsline {section}{\numberline {7.3}Fase 3 - Effetto della precisione numerica}{66}{section.7.3}%
+\contentsline {section}{\numberline {7.4}Fase 4 - Esecuzione distribuita MPI + CUDA}{68}{section.7.4}%
+\contentsline {subsection}{\numberline {7.4.1}Metrica rank-local e tempo collettivo}{68}{subsection.7.4.1}%
+\contentsline {subsection}{\numberline {7.4.2}Effetto del numero di rank}{69}{subsection.7.4.2}%
+\contentsline {subsection}{\numberline {7.4.3}Effetto della griglia MPI}{70}{subsection.7.4.3}%
+\contentsline {subsection}{\numberline {7.4.4}Confronto fra backend nella composizione MPI + CUDA}{71}{subsection.7.4.4}%
+\contentsline {section}{\numberline {7.5}Risultati complementari sul backend CPU}{71}{section.7.5}%
+\contentsline {subsection}{\numberline {7.5.1}Il nucleo di CPU a rank singolo}{72}{subsection.7.5.1}%
+\contentsline {subsection}{\numberline {7.5.2}Effetto del numero di rank e della scala}{73}{subsection.7.5.2}%
+\contentsline {section}{\numberline {7.6}Il costo dei dati: trasferimenti e preprocessing}{74}{section.7.6}%
+\contentsline {section}{\numberline {7.7}Sintesi}{76}{section.7.7}%
+\contentsline {chapter}{\numberline {8}Conclusioni}{77}{chapter.8}%
+\contentsline {section}{\numberline {8.1}Che cosa \`e stato realizzato}{77}{section.8.1}%
+\contentsline {section}{\numberline {8.2}Che cosa dicono i dati finora}{77}{section.8.2}%
+\contentsline {section}{\numberline {8.3}Lavori futuri}{78}{section.8.3}%
+\contentsline {paragraph}{Blocking del ciclo su $j$ sul nucleo di CPU.}{78}{section*.64}%
+\contentsline {paragraph}{Parallelizzazione OpenMP interna al processo.}{78}{section*.65}%
+\contentsline {paragraph}{MPI CUDA-aware.}{78}{section*.66}%
+\contentsline {paragraph}{MPS per la condivisione della GPU.}{78}{section*.67}%
+\contentsline {paragraph}{Profilazione con \texttt {ncu}.}{78}{section*.68}%

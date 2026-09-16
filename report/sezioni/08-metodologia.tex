@@ -539,16 +539,16 @@ lancio dipenda dalla larghezza del multivettore e selezionare un valore che
 mantenga prestazioni robuste sull'intero insieme dei casi, secondo il
 criterio definito in \cref{sec:criterio-robustezza}.
 
-La campagna comprende \kernelname{cuda\_naive},
-\kernelname{cuda\_warp} e \kernelname{cuda\_warp\_smem}. Nei primi due
-backend lo sweep agisce direttamente sulla geometria del lancio, mentre
-per \kernelname{cuda\_warp\_smem} la dimensione del blocco determina anche
+La campagna comprende \kernelname{cuda\_naive} e \kernelname{cuda\_warp} (variante \emph{column-major}).
+Nei primi due
+backend lo sweep agisce direttamente sulla geometria del lancio.
+
+Per \kernelname{cuda\_warp\_smem} la dimensione del blocco determina anche
 il numero di warp che condividono il medesimo tile di $X$ e interagisce
 quindi con le successive scelte relative alla shared memory.
-
-Per questo motivo il valore ottenuto in questa campagna per
-\kernelname{cuda\_warp\_smem} costituisce una configurazione iniziale e
-viene riesaminato congiuntamente a \code{TILE\_GRANULARITY} nella campagna
+Per questo motivo questa campagna non costituisce una configurazione iniziale per
+\kernelname{cuda\_warp\_smem}, poiché il suo valore di \code{BLOCK}
+viene esaminato congiuntamente a \code{TILE\_GRANULARITY} nella campagna
 dedicata al tiling.
 
 Lo sweep svolge inoltre una seconda funzione. Una volta completate le
@@ -556,16 +556,15 @@ successive campagne di configurazione, le misure dei backend vengono
 ricondotte alle rispettive configurazioni selezionate e confrontate sullo
 stesso problema di riferimento.
 
-Il confronto coinvolge
+Il confronto coinvolge:
 
 \[
-\kernelname{cuda\_naive},\qquad
+\kernelname{cuda\_naive} \ (\text{variante column-major}),\qquad
 \kernelname{cuda\_warp},\qquad
-\kernelname{cuda\_warp\_smem},\qquad
 \kernelname{cublas}.
 \]
 
-Per i tre kernel custom vengono utilizzati i parametri selezionati durante
+Per i kernel custom vengono utilizzati i parametri selezionati durante
 la Fase 1, mentre cuBLAS costituisce il riferimento esterno e non richiede
 la scelta di una dimensione del blocco da parte del progetto.
 
@@ -632,66 +631,7 @@ Quando una delle due configurazioni coincide esattamente con un punto già
 misurato nella Campagna~1.1, viene riutilizzato lo stesso campione anziché
 ripetere l'esecuzione.
 
-\subsection{Campagna 1.3 - Padding del tile in shared memory}
-\label{sec:camp-pad}
-
-La terza campagna riguarda esclusivamente
-\kernelname{cuda\_warp\_smem} e studia l'effetto del padding applicato
-alle righe del tile di $X$ in shared memory.
-
-Vengono confrontate le due configurazioni:
-
-\[
-\code{SMEM\_PAD}\in\{0,1\},
-\]
-
-che producono rispettivamente:
-
-\[
-\code{tile\_row\_stride}=k
-\qquad
-\text{e}
-\qquad
-\code{tile\_row\_stride}=k+1.
-\]
-
-La struttura del kernel, la dimensione del blocco e tutti gli altri
-parametri sperimentali vengono mantenuti invariati.
-
-Il parametro modifica la distanza, in shared memory, fra gli elementi
-letti da lane consecutive durante il consumo del tile. In doppia
-precisione ciascun elemento occupa due parole da 32 bit, per cui la
-distribuzione degli accessi sui 32 bank dipende dallo stride
-
-\[
-2\bigl(k+\code{SMEM\_PAD}\bigr)
-\pmod{32}.
-\]
-
-Il padding è stato introdotto per interrompere pattern periodici
-sfavorevoli, in particolare il caso $k=32$, per il quale in assenza di
-padding lo stride della riga produce una mappatura patologica sui bank.
-
-L'effetto del padding non è però indipendente dal valore di $k$.
-Modificando lo stride della riga cambia infatti anche la mappatura sui
-bank per i casi che non presentano il comportamento patologico di
-$k=32$.
-
-La campagna viene quindi eseguita su tutti i valori
-
-\[
-k\in\{3,6,8,20,32\},
-\]
-
-con l'obiettivo di verificare se il beneficio ottenuto nei casi
-sfavorevoli viene mantenuto senza introdurre penalizzazioni significative
-negli altri.
-
-In questa campagna \code{BLOCK} viene mantenuto al valore di riferimento
-individuato nella Campagna~1.1. L'interazione fra dimensione del blocco e
-granularità del tile viene studiata separatamente nella Campagna~1.4.
-
-\subsection{Campagna 1.4 - Granularità del tile}
+\subsection{Campagna 1.3 - Granularità del tile}
 \label{sec:camp-granularita}
 
 La quarta campagna riguarda esclusivamente
@@ -762,9 +702,61 @@ v =
 
 La selezione viene effettuata sulla coppia nel suo insieme, anziché
 scegliere prima la dimensione del blocco e successivamente la granularità.
-La configurazione risultante sostituisce quindi, per
-\kernelname{cuda\_warp\_smem}, il valore preliminare di \code{BLOCK}
-individuato nella Campagna~1.1.
+
+\subsection{Campagna 1.4 - Padding del tile in shared memory}
+\label{sec:camp-pad}
+
+La terza campagna riguarda esclusivamente
+\kernelname{cuda\_warp\_smem} e studia l'effetto del padding applicato
+alle righe del tile di $X$ in shared memory.
+
+Vengono confrontate le due configurazioni:
+
+\[
+\code{SMEM\_PAD}\in\{0,1\},
+\]
+
+che producono rispettivamente:
+
+\[
+\code{tile\_row\_stride}=k
+\qquad
+\text{e}
+\qquad
+\code{tile\_row\_stride}=k+1.
+\]
+
+La struttura del kernel, la dimensione del blocco e tutti gli altri
+parametri sperimentali vengono mantenuti invariati.
+
+Il parametro modifica la distanza, in shared memory, fra gli elementi
+letti da lane consecutive durante il consumo del tile. In doppia
+precisione ciascun elemento occupa due parole da 32 bit, per cui la
+distribuzione degli accessi sui 32 bank dipende dallo stride
+
+\[
+2\bigl(k+\code{SMEM\_PAD}\bigr)
+\pmod{32}.
+\]
+
+Il padding è stato introdotto per interrompere pattern periodici
+sfavorevoli, in particolare il caso $k=32$, per il quale in assenza di
+padding lo stride della riga produce una mappatura patologica sui bank.
+
+L'effetto del padding non è però indipendente dal valore di $k$.
+Modificando lo stride della riga cambia infatti anche la mappatura sui
+bank per i casi che non presentano il comportamento patologico di
+$k=32$.
+
+La campagna viene quindi eseguita su tutti i valori
+
+\[
+k\in\{3,6,8,20,32\},
+\]
+
+con l'obiettivo di verificare se il beneficio ottenuto nei casi
+sfavorevoli viene mantenuto senza introdurre penalizzazioni significative
+negli altri.
 
 \section{Fase 2 - Caratterizzazione dimensionale}
 \label{sec:fase2-dimensione}

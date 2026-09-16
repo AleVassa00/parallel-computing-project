@@ -2,7 +2,7 @@ PWD /Users/andreagalluzzi/Desktop/00-progetto-scpa/parallel-computing-project/re
 INPUT /usr/local/texlive/2026/texmf.cnf
 INPUT /usr/local/texlive/2026/texmf-dist/web2c/texmf.cnf
 INPUT /usr/local/texlive/2026/texmf-var/web2c/pdftex/pdflatex.fmt
-INPUT main.tex
+INPUT /Users/andreagalluzzi/Desktop/00-progetto-scpa/parallel-computing-project/report/main.tex
 OUTPUT main.log
 INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/base/report.cls
 INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/base/report.cls
@@ -549,16 +549,12 @@ INPUT ./sezioni/10-risultati.tex
 INPUT ./sezioni/10-risultati.tex
 INPUT ./sezioni/10-risultati.tex
 INPUT sezioni/10-risultati.tex
+INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmri8.tfm
 INPUT ./img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_warp_xcolumn.png
 INPUT ./img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_warp_xcolumn.png
 INPUT ./img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_warp_xcolumn.png
 INPUT ./img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_warp_xcolumn.png
 INPUT ./img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_warp_xcolumn.png
-INPUT ./img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_warp_smem.png
-INPUT ./img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_warp_smem.png
-INPUT ./img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_warp_smem.png
-INPUT ./img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_warp_smem.png
-INPUT ./img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_warp_smem.png
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmr7.tfm
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmtt8.tfm
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmr5.tfm
@@ -611,6 +607,7 @@ INPUT /usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr8.pfb
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr9.pfb
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri10.pfb
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri7.pfb
+INPUT /usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri8.pfb
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri9.pfb
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy10.pfb
 INPUT /usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy6.pfb

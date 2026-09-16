@@ -1,16 +1,10 @@
 \chapter{Risultati}
 \label{cap:risultati}
 
-Il capitolo segue le quattro fasi definite in \cref{sec:disegno-fasi}, non la
-numerazione storica delle cartelle che contengono gli output. Le prime tre
-fasi caratterizzano i backend CUDA con un solo processo MPI. La quarta porta
-le configurazioni ottenute nell'applicazione distribuita completa, dove più
+Il capitolo segue le quattro fasi definite in \cref{sec:disegno-fasi}: le prime tre
+fasi caratterizzano i backend CUDA con un solo processo MPI, mentre la quarta
+fase porta le configurazioni ottenute nell'applicazione distribuita completa, dove più
 rank condividono l'unica GPU del nodo.
-
-Per ciascun esperimento vengono prima presentate le misure, poi la loro
-lettura. Questa separazione permette di distinguere i fatti osservati dalle
-deduzioni che li collegano al comportamento dei kernel. Le campagne usano 5
-invocazioni di warm-up e 20 repetition misurate, salvo indicazione contraria.
 
 \section{Fase 1 - Configurazione dei backend CUDA}
 \label{sec:ris-fase1}
@@ -32,21 +26,20 @@ caso peggiore, rispetto al miglior blocco \emph{per lo stesso} $k$.
 \caption{Campagna 1.1: perdita rispetto al miglior \code{BLOCK} per lo stesso
 $k$, in percentuale. In grassetto il valore selezionato per ciascun kernel.}
 \label{tab:ris-block-perdite}
-\begin{tabular}{@{}rrrrrrr@{}}
+\begin{tabular}{@{}rrrrr@{}}
 \toprule
 & \multicolumn{2}{c}{\kernelname{cuda\_naive}}
-& \multicolumn{2}{c}{\kernelname{cuda\_warp}}
-& \multicolumn{2}{c}{\kernelname{cuda\_warp\_smem}} \\
-\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
-\code{BLOCK} & media & max & media & max & media & max \\
+& \multicolumn{2}{c}{\kernelname{cuda\_warp}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+\code{BLOCK} & media & max & media & max \\
 \midrule
-64   & 1,13  & 3,85  & 0,41 & 1,32 & 13,79 & 38,78 \\
-128  & \textbf{0,92} & \textbf{1,69} & \textbf{0,42} & \textbf{0,74} & 1,31 & 3,68 \\
-192  & 3,55  & 8,21  & 0,98 & 1,99 & 4,64 & 18,35 \\
-256  & 1,09  & 4,56  & 1,19 & 3,95 & \textbf{0,56} & \textbf{1,46} \\
-384  & 3,84  & 9,71  & 1,27 & 1,78 & 8,27 & 19,38 \\
-512  & 5,64  & 10,23 & 3,17 & 5,89 & 7,08 & 9,33 \\
-1024 & 10,86 & 23,29 & \multicolumn{4}{c}{\footnotesize\itshape lancio fallito per $k = 20$ e $k = 32$} \\
+64   & 1,13  & 3,85  & 0,41 & 1,32 \\
+128  & \textbf{0,92} & \textbf{1,69} & \textbf{0,42} & \textbf{0,74} \\
+192  & 3,55  & 8,21  & 0,98 & 1,99 \\
+256  & 1,09  & 4,56  & 1,19 & 3,95 \\
+384  & 3,84  & 9,71  & 1,27 & 1,78 \\
+512  & 5,64  & 10,23 & 3,17 & 5,89 \\
+1024 & 10,86 & 23,29 & \multicolumn{2}{c}{\scriptsize\itshape\shortstack{lancio fallito\\per $k = 20$ e $k = 32$}} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -67,7 +60,6 @@ riportate in \cref{tab:ris-block-assolute}.
 \midrule
 \kernelname{cuda\_naive} (\code{BLOCK}=128)      & 149,3 & 308,7 & 337,3 & 345,6 & 350,3 \\
 \kernelname{cuda\_warp} (\code{BLOCK}=128)       & 300,3 & 351,4 & 350,3 & 351,4 & 352,5 \\
-\kernelname{cuda\_warp\_smem} (\code{BLOCK}=256) & 289,3 & 337,2 & 346,9 & 346,3 & 338,4 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -79,12 +71,7 @@ riportate in \cref{tab:ris-block-assolute}.
   \includegraphics[width=\linewidth]{img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_warp_xcolumn.png}
   \caption{\kernelname{cuda\_warp}, $X$ column-major.}
 \end{subfigure}
-\\[6pt]
-\begin{subfigure}{\linewidth}
-  \centering
-  \includegraphics[width=\linewidth]{img/fase1/campagna_VAS_block_k_tuning/campagna_VAS_block_k_tuning_summary_cuda_warp_smem.png}
-  \caption{\kernelname{cuda\_warp\_smem}.}
-\end{subfigure}
+
 \caption{Campagna 1.1: prestazione normalizzata per $(\code{BLOCK}, k)$ a
 sinistra, perdita media e massima sui cinque $k$ a destra. Le celle
 \code{FAIL} sono i lanci non riusciti a \code{BLOCK}$=1024$.}
@@ -101,62 +88,45 @@ kernel che completa anche a \code{BLOCK}$=1024$.}
 
 \subsubsection*{Lettura}
 
-\textbf{Il blocco conta poco, ma non conta zero, e conta in modo diverso per i
-tre kernel.} Per \kernelname{cuda\_warp} l'intervallo fra il migliore e il
-peggiore dei sette valori è di appena $3{,}6$ punti percentuali in media: è il
-kernel meno sensibile, e la ragione è strutturale. Un warp per riga di $Y$
-significa che il lavoro è già partizionato alla granularità del warp, e quanti
-warp stiano in un blocco cambia solo come vengono raggruppati, non che cosa
-ciascuno fa. \kernelname{cuda\_warp\_smem} è invece il più sensibile
-($13{,}8\%$ di perdita media a \code{BLOCK}$=64$, con punte del $38{,}8\%$),
-ed è coerente con la sua struttura: il tile in shared memory è condiviso fra i
-warp del blocco, quindi il numero di warp per blocco è il fattore di riuso del
-tile. Con due soli warp per blocco il tile viene riletto da pochi consumatori e
-il vantaggio della shared memory si assottiglia.
+\textbf{La sensibilità a \code{BLOCK} dipende dalla struttura del kernel.}
 
-\textbf{L'argomento sull'occupancy regge, ma solo in parte.} La previsione era
-che 192 e 384, non essendo divisori di 1024, fossero penalizzati. Lo sono: per
-\kernelname{cuda\_naive} la perdita media passa da $1{,}09\%$ a
-\code{BLOCK}$=256$ a $3{,}55\%$ a 192 e $3{,}84\%$ a 384, e per
-\kernelname{cuda\_warp\_smem} da $0{,}56\%$ a $4{,}64\%$ e $8{,}27\%$. Ma
-\code{BLOCK}$=512$, che è un divisore di 1024, è peggiore di entrambi per
-\kernelname{cuda\_warp}: il criterio dei divisori è quindi una condizione utile
-e non sufficiente, e il residuo va cercato altrove - in particolare nella
-pressione sui registri, che cresce con i thread per blocco.
+\kernelname{cuda\_warp} è il backend meno sensibile nell'intervallo delle
+configurazioni valide. Fra 64 e 384 thread per blocco le prestazioni rimangono
+vicine all'ottimo e il valore selezionato, \code{BLOCK}=128, limita la perdita
+massima allo $0{,}74\%$. Il risultato è coerente con la mappatura
+warp-per-row: il lavoro associato a una riga di $Y$ è già definito alla
+granularità del warp, per cui modificare la dimensione del blocco cambia
+principalmente quanti warp vengono raggruppati nello stesso blocco, senza
+modificare il lavoro assegnato a ciascuno di essi.
 
-\textbf{I lanci falliti a \code{BLOCK}$=1024$ sono essi stessi un dato.} Con
-1024 thread per blocco, \kernelname{cuda\_warp} e
-\kernelname{cuda\_warp\_smem} non eseguono per $k = 20$ e $k = 32$, mentre
-\kernelname{cuda\_naive} completa. La differenza fra i kernel è esattamente il
-numero di accumulatori tenuti in registro: \kernelname{cuda\_naive} ne tiene
-uno per thread, gli altri due ne tengono $k$, che in doppia precisione valgono
-$2k$ registri a \SI{32}{\bit}.
+\textbf{Non emerge una regola semplice basata sulla sola dimensione del
+blocco.}
 
-\begin{ipotesi}{a \code{BLOCK}$=1024$ il fabbisogno di registri supera il file
-di registri dello SM}
-Un blocco da 1024 thread può disporre al più di 64 registri per thread, perché
-il file di registri di uno SM Turing ne contiene \num{65536}. Con $k = 20$
-accumulatori \code{double} servono già 40 registri solo per gli accumulatori,
-ai quali si aggiungono indici, puntatori e registri temporanei. A $k = 32$ i
-soli accumulatori ne richiedono 64. Il superamento della soglia produce un
-errore di lancio a runtime, che è esattamente l'esito osservato
-(\code{exit\_code} 1, nessuna misura prodotta).
+Per \kernelname{cuda\_naive}, ad esempio, le configurazioni
+\code{BLOCK}=192 e \code{BLOCK}=384 risultano peggiori di 128 e 256, ma lo
+stesso andamento non si ripete in modo uniforme sugli altri kernel.
+Analogamente, \code{BLOCK}=512 produce per \kernelname{cuda\_warp} una perdita
+maggiore rispetto a blocchi più piccoli. Il numero di thread per blocco non è
+quindi sufficiente, da solo, a spiegare le differenze osservate. Alla
+geometria del lancio si aggiungono infatti il consumo di registri per thread.
 
-\textbf{Come falsificarla.} È il controllo già previsto dalla
-caratterizzazione \code{ptxas} di \cref{sec:ris-fase3}: compilare i due kernel
-con \code{-Xptxas -v} a \code{BLOCK}$=1024$ e verificare che il numero di
-registri per thread dichiarato superi 64 per $k \ge 20$ e resti sotto per
-\kernelname{cuda\_naive}. Se non lo superasse, la causa del fallimento sarebbe
-un'altra e andrebbe cercata nel budget di shared memory.
-\end{ipotesi}
+\textbf{I fallimenti a \code{BLOCK}=1024 costituiscono un ulteriore limite
+della configurazione.}
 
-\textbf{In funzione delle campagne successive.} Il risultato che conta per il
-seguito non è quale blocco vinca, ma che la scelta sia \emph{quasi
-indifferente} nell'intorno del valore selezionato: con una perdita massima
-inferiore al $2\%$ per tutti e tre i kernel, le differenze misurate nelle fasi
-2, 3 e 4 - che sono di ordini di grandezza - non possono essere attribuite a
-un blocco mal scelto. È precisamente ciò che la fase di tuning doveva
-garantire.
+Con 1024 thread per blocco,
+\kernelname{cuda\_warp}  non completa
+l'esecuzione per $k=20$ e $k=32$, mentre \kernelname{cuda\_naive} continua a
+essere eseguibile. La differenza è coerente con la diversa pressione sui
+registri: il kernel naive mantiene un solo accumulatore per thread, mentre
+nelle istanze specializzate dei due kernel warp ogni lane mantiene un vettore
+di $k$ accumulatori.
+
+\textbf{Esito della campagna.}
+Il criterio di robustezza porta a selezionare \code{BLOCK}=128 per
+\kernelname{cuda\_naive} e per \kernelname{cuda\_warp}. In entrambi i casi la
+configurazione scelta rimane molto vicina al miglior valore specifico per
+ciascun $k$, evitando di ottimizzare il kernel per un solo punto della
+traccia.
 
 \subsection{Campagna 1.2 - Layout in memoria di $X$}
 \label{sec:ris-layout}
@@ -193,45 +163,185 @@ column-major.}
 
 \subsubsection*{Lettura}
 
-\textbf{La soglia è netta e cade fra $k = 6$ e $k = 8$.} Fino a $k = 6$ i due
-layout sono indistinguibili entro la dispersione delle misure ($1{,}01\times$ e
-$1{,}00\times$, con CV sotto lo $0{,}7\%$): la differenza non è misurabile e non
-va discussa. Da $k = 8$ in poi il column-major vince, e il vantaggio cresce
-monotonamente fino a $3{,}82\times$ a $k = 32$.
+\textbf{L'effetto del layout emerge a partire da $k=8$.}
 
-\textbf{La forma della curva identifica il meccanismo.} Con $X$ row-major le
-32 lane di un warp, al passo $j$, leggono gli elementi $X[j][0..k-1]$ a
-distanza $k$ l'una dall'altra: la richiesta di memoria non è coalescibile in
-una singola transazione e il controller deve emetterne fino a una per lane. Con
-$X$ column-major gli stessi elementi diventano contigui e la richiesta collassa
-in poche transazioni. Il costo del layout sbagliato è quindi proporzionale al
-numero di transazioni sprecate, che cresce con $k$ - ed è esattamente ciò che
-il fattore $1{,}00 \to 1{,}92 \to 2{,}02 \to 3{,}82$ mostra. Un guadagno
-costante su tutti i $k$ avrebbe indicato un'altra causa.
+Per $k=3$ e $k=6$ le due varianti hanno prestazioni molto simili:
+lo speedup del layout column-major vale rispettivamente $1{,}01\times$ e
+$1{,}00\times$, con coefficienti di variazione inferiori allo $0{,}7\%$.
+In questa regione l'eventuale vantaggio è quindi dello stesso ordine della
+dispersione delle misure e non è sufficientemente marcato da attribuirgli un
+significato prestazionale.
 
-\textbf{La conversione non cambia il bilancio, e il dato lo dimostra.} Portare
-$X$ in column-major costa fra $0{,}26$ e $3{,}32$ \si{\milli\second}, contro un
-risparmio sul kernel che a $k = 32$ vale $186{,}4 - 48{,}7 \approx
-\SI{138}{\milli\second}$ per singola invocazione. La conversione si ripaga
-quindi entro la prima invocazione anche se la si contasse dentro la metrica, e
-la scelta di tenerla fuori dalla metrica non è ciò che rende il column-major
-conveniente.
+A partire da $k=8$ il comportamento cambia nettamente: il layout
+column-major raggiunge uno speedup di $1{,}92\times$, che sale a
+$2{,}02\times$ per $k=20$ e a $3{,}82\times$ per $k=32$.
 
-\textbf{In funzione delle campagne correlate.} Questo risultato spiega perché
-\kernelname{cuda\_warp\_smem} non abbia bisogno della conversione e lavori
-invece con $X$ row-major: staging il tile in shared memory, la lettura da
-memoria globale viene fatta cooperativamente dai thread del blocco in forma già
-coalescente, e il layout di partenza smette di contare. I due kernel risolvono
-lo stesso problema - l'accesso non coalescente a $X$ - per due strade
-diverse. Il confronto conclusivo della fase misura quale delle due costi meno.
+Il vantaggio cresce
+quindi all'aumentare della larghezza del multivettore e rende il layout
+column-major la scelta naturale per \kernelname{cuda\_warp} nelle campagne
+successive.
 
-\subsection{Campagna 1.3 - Padding del tile in shared memory}
+\textbf{L'andamento è coerente con il pattern di accesso previsto dal kernel.}
+
+In \kernelname{cuda\_warp} lane consecutive elaborano valori consecutivi
+dell'indice $j$. Per una colonna $c$ fissata, con $X$ row-major esse richiedono
+
+\[
+X[j_0][c],\;
+X[j_0+1][c],\;
+\ldots,\;
+X[j_0+31][c],
+\]
+
+che nel buffer sono separati da uno stride di $k$ elementi. All'aumentare di
+$k$ gli indirizzi richiesti dalle lane dello stesso warp risultano quindi
+sempre più distanti, rendendo meno favorevole il raggruppamento degli accessi
+alla global memory.
+
+Con $X$ column-major gli stessi elementi sono invece \emph{consecutivi} in memoria.
+Il kernel mantiene invariata la propria mappatura warp-per-row, ma le richieste
+delle lane possono essere servite mediante accessi molto più compatti. La
+crescita del vantaggio con $k$ è quindi coerente con l'ipotesi che il layout
+row-major penalizzi progressivamente il percorso di lettura di $X$.
+
+I risultati mostrano che la differenza fra i layout diventa rilevante proprio quando
+aumenta lo stride fra gli elementi letti simultaneamente dalle lane.
+
+\textbf{Il confronto chiarisce anche il ruolo della shared memory.}
+
+\kernelname{cuda\_warp\_smem} mantiene $X$ nel layout row-major, ma evita che
+il pattern strided del kernel \code{cuda_warp} venga ripetuto direttamente sulla global
+memory. Il tile di $X$ viene prima caricato cooperativamente dai thread del
+blocco, utilizzando accessi globali contigui, e viene successivamente
+consumato dalla shared memory secondo la solita mappatura warp-per-row.
+
+Le due varianti affrontano quindi lo stesso limite del percorso row-major con
+strategie differenti: \kernelname{cuda\_warp} modifica la rappresentazione
+fisica di $X$, mentre \kernelname{cuda\_warp\_smem} mantiene il layout
+originario e modifica il percorso attraverso cui i dati raggiungono le lane.
+Il confronto conclusivo della Fase~1 permette di valutare quale delle due
+strategie risulti più conveniente nel regime studiato.
+
+
+\subsection{Campagna 1.3 - Granularità del tile}
+\label{sec:ris-granularita}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Campagna 1.3: prestazione normalizzata di \kernelname{cuda\_warp\_smem}
+per ogni coppia $(\code{BLOCK}, g)$, in percentuale dell'ottimo per lo stesso
+$k$. Media sui cinque $k$ e caso peggiore. In grassetto la coppia selezionata.}
+\label{tab:ris-granularita}
+\begin{tabular}{@{}rrrrrrrrr@{}}
+\toprule
+& \multicolumn{2}{c}{$g = 1$} & \multicolumn{2}{c}{$g = 8$}
+& \multicolumn{2}{c}{$g = 16$} & \multicolumn{2}{c}{$g = 32$} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}
+\code{BLOCK} & media & peggiore & media & peggiore & media & peggiore & media & peggiore \\
+\midrule
+64  & 83,6 & 54,7 & 82,7 & 53,8 & 77,4 & 46,2 & 86,8 & 61,0 \\
+128 & 88,0 & 51,3 & 84,3 & 50,5 & 82,2 & 50,4 & 98,7 & 97,1 \\
+192 & 79,0 & 67,4 & 76,5 & 66,4 & 87,7 & 71,9 & 94,9 & 81,1 \\
+256 & 85,0 & 65,5 & 98,1 & 94,4 & 96,7 & 87,8 & \textbf{99,0} & \textbf{98,5} \\
+384 & 89,1 & 80,0 & 89,9 & 78,6 & 89,5 & 76,0 & 90,5 & 80,2 \\
+512 & 91,9 & 82,8 & 92,3 & 90,7 & 90,6 & 86,0 & 92,2 & 89,7 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_joint_tuning_summary}
+\caption{Campagna 1.4: tuning congiunto di \code{BLOCK} e granularità. A
+sinistra la prestazione normalizzata media sui cinque $k$, a destra il caso
+peggiore.}
+\label{fig:ris-granularita}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_block256_detail}
+\caption{Campagna 1.4: dettaglio a \code{BLOCK}$=256$. A destra il piano di
+tiling effettivamente scelto a runtime, che dipende da $k$ e non da $g$ se non
+attraverso l'arrotondamento.}
+\label{fig:ris-granularita-dettaglio}
+\end{figure}
+
+\subsubsection*{Lettura}
+
+\textbf{Lo sweep congiunto conferma che \code{BLOCK} e granularità non possono
+essere scelti indipendentemente.}
+
+La configurazione preferibile cambia infatti al variare di $g$. Con
+$g=1$ il valore medio più alto si ottiene a \code{BLOCK}=512, mentre per
+$g=8$, $g=16$ e $g=32$ il miglior valore medio si trova a
+\code{BLOCK}=256. Anche il comportamento nel caso peggiore cambia con la
+coppia considerata.
+
+La dimensione del blocco influenza il numero di warp che cooperano nello
+stesso blocco e le risorse che determinano l'\emph{occupancy}, mentre la granularità
+interviene successivamente sulla dimensione del tile scelta dal
+pianificatore. I due parametri agiscono quindi sullo stesso kernel attraverso
+meccanismi distinti, ma non indipendenti.
+
+\textbf{Fra le granularità considerate, $g=32$ mostra il comportamento più
+robusto.}
+
+Essa fornisce la migliore prestazione media per cinque delle sei dimensioni
+di blocco considerate, con l'unica eccezione di \code{BLOCK}=512, dove
+$g=8$ e $g=32$ risultano sostanzialmente equivalenti. In particolare, la
+coppia
+
+\[
+(\code{BLOCK},g)=(256,32)
+\]
+
+mantiene in media il $99{,}0\%$ della migliore prestazione ottenibile per
+ciascun $k$ e non scende sotto il $98{,}5\%$ nel caso peggiore.
+
+Il risultato è coerente con il ruolo di \code{TILE\_GRANULARITY} nel kernel.
+Il ciclo di consumo della shared memory assegna alla lane $\ell$ le righe
+
+\[
+j=\ell,\;\ell+32,\;\ell+64,\ldots
+\]
+
+del tile. Quando il numero di righe è multiplo di 32, tutte le lane
+completano lo stesso numero di passi. Una dimensione non multipla di 32 può
+invece produrre un'ultima iterazione nella quale soltanto una parte delle
+lane ha ancora una riga da elaborare.
+
+Questo non implica tuttavia che una granularità pari a 32 sia
+intrinsecamente ottimale. Arrotondare il tile a multipli più grandi può
+lasciare inutilizzata una parte del budget di shared memory e aumentare il
+numero complessivo di tile, e quindi delle sincronizzazioni. La campagna
+misura proprio il bilancio fra questi due effetti.
+
+\textbf{La granularità rifinisce un piano determinato principalmente dal
+budget di shared memory.}
+
+Come mostra \cref{fig:ris-granularita-dettaglio}, le diverse granularità non
+producono piani radicalmente differenti. Il pianificatore determina prima
+quante righe sono compatibili con il budget disponibile e con l'obiettivo di
+occupancy, quindi arrotonda tale valore secondo $g$ e verifica nuovamente il
+numero di blocchi residenti.
+
+Per questo motivo \code{TILE\_GRANULARITY} non determina da sola la
+dimensione del tile. Ne modifica piuttosto il valore finale attorno a una
+dimensione già imposta dalle risorse disponibili. L'effetto prestazionale
+può quindi essere ridotto quando i diversi arrotondamenti conducono a tile
+simili, oppure diventare più evidente quando cambiano il numero di passi
+necessari per attraversare $X$ e, di conseguenza, il numero di
+sincronizzazioni eseguite dal blocco.
+
+\subsection{Campagna 1.4 - Padding del tile in shared memory}
 \label{sec:ris-pad}
 
 \begin{table}[H]
 \centering
 \footnotesize
-\caption{Campagna 1.3: effetto di \code{SMEM\_PAD} su
+\caption{Campagna 1.4: effetto di \code{SMEM\_PAD} su
 \kernelname{cuda\_warp\_smem}, \code{BLOCK}$=256$. \code{x\_rows\_per\_tile} è
 il numero di righe di $X$ che il pianificatore fa entrare nel tile.}
 \label{tab:ris-pad}
@@ -283,132 +393,154 @@ parzialmente nascosta dal resto del lavoro del kernel.}
 
 \subsubsection*{Lettura}
 
-\textbf{La previsione di \cref{sec:bank-conflict} è confermata nel suo punto
-più specifico.} Il guadagno massimo compare a $k=32$ e vale $94{,}1\%$.
-Senza padding, in doppia precisione, lo stride fra righe vale
-$2\cdot32=64\equiv0\pmod{32}$. Le lane ricadono quindi sulla stessa classe di
-bank e la lettura viene serializzata. Il fattore misurato è poco inferiore a
-$2\times$, non a $32\times$, perché il conflitto interessa soltanto la parte
-di accesso alla shared memory e non l'intero kernel.
+\textbf{Il caso $k=32$ conferma il comportamento patologico previsto per la
+mappatura sui bank.}
 
-\textbf{I casi intermedi mostrano che lo stride non basta a prevedere il
-guadagno complessivo.} Il padding produce $+11{,}4\%$ a $k=6$ e $+7{,}6\%$ a
-$k=8$, mentre a $k=20$ le due varianti sono indistinguibili entro mezzo punto
-percentuale. La mappatura sui bank interagisce con il numero di righe del tile,
-con l'occupancy e con la quota di lavoro non interessata dal conflitto. Per
-questo la regola modulare individua correttamente il caso patologico, ma non va
-usata come modello quantitativo per gli altri quattro punti.
+Senza padding, la distanza fra due righe consecutive del tile è pari a
+$k=32$ elementi. In doppia precisione ciascun elemento occupa due parole da
+32 bit, quindi lo spostamento fra gli indirizzi iniziali letti da lane
+consecutive vale
 
-\textbf{Il beneficio robusto giustifica il costo in capacità.} Allungando la
-riga del tile di uno scalare, a parità di budget di shared memory entrano meno
-righe di $X$, da 672 a 512 a $k=3$ e da 128 a 96 a $k=32$. La perdita massima
-osservata è però soltanto dello $0{,}5\%$, mentre il caso peggiore senza padding
-perde quasi metà del throughput. La scelta \code{SMEM\_PAD}$=1$ è quindi
-coerente con il criterio di robustezza di \cref{sec:criterio-robustezza}.
+\[
+2\cdot32 = 64 \equiv 0 \pmod{32}.
+\]
 
-\textbf{In funzione delle campagne correlate.} Il fenomeno è lo stesso già
-incontrato sulla CPU con il padding di \code{LDA} contro i conflict miss di L1:
-stessa causa (un indirizzo periodico che collide con la periodicità della
-gerarchia), stessa cura (rompere la periodicità con una colonna in più), altra
-gerarchia. La campagna 1.4 mostrerà che la perdita di riuso qui quantificata è
-anche ciò che rende la granularità del tile un parametro non trascurabile.
+Gli accessi ricadono quindi periodicamente sugli stessi bank, producendo un
+forte conflitto durante la lettura del tile dalla shared memory.
 
-\subsection{Campagna 1.4 - Granularità del tile}
-\label{sec:ris-granularita}
+Con \code{SMEM\_PAD}=1 lo stride diventa invece $33$ elementi e lo
+spostamento corrispondente vale
+
+\[
+2\cdot33 = 66 \equiv 2 \pmod{32},
+\]
+
+rompendo la periodicità del caso precedente. Il risultato sperimentale è
+coerente con questa previsione: a $k=32$ il throughput passa da
+$177{,}1$ a $343{,}7$ GFLOPS, con un incremento del $94{,}1\%$.
+
+Il guadagno complessivo del kernel non deve però essere interpretato come
+misura diretta della molteplicità del bank conflict. Il conflitto interessa
+infatti soltanto la fase in cui $X$ viene letto dalla shared memory, mentre il
+tempo totale comprende anche caricamento del tile, accessi ad $A$, operazioni
+aritmetiche, riduzione e sincronizzazioni.
+
+\textbf{Negli altri valori di $k$ l'effetto del padding è meno regolare.}
+
+Il guadagno vale $11{,}4\%$ a $k=6$ e $7{,}6\%$ a $k=8$, mentre a
+$k=20$ le due configurazioni differiscono soltanto dello $0{,}5\%$ a favore
+della variante senza padding. A $k=3$ il vantaggio è invece limitato
+all'$1{,}3\%$.
+
+Questi risultati mostrano che la semplice regola modulare è utile per
+individuare configurazioni chiaramente patologiche, come $k=32$, ma non
+costituisce da sola un modello quantitativo delle prestazioni. Il tempo
+complessivo dipende anche dalla dimensione effettiva del tile, dal numero di
+blocchi residenti e dalla parte del kernel non coinvolta negli accessi alla
+shared memory.
+
+\textbf{Il padding migliora il caso peggiore al costo di una minore capacità
+utile del tile.}
+
+Aggiungere una colonna modifica la dimensione di ogni riga da $k$ a $k+1$
+elementi. A parità di budget di shared memory possono quindi essere mantenute
+meno righe di $X$ nello stesso tile. Ad esempio, il pianificatore passa da
+672 a 512 righe per $k=3$ e da 128 a 96 per $k=32$.
+
+Le righe che non entrano nel tile corrente non vengono escluse dal calcolo,
+ma vengono elaborate nei tile successivi. Il costo potenziale del padding è
+quindi una riduzione della quantità di $X$ trattata in ciascuna iterazione del
+tiling e, in alcuni casi, un aumento del numero complessivo di tile e delle
+relative sincronizzazioni.
+
+Nonostante questo costo, il peggioramento massimo osservato con
+\code{SMEM\_PAD}=1 è soltanto dello $0{,}5\%$, mentre nel caso patologico
+$k=32$ il vantaggio è vicino a un fattore due. La scelta del padding è quindi
+fortemente favorevole secondo il criterio di robustezza adottato nella
+Fase~1.
+
+\textbf{Esito della campagna.}
+
+La configurazione selezionata è quindi:
+
+\[
+\code{SMEM\_PAD}=1.
+\]
+
+\textbf{Ripercussioni sul tuning congiunto.}
+
+Combinando questo risultato con la scelta
+\code{TILE_GRANULARITY}=32 della Campagna~1.3, la configurazione definitiva di
+\kernelname{cuda\_warp\_smem} diventa
+
+\[
+(\code{BLOCK},\code{SMEM\_PAD},g)=(256,1,32).
+\]
+
+
+Nello sweep congiunto la coppia $(256,32)$ presenta una perdita massima
+dell'$1{,}5\%$ rispetto alla migliore configurazione specifica per ciascun
+$k$. La scelta soddisfa quindi il criterio di robustezza adottato nella
+Fase~1 e definisce definitivamente il valore di
+\code{BLOCK}.
+
+\subsection{Esito della Fase 1 - Configurazioni consolidate}
+\label{sec:ris-fase1-sintesi}
+
+Le quattro campagne precedenti determinano le configurazioni utilizzate
+nelle fasi successive. I valori selezionati sono raccolti in
+\cref{tab:ris-fase1-sintesi}.
 
 \begin{table}[H]
 \centering
 \footnotesize
-\caption{Campagna 1.4: prestazione normalizzata di \kernelname{cuda\_warp\_smem}
-per ogni coppia $(\code{BLOCK}, g)$, in percentuale dell'ottimo per lo stesso
-$k$. Media sui cinque $k$ e caso peggiore. In grassetto la coppia selezionata.}
-\label{tab:ris-granularita}
-\begin{tabular}{@{}rrrrrrrrr@{}}
+\caption{Configurazione selezionata per ciascun backend CUDA.}
+\label{tab:ris-fase1-sintesi}
+\begin{tabular}{@{}llll@{}}
 \toprule
-& \multicolumn{2}{c}{$g = 1$} & \multicolumn{2}{c}{$g = 8$}
-& \multicolumn{2}{c}{$g = 16$} & \multicolumn{2}{c}{$g = 32$} \\
-\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}
-\code{BLOCK} & media & peggiore & media & peggiore & media & peggiore & media & peggiore \\
+\textbf{Backend} & \textbf{\code{BLOCK}} & \textbf{Layout di $X$} & \textbf{Altro} \\
 \midrule
-64  & 83,6 & 54,7 & 82,7 & 53,8 & 77,4 & 46,2 & 86,8 & 61,0 \\
-128 & 88,0 & 51,3 & 84,3 & 50,5 & 82,2 & 50,4 & 98,7 & 97,1 \\
-192 & 79,0 & 67,4 & 76,5 & 66,4 & 87,7 & 71,9 & 94,9 & 81,1 \\
-256 & 85,0 & 65,5 & 98,1 & 94,4 & 96,7 & 87,8 & \textbf{99,0} & \textbf{98,5} \\
-384 & 89,1 & 80,0 & 89,9 & 78,6 & 89,5 & 76,0 & 90,5 & 80,2 \\
-512 & 91,9 & 82,8 & 92,3 & 90,7 & 90,6 & 86,0 & 92,2 & 89,7 \\
+\kernelname{cuda\_naive}      & 128 & row    & - \\
+\kernelname{cuda\_warp}       & 128 & column & - \\
+\kernelname{cuda\_warp\_smem} & 256 & row    & \code{SMEM\_PAD}=1, $g=32$ \\
+\kernelname{cublas}           & -   & row    & riferimento esterno \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=\linewidth]{img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_joint_tuning_summary}
-\caption{Campagna 1.4: tuning congiunto di \code{BLOCK} e granularità. A
-sinistra la prestazione normalizzata media sui cinque $k$, a destra il caso
-peggiore.}
-\label{fig:ris-granularita}
-\end{figure}
+Per \kernelname{cuda\_naive} e \kernelname{cuda\_warp} la dimensione del
+blocco deriva dalla Campagna~1.1. Per \kernelname{cuda\_warp} la
+Campagna~1.2 seleziona inoltre il layout column-major di $X$. Le
+Campagne~1.3 e~1.4 completano invece la configurazione di
+\kernelname{cuda\_warp\_smem}, selezionando rispettivamente il padding e la
+coppia $(\code{BLOCK},\code{TILE\_GRANULARITY})$.
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=\linewidth]{img/fase1/campagna_VAS_5_smem_granularity_tuning/campagna_VAS_5_block256_detail}
-\caption{Campagna 1.4: dettaglio a \code{BLOCK}$=256$. A destra il piano di
-tiling effettivamente scelto a runtime, che dipende da $k$ e non da $g$ se non
-attraverso l'arrotondamento.}
-\label{fig:ris-granularita-dettaglio}
-\end{figure}
+Da questo punto in avanti i parametri dei backend rimangono invariati.
+Le fasi successive modificano quindi le caratteristiche del problema o
+dell'aritmetica, senza introdurre un nuovo tuning.
 
-\subsubsection*{Lettura}
 
-\textbf{Il tuning congiunto era necessario, e la tabella lo dimostra.} Se
-\code{BLOCK} e $g$ fossero indipendenti, la riga migliore sarebbe la stessa per
-ogni colonna. Non lo è: a $g = 1$ il valore migliore di \code{BLOCK} è 512
-($91{,}9\%$), a $g = 8$ e $g = 32$ è 256, a $g = 16$ è ancora 256 ma con un
-margine molto più stretto su 192. Fissare \code{BLOCK} al valore trovato nella
-campagna 1.1 e cercare $g$ separatamente avrebbe quindi prodotto una
-configurazione subottima.
+\section{Fase 2 - Caratterizzazione dimensionale}
+\label{sec:ris-fase2}
 
-\textbf{La granularità grossa vince perché allinea il tile ai warp.} $g = 32$
-domina su cinque delle sei dimensioni di blocco, e il valore 32 non è casuale:
-è la dimensione del warp. Arrotondare il numero di righe del tile a un multiplo
-di 32 fa sì che il caricamento cooperativo del tile si distribuisca in modo
-uniforme fra i warp del blocco, senza un warp di coda che lavora a metà
-carico. Con $g = 1$ il tile ha una dimensione arbitraria e l'ultima porzione
-viene caricata da un sottoinsieme irregolare di lane: nel caso peggiore la
-prestazione scende al $51{,}3\%$ dell'ottimo.
+La seconda fase applica le configurazioni consolidate in
+\cref{tab:ris-fase1-sintesi} ai nove punti del disegno dimensionale.
+Prima di considerare l'effetto di scala e forma, è utile prendere come
+riferimento il punto sul quale è stato eseguito il tuning,
 
-\textbf{Il pannello destro di \cref{fig:ris-granularita-dettaglio} spiega
-perché il parametro non domina.} Il numero di righe per tile effettivamente
-scelto a runtime è quasi identico per tutte e quattro le granularità (512, 288,
-224, 128, 96 righe per $k = 3, 6, 8, 20, 32$): $g$ non decide la dimensione del
-tile, che discende dal budget di shared memory, ma solo come essa viene
-arrotondata. È il motivo per cui l'effetto è grande nei casi patologici e
-trascurabile altrove, e il motivo per cui va scelto con il criterio del caso
-peggiore e non della media.
+\[
+M=N=\num{16384}.
+\]
 
-\textbf{In funzione delle campagne correlate.} Le campagne 1.3 e 1.4 agiscono
-sulla stessa risorsa - le righe di $X$ che stanno nel tile - in direzioni
-opposte: il padding ne toglie, la granularità corretta evita di sprecarle. La
-configurazione finale $(\code{BLOCK}, \code{SMEM\_PAD}, g) = (256, 1, 32)$
-perde l'$1{,}5\%$ nel caso peggiore, contro il $38{,}8\%$ della peggiore
-combinazione misurata: il tuning di questo kernel vale, da solo, più di quanto
-valga la differenza fra i kernel nel confronto conclusivo della fase.
-
-\subsection{Esito della Fase 1 - Confronto fra i backend configurati}
-\label{sec:ris-confronto-kernel}
-
-Le configurazioni confrontate sono \kernelname{cuda\_naive} con
-\code{BLOCK}$=128$, \kernelname{cuda\_warp} con \code{BLOCK}$=128$ e $X$
-column-major,
-\kernelname{cuda\_warp\_smem} con \code{BLOCK}$=256$, \code{SMEM\_PAD}$=1$,
-$g=32$, e \kernelname{cublas} come riferimento esterno.
+Questo caso permette di confrontare direttamente i quattro backend nella
+configurazione finale selezionata dalla Fase~1.
 
 \begin{table}[H]
 \centering
 \footnotesize
-\caption{Confronto conclusivo della Fase 1: \code{gflops\_kernel} e tempo di
-kernel, $M=N=\num{16384}$, FP64, $P=1$. L'ultima riga è la percentuale del
-tetto FP64 nominale raggiunta dal miglior kernel.}
+\caption{Confronto fra i backend configurati sul problema di riferimento,
+$M=N=\num{16384}$, FP64, $P=1$. L'ultima riga riporta la percentuale del
+tetto FP64 nominale raggiunta da \kernelname{cuda\_warp}.}
 \label{tab:ris-confronto-kernel}
 \begin{tabular}{@{}lrrrrr@{}}
 \toprule
@@ -458,85 +590,107 @@ dispersione.
 \addlegendentry{\kernelname{cublas}}
 \end{axis}
 \end{tikzpicture}
-\caption{Confronto conclusivo della Fase 1 fra backend in doppia precisione. La
-distanza dal tetto, non il valore assoluto, è il risultato.}
+\caption{Confronto fra i backend configurati sul problema di riferimento in
+doppia precisione. La linea tratteggiata rappresenta il tetto FP64 nominale
+utilizzato nel modello roofline.}
 \label{fig:ris-confronto-kernel}
 \end{figure}
 
 \subsubsection*{Lettura}
 
-\textbf{Il modello prestazionale è confermato.} Il roofline adottato prevedeva
-che in FP64 il nucleo fosse memory-bound solo
-a $k = 3$ e compute-bound per ogni $k \ge 6$, con un tetto costante a
-\SI{350}{\giga\flop\per\second}. Misurato: \kernelname{cuda\_warp} sta
-all'$86{,}3\%$ del tetto a $k = 3$ e fra il $101{,}8\%$ e il $102{,}4\%$ per
-tutti i $k \ge 6$. La curva si appiattisce esattamente dove il modello diceva e
-al valore che il modello diceva. Il superamento del $100\%$ non è un errore di
-misura: il tetto usato nel modello è calcolato sul clock boost nominale,
-e uno scarto del $2\%$ è nell'ordine dello scostamento fra clock nominale e
-clock sostenuto.
+\textbf{Il comportamento di \kernelname{cuda\_warp} è coerente con il modello
+roofline.}
 
-\textbf{Il guadagno di \kernelname{cuda\_warp} su \kernelname{cuda\_naive}
-scompare al crescere di $k$, ed è la cosa giusta da aspettarsi.} Lo speedup
-vale $2{,}01\times$ a $k = 3$, $1{,}16\times$ a $k = 6$ e poi resta fra
-$1{,}01\times$ e $1{,}03\times$
-per $k \ge 8$. A prima vista è deludente, letto attraverso il roofline è
-inevitabile. Il riuso di $A$ in registro alza l'intensità aritmetica, e alzare
-l'intensità aritmetica serve \emph{soltanto} finché si è a sinistra del
-ginocchio. Da $k = 6$ in poi entrambi i kernel sono compute-bound e nessuno dei
-due può superare lo stesso tetto: quello che \kernelname{cuda\_warp} guadagna
-non ha più dove andare. Il vero risultato è che \kernelname{cuda\_naive} non
-arriva al tetto a $k = 3$ ($43{,}0\%$) mentre \kernelname{cuda\_warp} ci si
-avvicina, cioè che la differenza si manifesta tutta e sola nel regime dove il
-modello dice che può manifestarsi.
+Per $k=3$ il kernel raggiunge $302{,}1$ GFLOPS, pari all'$86{,}3\%$ del tetto
+FP64 nominale adottato nel modello. A partire da $k=6$ la prestazione si
+stabilizza invece in un intervallo molto stretto, fra $356$ e $358$ GFLOPS,
+senza crescere ulteriormente all'aumentare di $k$.
 
-\textbf{La shared memory non guadagna nulla in doppia precisione, come
-previsto.} \kernelname{cuda\_warp\_smem} resta fra il $96\%$ e il $99\%$ di
-\kernelname{cuda\_warp} su tutto l'intervallo, con l'unico scarto apprezzabile
-a $k = 32$ ($-4{,}1\%$). È una previsione negativa confermata, e vale come
-risultato: il traffico su $X$ che il tile riduce non è il collo di bottiglia
-quando il collo di bottiglia è il calcolo. Il kernel non è però inutile - è
-scritto per un regime che in FP64 non si presenta mai, e la
-\cref{sec:ris-fase3} lo misura nel regime in cui quel regime esiste.
+L'andamento è quindi quello atteso nel passaggio da un regime nel quale il
+traffico di memoria limita ancora la prestazione a uno nel quale il throughput
+aritmetico della GPU diventa il vincolo dominante. Il valore misurato supera
+di circa il $2\%$ il tetto nominale di $350$ GFLOPS utilizzato nel modello.
+Questo scostamento non modifica la lettura del regime, ma mostra che il tetto
+roofline deve essere interpretato come una stima del limite sostenibile e non
+come una soglia sperimentale esatta. Senza una misura diretta delle frequenze
+e degli altri parametri hardware durante l'esecuzione non è possibile
+attribuire con maggiore precisione la differenza.
 
-\textbf{cuBLAS è il risultato più istruttivo della campagna.} Non tanto perché
-perda - da $19{,}6\times$ a $k = 3$ a $2{,}2\times$ a $k = 32$ - quanto per
-\emph{come} perde: il suo tempo di kernel è costante,
-\SIrange{104.2}{104.6}{\milli\second}, su tutti e cinque i valori di $k$. Un
-tempo che non dipende da $k$ significa che il costo non è determinato dal
-lavoro richiesto ($2MNk$ operazioni) ma dal percorso attraversato, cioè dallo
-streaming di $A$ con una geometria di tile dimensionata per matrici quadrate
-grandi. Con $k \le 32$ il multivettore riempie una frazione minima della
-mattonella, e il resto del lavoro pianificato viene speso su padding. Ne segue
-anche la previsione, verificabile, che i GFLOPS di cuBLAS crescano
-\emph{linearmente} con $k$ finché $k$ resta sotto la dimensione della
-mattonella: e infatti $15{,}4 \to 30{,}9 \to 41{,}1 \to 102{,}8 \to 164{,}3$
-sta su una retta entro l'$1\%$. È la risposta quantitativa alla domanda
-``perché non avete chiamato una libreria''.
+\textbf{Il vantaggio della mappatura warp-per-row è massimo ai piccoli $k$ e
+si riduce quando entrambi i kernel si avvicinano al limite di calcolo.}
+Rispetto a \kernelname{cuda\_naive}, \kernelname{cuda\_warp} ottiene uno
+speedup di circa $2{,}01\times$ a $k=3$ e $1{,}16\times$ a $k=6$. Per
+$k\ge8$ il rapporto si riduce invece a circa $1{,}01$-$1{,}03\times$.
 
-\textbf{Configurazioni consolidate.} La \cref{tab:ris-fase1-sintesi} raccoglie
-quanto la fase 1 lascia in eredità alle fasi successive.
+Il risultato è coerente con le differenze strutturali fra i due kernel.
+\kernelname{cuda\_warp} assegna una riga di $Y$ a un warp, percorre
+cooperativamente la dimensione $j$ e riutilizza esplicitamente ciascun valore
+di $A$ per aggiornare i $k$ accumulatori della lane. Il kernel naive assegna
+invece un thread a ciascun elemento di $Y$ e non realizza lo stesso riuso
+esplicito all'interno del thread.
 
-\begin{table}[H]
-\centering
-\footnotesize
-\caption{Configurazione selezionata per ciascun backend CUDA, usata invariata
-nelle fasi 2, 3 e 4.}
-\label{tab:ris-fase1-sintesi}
-\begin{tabular}{@{}llll@{}}
-\toprule
-\textbf{Backend} & \textbf{\code{BLOCK}} & \textbf{Layout di $X$} & \textbf{Altro} \\
-\midrule
-\kernelname{cuda\_naive}      & 128 & row & - \\
-\kernelname{cuda\_warp}       & 128 & column & - \\
-\kernelname{cuda\_warp\_smem} & 256 & row & \code{SMEM\_PAD}=1, $g$=32 \\
-\kernelname{cublas}           & - & row & riferimento esterno \\
-\bottomrule
-\end{tabular}
-\end{table}
+Queste differenze hanno un effetto marcato quando il kernel si trova ancora
+lontano dal tetto di calcolo. Quando $k$ cresce, \kernelname{cuda\_naive}
+raggiunge a sua volta circa $350$ GFLOPS e il margine disponibile per ulteriori
+miglioramenti si riduce. Il risultato importante non è quindi che
+\kernelname{cuda\_warp} continui ad aumentare indefinitamente il throughput,
+ma che raggiunga il plateau prestazionale già per valori più piccoli di $k$.
 
-\section{Fase 2 - Caratterizzazione dimensionale}
-\label{sec:ris-fase2}
+\textbf{Lo staging di $X$ in shared memory non produce un vantaggio in FP64.}
+\kernelname{cuda\_warp\_smem} rimane molto vicino a
+\kernelname{cuda\_warp} su tutto l'intervallo, ma non lo supera in nessuno dei
+cinque casi. La differenza è inferiore al $2\%$ per $k\le20$ e raggiunge circa
+il $4{,}1\%$ a $k=32$.
+
+Per $k\ge6$ questo comportamento è coerente con il plateau già osservato:
+ridurre ulteriormente il costo degli accessi a $X$ non può tradursi in un
+aumento equivalente del throughput quando il kernel si trova già vicino al
+limite aritmetico della GPU. Anche a $k=3$, dove il modello colloca ancora il
+problema nel regime limitato dalla memoria, la shared memory non introduce un
+vantaggio misurabile rispetto alla variante column-major di
+\kernelname{cuda\_warp}. In questo caso il miglioramento potenziale del
+percorso di $X$ non compensa i costi aggiuntivi dello staging, delle
+sincronizzazioni e della gestione del tile.
+
+La conclusione della campagna è quindi specifica al regime FP64 considerato:
+la strategia basata sulla shared memory è corretta e, dopo il tuning delle
+Campagne~1.3 e~1.4, molto vicina alla variante column-major, ma non fornisce
+un vantaggio prestazionale sul problema di riferimento.
+
+\textbf{cuBLAS mostra un comportamento qualitativamente diverso dai kernel
+custom.}
+Il tempo di esecuzione rimane quasi costante, fra
+\SI{104.2}{\milli\second} e \SI{104.6}{\milli\second}, mentre $k$ passa da 3 a
+32. Poiché il numero di operazioni utilizzato nel calcolo dei GFLOPS cresce
+linearmente con $k$, un tempo quasi costante produce a sua volta una crescita
+quasi lineare del throughput riportato:
+
+\[
+15{,}4
+\rightarrow
+30{,}9
+\rightarrow
+41{,}1
+\rightarrow
+102{,}8
+\rightarrow
+164{,}3
+\quad\text{GFLOPS}.
+\]
+
+Il dato indica che, nell'intervallo $k\le32$, il tempo della chiamata cuBLAS è
+dominato da una componente che varia poco con la larghezza del multivettore.
+I soli tempi non permettono però di stabilire quale kernel interno sia stato
+selezionato dalla libreria, quale geometria di tiling utilizzi o quanta parte
+del costo sia attribuibile al traffico di $A$. Una conclusione più specifica
+richiederebbe la profilazione della chiamata cuBLAS.
+
+Ciò che la campagna dimostra direttamente è invece sufficiente per il
+confronto: in FP64 e per i multivettori stretti considerati,
+\kernelname{cublas} rimane sensibilmente più lento dei tre kernel
+specializzati. Il divario rispetto a \kernelname{cuda\_warp} passa da circa
+$19{,}6\times$ a $k=3$ a circa $2{,}2\times$ a $k=32$, restringendosi
+progressivamente all'aumentare della larghezza del multivettore.
 
 I nove punti del disegno fattoriale sono quelli di \cref{tab:fase2-punti}: tre
 scale nominali e, per ciascuna, tre forme a prodotto $MN$ costante entro
@@ -635,54 +789,101 @@ al tetto per nessun $k$.}
 
 \subsubsection*{Lettura}
 
-\textbf{La scala conta, la forma quasi no, e il rapporto fra i due effetti è di
-un ordine di grandezza.} Passando da $S = 4096$ a $S = 16384$ a forma fissata,
-\kernelname{cuda\_warp} guadagna il $26\%$ a $k = 32$ ($281{,}5 \to 354{,}9$);
-cambiando forma a scala fissata, lo scarto massimo fra le tre forme è del
-$3{,}7\%$ a $S = 4096$ e dell'$1{,}2\%$ a $S = 16384$. Poiché il disegno tiene
-$MN$ costante entro l'$1{,}2\%$, quest'ultimo numero è al limite di ciò che la
-campagna può risolvere: la conclusione onesta è che \textbf{alla scala massima
-la forma non ha un effetto misurabile}, non che ne abbia uno piccolo.
+\textbf{La sensibilità alla forma diminuisce al crescere della scala.}
 
-\textbf{Il deficit a $S = 4096$ è un problema di parallelismo, non di forma.} A
-$S = 4096$ la curva di \cref{fig:ris-fase2-scala} è piatta ben sotto il tetto e
-non lo raggiunge per nessun $k$: il kernel è compute-bound secondo il roofline,
-ma non ha abbastanza warp residenti per saturare i 48 SM. Con un warp per riga
-di $Y$, il caso quadrato a $S = 4096$ offre 4096 warp contro i 16384 del caso
-massimo. La previsione del roofline - che il tetto di calcolo
-presuppone parallelismo sufficiente - è quindi confermata dal lato in cui
-viene a mancare.
+Nel caso quadrato, \kernelname{cuda\_warp} migliora sensibilmente passando da
+$S=4096$ a $S=16384$. A $k=32$, ad esempio, il throughput cresce da
+$281{,}5$ a $354{,}9$ GFLOPS, con un incremento di circa il $26\%$. Un
+andamento analogo compare per $k=6$ e $k=8$, mentre a $k=3$ la crescita è più
+contenuta.
 
-\textbf{La forma agisce, quando agisce, nella direzione prevista.} L'unico
-punto in cui le tre forme si separano in modo leggibile è $S = 4096$ ai $k$
-piccoli, dove \kernelname{cuda\_warp} passa da $269{,}6$ ($M = N$) a $285{,}7$
-($M = 3N$) a $k = 3$: la matrice alta e stretta triplica le righe di $Y$ e
-quindi i warp disponibili, che è esattamente la risorsa scarsa in quel punto.
-Appena il parallelismo abbonda, il vantaggio svanisce. Va però detto che a
-$S = 4096$ il CV massimo osservato sale al $5{,}8\%$ (\kernelname{cublas}) e al
-$3{,}8\%$ (\kernelname{cuda\_naive}), contro lo $0{,}6\%$ a $S = 16384$: le
-differenze fra forme a piccola scala vanno prese come indicazioni, non come
-misure.
+L'effetto della forma dipende invece fortemente dalla scala. A $S=4096$ le
+tre geometrie producono differenze rilevanti soprattutto per $k=6$ e $k=8$:
+nel primo caso \kernelname{cuda\_warp} passa da $275{,}7$ GFLOPS per $M=N$ a
+$330{,}0$ GFLOPS per $M=3N$, mentre nel secondo passa da $277{,}4$ a
+$330{,}5$ GFLOPS. Lo scarto fra la configurazione migliore e quella peggiore
+è quindi vicino al $20\%$ in entrambi i casi.
 
-\textbf{Il comportamento di cuBLAS chiude il cerchio aperto dalla campagna
-1.5.} Il suo tempo di kernel resta costante in $k$ a \emph{tutte} le scale
-(\SIrange{6.1}{6.3}{\milli\second} a $S = 4096$,
-\SIrange{24.5}{26.2}{\milli\second} a $S = 8192$,
-\SIrange{99.3}{105.3}{\milli\second} a $S = 16384$), e i tre valori stanno fra
-loro come $1 : 4 : 16$, cioè come $MN$. È la prova diretta che il costo di
-cuBLAS su questo problema è determinato dallo streaming di $A$ e non dal lavoro
-$2MNk$: l'ipotesi formulata nel confronto conclusivo della Fase 1 su un singolo punto è qui
-verificata su nove punti indipendenti. Ne segue anche il solo caso in cui
-cuBLAS migliora scendendo di scala ($184{,}3$ a $S = 4096$ contro $163{,}2$ a
-$S = 16384$ per $k = 32$): a matrice più piccola la mattonella sprecata è meno
-sproporzionata.
+A $S=8192$ la stessa differenza si riduce a circa il $3\%$, mentre a
+$S=16384$ rimane inferiore al $2\%$ per tutti i valori di $k$. La campagna
+mostra quindi che la geometria del problema può influire sulle prestazioni
+quando la taglia è piccola, mentre il suo effetto diventa progressivamente
+meno visibile alle scale maggiori.
 
-\textbf{In funzione delle fasi successive.} La fase conferma che le
-configurazioni scelte nella fase 1 su un solo punto restano valide su due
-ordini di grandezza di $MN$ e su tre forme: la gerarchia fra i kernel non si
-inverte mai. È la licenza a condurre le fasi 3 e 4 su un solo problema senza
-dover ogni volta ripetere lo sweep dimensionale.
+\textbf{La scala più piccola non raggiunge il plateau osservato sul problema
+di riferimento.}
 
+Sul caso quadrato con $S=4096$, \kernelname{cuda\_warp} rimane fra circa
+$270$ e $282$ GFLOPS per tutti i valori di $k$, ben al di sotto dei
+$350$ GFLOPS circa raggiunti alle due scale maggiori per $k\ge6$.
+
+Il dato mostra che, per questa dimensione, il kernel non riesce ancora a
+sostenere il throughput osservato sul problema più grande. Una taglia minore
+riduce sia la quantità complessiva di lavoro disponibile sia il numero di
+blocchi e warp che attraversano la GPU durante l'intera esecuzione. I soli
+tempi raccolti non permettono però di attribuire il deficit a una singola
+causa, ad esempio occupancy, costi fissi o insufficiente parallelismo
+complessivo.
+
+È quindi più corretto concludere che il tetto aritmetico del roofline
+rappresenta un limite raggiungibile soltanto quando il problema è
+sufficientemente grande da sostenere l'esecuzione della GPU, e non che
+$S=4096$ sia limitato da uno specifico meccanismo già identificato.
+
+\textbf{Alla scala piccola la forma modifica anche la geometria del
+parallelismo disponibile.}
+
+Mantenere $MN$ pressoché costante e cambiare il rapporto $M:N$ non modifica
+soltanto l'aspetto della matrice. Cambiano contemporaneamente il numero di
+righe di $Y$, la lunghezza della riduzione lungo $N$ e le dimensioni dei
+buffer coinvolti.
+
+Questo è particolarmente rilevante per \kernelname{cuda\_warp}, che assegna
+un warp a ciascuna riga di $Y$. Nel caso $M=3N$ della scala $S=4096$ il numero
+di righe è maggiore rispetto al caso quadrato, mentre la dimensione $N$ è più
+corta. Il fatto che questa geometria raggiunga $330$ GFLOPS a $k=6$ e $k=8$,
+contro circa $276$-$277$ GFLOPS del caso quadrato, è coerente con una migliore
+esposizione del parallelismo disponibile.
+
+La campagna non consente tuttavia di separare l'effetto del maggior numero di
+righe da quello della minore lunghezza della riduzione e dagli altri effetti
+della geometria. Il risultato va quindi interpretato come sensibilità alla
+forma del problema, non come misura isolata di uno specifico meccanismo.
+
+\textbf{Il comportamento di cuBLAS rimane qualitativamente stabile sulle tre
+scale.}
+
+Il tempo di kernel varia poco con $k$ a ciascuna dimensione:
+\SIrange{6.1}{6.3}{\milli\second} a $S=4096$,
+\SIrange{24.5}{26.2}{\milli\second} a $S=8192$ e
+\SIrange{99.3}{105.3}{\milli\second} a $S=16384$.
+
+Passando da una scala alla successiva, il tempo cresce inoltre
+approssimativamente di un fattore quattro, coerentemente con la crescita di
+$MN$. I dati indicano quindi che, nell'intervallo $k\le32$, il costo della
+chiamata cuBLAS dipende molto più dalla dimensione della matrice che dalla
+larghezza del multivettore.
+
+Questa osservazione estende alle tre scale il comportamento già rilevato sul
+problema di riferimento. Non permette però di stabilire quale parte del costo
+sia dovuta al traffico di $A$, né quale kernel interno o strategia di tiling
+sia stata scelta dalla libreria. Per attribuire il comportamento a questi
+meccanismi sarebbe necessaria una profilazione specifica.
+
+\textbf{La scala massima fornisce il regime di riferimento per le fasi
+successive.}
+
+A $S=16384$ le prestazioni dei kernel custom sono ormai poco sensibili alla
+forma e, per \kernelname{cuda\_warp}, il throughput raggiunge il plateau
+osservato nel confronto sul problema di riferimento. Alle scale inferiori,
+invece, sia la dimensione sia la geometria possono ancora modificare in modo
+apprezzabile il comportamento.
+
+Per questo motivo le Fasi~3 e~4 mantengono
+$M=N=\num{16384}$ come problema di riferimento. La scelta non presuppone che
+le configurazioni della Fase~1 siano ottimali per ogni possibile dimensione,
+ma utilizza una taglia nella quale gli effetti specifici dei problemi piccoli
+sono ormai ridotti e il comportamento dei backend risulta più stabile.
 \section{Fase 3 - Effetto della precisione numerica}
 \label{sec:ris-fase3}
 \label{sec:c7}
